@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Tabel Users (Mahasiswa)
+model User {
+  id            Int       @id @default(autoincrement())
+  nim           String    @unique @db.VarChar(45)
+  fullName      String    @db.VarChar(100)
+  email         String    @unique @db.VarChar(255)
+  passwordHash  String    @db.VarChar(255)
+  createdAt     DateTime  @default(now())
+  
+  conversations Conversation[]
+  
+  @@map("users")
+}
+
+// Tabel Chat Conversations
+model Conversation {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  title     String    @db.VarChar(200)
+  createdAt DateTime  @default(now())
+  
+  user      User      @relation(fields: [userId], references: [id])
+  messages  Message[]
+  
+  @@map("chat_conversations")
+}
+
+// Tabel Chat Messages
+model Message {
+  id             Int          @id @default(autoincrement())
+  conversationId Int
+  role           String       @db.VarChar(10) // 'user' atau 'bot'
+  content        String       @db.Text
+  createdAt      DateTime     @default(now())
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  
+  @@map("chat_messages")
+}
