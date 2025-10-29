@@ -7,25 +7,19 @@ Chatbot ini menggunakan teknologi AI dan Natural Language Processing (NLP) untuk
 🎯 Tujuan Proyek
 
 Memberikan layanan asisten virtual yang dapat menjawab pertanyaan umum mahasiswa, dosen, maupun calon mahasiswa.
-
 Mempermudah akses informasi seperti jadwal, program studi, dan kegiatan kampus.
-
 Mengintegrasikan teknologi chatbot modern dengan antarmuka yang ramah pengguna (UI/UX).
 
 ⚙️ Fitur Utama
 
 💬 Chat dengan AI — interaksi dua arah antara pengguna dan chatbot.
-
 🧾 Riwayat Percakapan (Chat History) — menyimpan percakapan pengguna sebelumnya.
-
 👤 Autentikasi Pengguna — identifikasi mahasiswa berdasarkan NIM.
-
 📄 Respon berbasis dokumen PDF — chatbot dapat memberikan file pendukung atau referensi.
-
 🎨 UI/UX Modern — antarmuka berbasis ReactJS dengan tampilan clean dan responsif.
 
 🧰 Teknologi yang Digunakan
-Bagian	Teknologi
+
 Frontend	React.js, Tailwind CSS
 Backend	Node.js, Express.js
 Database	MySQL
