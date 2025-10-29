@@ -1,8 +1,13 @@
 import React from 'react';
 
+// Component untuk membuat teks memiliki warna gradien
 const GradientText = ({ children, className = '' }) => {
   return (
-    <span className={`bg-gradient-to-r from-primary-500 via-red-400 to-secondary-500 text-transparent bg-clip-text font-bold ${className}`}>
+    <span 
+      className={`bg-clip-text text-transparent bg-gradient-to-r from-orange-500 to-purple-600 ${className}`}
+      // Properti style untuk memastikan gradien bekerja pada teks
+      style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
+    >
       {children}
     </span>
   );
