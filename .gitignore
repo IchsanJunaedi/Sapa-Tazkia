@@ -1,12 +1,1 @@
-# Ignore semua node_modules di semua subfolder
 **/node_modules/
-
-# File environment (kalau ada)
-.env
-**/.env
-
-# VSCode config
-.vscode/
-
-# Log files
-*.log
