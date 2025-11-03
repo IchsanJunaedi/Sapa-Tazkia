@@ -38,11 +38,13 @@ model Conversation {
 model Message {
   id             Int          @id @default(autoincrement())
   conversationId Int
-  role           String       @db.VarChar(10) // 'user' atau 'bot'
+  role           String       @db.VarChar(10)
   content        String       @db.Text
+  responseTime   Float?       // NEW: Response time in seconds
   createdAt      DateTime     @default(now())
   
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   
   @@map("chat_messages")
 }
+

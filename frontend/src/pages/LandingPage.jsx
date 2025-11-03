@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, Plus, MessageSquare, PenSquare, User, Settings, X, Mail } from 'lucide-react';
+// --- PERUBAHAN: Menambahkan Instagram, Globe, dan Youtube ---
+import { Send, Plus, MessageSquare, PenSquare, User, Settings, X, Mail, Instagram, Globe, Youtube } from 'lucide-react';
 
 // --- 1. Komponen GradientText Diintegrasikan ---
 const GradientText = ({ children, className = '' }) => {
@@ -50,68 +51,146 @@ const Button = ({ children, onClick, className, variant = 'default', size = 'md'
 
 
 // --- 3. Komponen Sidebar Diintegrasikan ---
-// Sidebar kini menerima prop untuk memicu modal login
-const Sidebar = ({ onClickLogin }) => {  
+// --- PERBAIKAN: Sidebar kini menerima prop isSidebarOpen dan onToggleSidebar ---
+const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar }) => { 
+  
+  // Komponen Ikon Toggle kustom menggunakan SVG yang Anda berikan
+  const ToggleIcon = ({ open }) => (
+      <img 
+          src="https://www.svgrepo.com/show/493722/sidebar-toggle-nav-side-aside.svg" 
+          alt="Toggle Sidebar" 
+          className={`w-6 h-6 text-gray-700 transition-transform duration-300 ${open ? '' : 'transform rotate-180'}`}
+      />
+  );
+  
   return (
-    <div className="w-20 bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl">
+    // --- PERBAIKAN: Lebar dinamis (w-20 atau w-64) dengan transisi ---
+    <div className={` ${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative`}>
       
-      {/* Tombol Pengaturan (Settings) - Paling Atas */}
-      <div className="flex justify-center mb-8">
-        <button className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors">
-          <Settings size={24} />
-        </button>
-      </div>
+      {/* --- PERBAIKAN: Layout Tombol Toggle dan Settings disesuaikan --- */}
+      {isSidebarOpen ? (
+        // --- TAMPILAN TERBUKA: Settings dan Toggle sejajar (HANYA IKON) ---
+        <div className="flex justify-between items-center mb-8">
+            {/* Tombol Pengaturan (Settings) - HANYA IKON */}
+            <button className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3" title="Settings">
+                <Settings size={24} />
+                {/* Teks "Pengaturan" dihapus sesuai permintaan */}
+            </button>
+            {/* Tombol Toggle Sidebar */}
+            <button 
+                onClick={onToggleSidebar} 
+                className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors" 
+                title="Tutup Sidebar"
+            >
+                <ToggleIcon open={true} />
+            </button>
+        </div>
+      ) : (
+        // --- TAMPILAN TERTUTUP: HANYA TOMBOL TOGGLE ---
+        <>
+            {/* Tombol Toggle Sidebar */}
+            <div className="flex justify-center mb-8">
+                <button 
+                    onClick={onToggleSidebar} 
+                    className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors" 
+                    title="Buka Sidebar"
+                >
+                    <ToggleIcon open={false} />
+                </button>
+            </div>
+            {/* Tombol Pengaturan (Settings) DIHAPUS saat tertutup */}
+        </>
+      )}
 
       {/* Tombol Login Mahasiswa - Dipicu oleh onClickLogin */}
+      {/* --- PERBAIKAN: Layout dinamis (w-full/w-12, h-12, justify) --- */}
       <div className="flex justify-center mb-10">
         <button 
-          className="w-12 h-12 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all flex items-center justify-center group relative"
+          className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all flex items-center group relative gap-3`}
           title="Login Mahasiswa"
           onClick={onClickLogin} // Memicu modal saat diklik
         >
           <User size={20} />
-          {/* Tooltip untuk desktop */}
-          <span className="absolute left-full ml-3 px-3 py-1 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap hidden sm:block">
-            Login Mahasiswa
+          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
+              Login Mahasiswa
           </span>
         </button>
       </div>
 
       {/* Tombol New Chat */}
-      <div className="flex justify-center space-y-3">
+      {/* --- PERBAIKAN: Layout dinamis --- */}
+      <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
         <button 
-          className="w-12 h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center justify-center group relative"
+          className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
           title="New Chat"
         >
           <PenSquare size={20} />
-           <span className="absolute left-full ml-3 px-3 py-1 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap hidden sm:block">
-            New
+          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
+              New Chat
           </span>
         </button>
       </div>
       
       {/* Tombol Chats History */}
-      <div className="flex justify-center">
+      {/* --- PERBAIKAN: Layout dinamis --- */}
+      <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
         <button 
-          className="w-12 h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center justify-center group relative"
+          className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
           title="Chats"
         >
           <MessageSquare size={20} />
-          <span className="absolute left-full ml-3 px-3 py-1 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap hidden sm:block">
-            Chats
+          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
+              Riwayat Chat
           </span>
         </button>
       </div>
 
-      {/* Footer Dots */}
-      <div className="mt-auto flex justify-center flex-col items-center">
-        {/* Konten Follow Us asli, dimodifikasi menjadi dots */}
-        <div className="flex space-x-2">
-            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-            <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
-            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-        </div>
+      {/* --- PERUBAHAN: Footer Dots (Sidebar) diganti Social Links --- */}
+      {/* --- PERBAIKAN: Layout dinamis (flex-row/flex-col, items-start/items-center) --- */}
+      <div className={`mt-auto flex ${isSidebarOpen ? 'flex-col items-start gap-2' : 'flex-row items-center justify-center space-x-2'} pb-4`}>
+        {/* Instagram */}
+        <a 
+          href="https://www.instagram.com/stmiktazkia_official/" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          title="Instagram"
+          className="text-gray-500 hover:text-pink-500 transition-colors flex items-center gap-3"
+        >
+          <Instagram size={16} />
+          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>
+              Instagram
+          </span>
+        </a>
+        
+        {/* Website */}
+        <a 
+          href="https://stmik.tazkia.ac.id/" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          title="Website"
+          className="text-gray-500 hover:text-blue-500 transition-colors flex items-center gap-3"
+        >
+          <Globe size={16} />
+          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>
+              Website
+          </span>
+        </a>
+        
+        {/* YouTube */}
+        <a 
+          href="https://www.youtube.com/@stmiktazkia" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          title="YouTube"
+          className="text-gray-500 hover:text-red-500 transition-colors flex items-center gap-3"
+        >
+          <Youtube size={16} />
+          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>
+              YouTube
+          </span>
+        </a>
       </div>
+      {/* --- AKHIR PERUBAHAN --- */}
     </div>
   );
 };
@@ -323,6 +402,9 @@ const LandingPage = () => {
   // State untuk mengontrol pembukaan modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [initialModalStep, setInitialModalStep] = useState(0); // 0: Login, 1: Signup
+  
+  // --- PERBAIKAN: State untuk mengontrol sidebar ---
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mulai dalam keadaan tertutup (ikonik)
 
   const openModal = (step) => {
     setInitialModalStep(step);
@@ -330,11 +412,21 @@ const LandingPage = () => {
   };
   const closeModal = () => setIsModalOpen(false);
 
+  // --- PERBAIKAN: Fungsi untuk toggle sidebar ---
+  const handleToggleSidebar = () => {
+      setIsSidebarOpen(prev => !prev);
+  };
+
   return (
     <div className="min-h-screen flex bg-[#fbf9f6] font-sans"> 
       
       {/* 1. Sidebar Kiri (Lebar 20) */}
-      <Sidebar onClickLogin={() => openModal(0)} /> 
+      {/* --- PERBAIKAN: Kirim prop state sidebar --- */}
+      <Sidebar 
+        onClickLogin={() => openModal(0)} 
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
+      /> 
 
       {/* 2. Main Content Area */}
       <div className="flex-1 flex flex-col">
@@ -401,14 +493,43 @@ const LandingPage = () => {
           </div>
         </div>
 
-        {/* Footer Dots */}
-        <div className="flex justify-center p-4">
-            <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-            </div>
+        {/* --- PERUBAHAN: Footer Dots diganti Social Links --- */}
+        <div className="flex justify-center p-6 space-x-6">
+            {/* Instagram */}
+            <a 
+              href="https://www.instagram.com/stmiktazkia_official/" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              title="Instagram"
+              className="text-gray-500 hover:text-pink-500 transition-colors"
+            >
+              <Instagram size={14} />
+            </a>
+            
+            {/* Website */}
+            <a 
+              href="https://stmik.tazkia.ac.id/" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              title="Website"
+              className="text-gray-500 hover:text-blue-500 transition-colors"
+            >
+              <Globe size={14} />
+            </a>
+            
+            {/* YouTube */}
+            <a 
+              href="https://www.youtube.com/@stmiktazkia" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              title="YouTube"
+              className="text-gray-500 hover:text-red-500 transition-colors"
+            >
+              <Youtube size={14} />
+            </a>
         </div>
+        {/* --- AKHIR PERUBAHAN --- */}
+
       </div>
 
       {/* MODAL OTENTIKASI - Tampil di atas Landing Page */}
@@ -418,3 +539,4 @@ const LandingPage = () => {
 };
 
 export default LandingPage;
+
