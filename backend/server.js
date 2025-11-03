@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
-const { generateAIResponse, requiresAuthentication, detectIntent } = require('./src/services/aiService');
+const { generateGeminiResponse, testGeminiConnection } = require('./src/services/geminiService'); // GANTI INI
 require('dotenv').config();
 
 const app = express();
@@ -12,10 +12,9 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Rate limiting map (simple in-memory, untuk production gunakan Redis)
+// Rate limiting map
 const rateLimitMap = new Map();
 
-// Rate limiting middleware (50 requests per day per user)
 function rateLimiter(req, res, next) {
   const userId = req.body.userId || 'anonymous';
   const today = new Date().toDateString();
@@ -34,18 +33,72 @@ function rateLimiter(req, res, next) {
   next();
 }
 
+// Detect intent (helper function)
+function detectIntent(message) {
+  const lowerMessage = message.toLowerCase();
+
+  if (lowerMessage.includes('pendaftaran') || lowerMessage.includes('daftar')) {
+    return 'pendaftaran';
+  } else if (lowerMessage.includes('program studi') || lowerMessage.includes('prodi') || lowerMessage.includes('jurusan')) {
+    return 'program_studi';
+  } else if (lowerMessage.includes('biaya') || lowerMessage.includes('uang kuliah') || lowerMessage.includes('spp')) {
+    return 'biaya';
+  } else if (lowerMessage.includes('lokasi') || lowerMessage.includes('alamat') || lowerMessage.includes('dimana')) {
+    return 'lokasi';
+  } else if (lowerMessage.includes('fasilitas') || lowerMessage.includes('lab') || lowerMessage.includes('perpustakaan')) {
+    return 'fasilitas';
+  } else if (lowerMessage.includes('beasiswa')) {
+    return 'beasiswa';
+  } else if (lowerMessage.includes('nilai') || lowerMessage.includes('ipk') || lowerMessage.includes('transkrip')) {
+    return 'akademik_personal';
+  } else {
+    return 'general';
+  }
+}
+
+function requiresAuthentication(message) {
+  const authKeywords = [
+    'nilai', 'ipk', 'transkrip', 'akademik saya', 'data saya', 
+    'jadwal saya', 'krs', 'beasiswa saya', 'tagihan', 'pembayaran saya'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  return authKeywords.some(keyword => lowerMessage.includes(keyword));
+}
+
 // Health check
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Sapa Tazkia Backend API',
     version: '2.0.0',
     status: 'running',
-    ai: 'OpenAI GPT-4o-mini',
+    ai: 'Google Gemini 2.5 Flash',
     features: ['AI Chat', 'RAG Ready', 'Authentication Ready']
   });
 });
 
-// Chat endpoint dengan AI Integration
+// Test Gemini Connection
+app.get('/api/test-gemini', async (req, res) => {
+  try {
+    const result = await testGeminiConnection();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test AI endpoint
+app.post('/api/test-ai', async (req, res) => {
+  try {
+    const { message } = req.body;
+    const response = await generateGeminiResponse(message, []); // GANTI FUNGSI
+    res.json({ response });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Chat endpoint dengan Gemini
 app.post('/api/chat', rateLimiter, async (req, res) => {
   const startTime = Date.now();
   
@@ -65,11 +118,9 @@ app.post('/api/chat', rateLimiter, async (req, res) => {
     const intent = detectIntent(message);
     console.log(`📊 Intent detected: ${intent}`);
     
-    // Check if requires authentication
+    // Check authentication
     if (requiresAuthentication(message)) {
-      // TODO: Implement real authentication check
-      // For now, simulate
-      const isAuthenticated = userId !== 1; // 1 = guest user
+      const isAuthenticated = userId !== 1;
       
       if (!isAuthenticated) {
         return res.json({
@@ -83,7 +134,6 @@ app.post('/api/chat', rateLimiter, async (req, res) => {
     
     let conversation;
     
-    // Gunakan conversation yang ada atau buat baru
     if (conversationId) {
       conversation = await prisma.conversation.findUnique({
         where: { id: parseInt(conversationId) }
@@ -91,7 +141,6 @@ app.post('/api/chat', rateLimiter, async (req, res) => {
     }
     
     if (!conversation) {
-      // Buat conversation baru dengan title smart
       const title = message.substring(0, 50) + (message.length > 50 ? '...' : '');
       conversation = await prisma.conversation.create({
         data: {
@@ -110,18 +159,17 @@ app.post('/api/chat', rateLimiter, async (req, res) => {
       }
     });
     
-    // Get conversation history untuk context
+    // Get conversation history
     const history = await prisma.message.findMany({
       where: { conversationId: conversation.id },
       orderBy: { createdAt: 'asc' },
-      take: 10 // Ambil 10 pesan terakhir
+      take: 10
     });
     
-    // Generate AI response
-    console.log('🤖 Generating AI response...');
-    const aiReply = await generateAIResponse(message, history);
+    // Generate AI response dengan GEMINI
+    console.log('🤖 Generating Gemini response...');
+    const aiReply = await generateGeminiResponse(message, history); // GANTI FUNGSI
     
-    // Calculate response time
     const responseTime = (Date.now() - startTime) / 1000;
     
     // Simpan pesan bot
@@ -134,7 +182,6 @@ app.post('/api/chat', rateLimiter, async (req, res) => {
       }
     });
     
-    // Check if response contains academic data
     const hasPDF = aiReply.toLowerCase().includes('pdf') || 
                    aiReply.toLowerCase().includes('transkrip') ||
                    intent === 'akademik_personal';
@@ -159,7 +206,7 @@ app.post('/api/chat', rateLimiter, async (req, res) => {
   }
 });
 
-// Get chat history by conversation ID
+// Other endpoints (history, conversations, delete) - TETAP SAMA seperti sebelumnya
 app.get('/api/chat/history/:conversationId', async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -189,7 +236,6 @@ app.get('/api/chat/history/:conversationId', async (req, res) => {
   }
 });
 
-// Get all conversations by user
 app.get('/api/chat/conversations/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -222,7 +268,6 @@ app.get('/api/chat/conversations/:userId', async (req, res) => {
   }
 });
 
-// Delete conversation
 app.delete('/api/chat/conversation/:conversationId', async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -248,17 +293,6 @@ app.delete('/api/chat/conversation/:conversationId', async (req, res) => {
   }
 });
 
-// Test AI endpoint (untuk development)
-app.post('/api/test-ai', async (req, res) => {
-  try {
-    const { message } = req.body;
-    const response = await generateAIResponse(message);
-    res.json({ response });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Graceful shutdown
 process.on('SIGINT', async () => {
   await prisma.$disconnect();
@@ -272,7 +306,7 @@ app.listen(PORT, () => {
   ║   🚀 Sapa Tazkia Backend Server v2.0      ║
   ║   📡 Port: ${PORT}                           ║
   ║   🌐 URL: http://localhost:${PORT}          ║
-  ║   🤖 AI: OpenAI GPT-4o-mini               ║
+  ║   🤖 AI: Google Gemini 2.5 Flash          ║
   ║   📊 Database: Connected                   ║
   ║   ✅ Status: Ready                         ║
   ╚════════════════════════════════════════════╝
