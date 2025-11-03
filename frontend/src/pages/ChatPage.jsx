@@ -1,18 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-// import axios from 'axios'; // <-- DIHAPUS: Tidak terpakai
-// --- PERUBAHAN: Menghapus LogOut yang tidak terpakai ---
+import axios from 'axios'; // <-- Ini penting
 import { Send, Plus, MessageSquare, PenSquare, User, Settings, Instagram, Globe, Youtube } from 'lucide-react';
 
-// --- 1. Komponen Pembantu (Button) Dihapus ---
-// Seluruh komponen 'Button' dihapus karena tidak terpakai (no-unused-vars)
-
-
-// --- 2. Komponen Sidebar Diintegrasikan ---
-// --- PERBAIKAN: Menambahkan prop isSidebarOpen dan onToggleSidebar ---
+// --- Komponen Sidebar ---
 const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChatId, navigate, isSidebarOpen, onToggleSidebar }) => {
     
-    // Komponen Ikon Toggle kustom menggunakan SVG yang Anda berikan
     const ToggleIcon = ({ open }) => (
         <img 
             src="https://www.svgrepo.com/show/493722/sidebar-toggle-nav-side-aside.svg" 
@@ -22,18 +15,14 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
     );
 
     return (
-        // --- PERBAIKAN: Lebar dinamis (w-20 atau w-64) dengan transisi ---
         <div className={` ${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative`}>
             
-            {/* --- PERBAIKAN: LOGIKA HEADER SIDEBAR DISAMAKAN DENGAN LANDING PAGE --- */}
+            {/* Header Sidebar */}
             {isSidebarOpen ? (
-                // --- TAMPILAN TERBUKA: Settings dan Toggle sejajar (HANYA IKON) ---
                 <div className="flex justify-between items-center mb-8">
-                    {/* Tombol Pengaturan (Settings) - HANYA IKON */}
                     <button className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3" title="Settings">
                         <Settings size={24} />
                     </button>
-                    {/* Tombol Toggle Sidebar */}
                     <button 
                         onClick={onToggleSidebar} 
                         className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors" 
@@ -43,26 +32,18 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
                     </button>
                 </div>
             ) : (
-                // --- TAMPILAN TERTUTUP: HANYA TOMBOL TOGGLE ---
-                <>
-                    {/* Tombol Toggle Sidebar */}
-                    <div className="flex justify-center mb-8">
-                        <button 
-                            onClick={onToggleSidebar} 
-                            className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors" 
-                            title="Buka Sidebar"
-                        >
-                            <ToggleIcon open={false} />
-                        </button>
-                    </div>
-                    {/* Tombol Pengaturan (Settings) DIHAPUS saat tertutup */}
-                </>
+                <div className="flex justify-center mb-8">
+                    <button 
+                        onClick={onToggleSidebar} 
+                        className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors" 
+                        title="Buka Sidebar"
+                    >
+                        <ToggleIcon open={false} />
+                    </button>
+                </div>
             )}
-            {/* --- AKHIR PERBAIKAN LOGIKA HEADER --- */}
 
-
-            {/* Tombol User Profile/Logout */}
-            {/* --- PERBAIKAN: Layout dinamis (w-full/w-12, h-12, justify) --- */}
+            {/* Tombol User Profile */}
             <div className="flex justify-center mb-10">
                 <button 
                     className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all flex items-center group relative gap-3`}
@@ -77,12 +58,11 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
             </div>
 
             {/* Tombol New Chat */}
-            {/* --- PERBAIKAN: Layout dinamis --- */}
             <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
                 <button 
                     className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
                     title="New Chat"
-                    onClick={onNewChat} // <-- Memicu reset chat state
+                    onClick={onNewChat}
                 >
                     <PenSquare size={20} />
                     <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
@@ -91,8 +71,7 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
                 </button>
             </div>
             
-            {/* Tombol Chats History */}
-            {/* --- PERBAIKAN: Layout dinamis --- */}
+            {/* Tombol Riwayat Chat (Contoh sederhana) */}
             <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
                 <button 
                     className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
@@ -106,67 +85,42 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
                 </button>
             </div>
 
-            {/* Area Riwayat Chat (dibiarkan kosong untuk layout ikonik) */}
-            <div className="flex-1 overflow-y-auto">
-                {/* Biasanya riwayat chat diletakkan di sini jika sidebar lebih lebar */}
+            {/* Area Riwayat Chat */}
+            <div className="flex-1 overflow-y-auto mt-4 space-y-2">
+                {isSidebarOpen && chatHistory.map(chat => (
+                    <button 
+                      key={chat.id} 
+                      onClick={() => onSelectChat(chat.id)}
+                      className={`w-full text-left p-2 rounded-lg truncate text-sm ${currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'}`}
+                      title={chat.title}
+                    >
+                      {chat.title}
+                    </button>
+                ))}
             </div>
 
-            {/* --- PERUBAHAN: Footer Dots (Sidebar) diganti Social Links --- */}
-            {/* --- PERBAIKAN: Layout dinamis (flex-row/flex-col, items-start/items-center) --- */}
+            {/* Social Links */}
             <div className={`mt-auto flex ${isSidebarOpen ? 'flex-col items-start gap-2' : 'flex-row items-center justify-center space-x-2'} pb-4`}>
-                {/* Instagram */}
-                <a 
-                  href="https://www.instagram.com/stmiktazkia_official/" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  title="Instagram"
-                  className="text-gray-500 hover:text-pink-500 transition-colors flex items-center gap-3"
-                >
+                <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors flex items-center gap-3">
                     <Instagram size={16} />
-                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>
-                        Instagram
-                    </span>
+                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>Instagram</span>
                 </a>
-                
-                {/* Website */}
-                <a 
-                  href="https://stmik.tazkia.ac.id/" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  title="Website"
-                  className="text-gray-500 hover:text-blue-500 transition-colors flex items-center gap-3"
-                >
+                <a href="https://stmik.tazkia.ac.id/" target="_blank" rel="noopener noreferrer" title="Website" className="text-gray-500 hover:text-blue-500 transition-colors flex items-center gap-3">
                     <Globe size={16} />
-                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>
-                        Website
-                    </span>
+                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>Website</span>
                 </a>
-                
-                {/* YouTube */}
-                <a 
-                  href="https://www.youtube.com/@stmiktazkia" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  title="YouTube"
-                  className="text-gray-500 hover:text-red-500 transition-colors flex items-center gap-3"
-                >
+                <a href="https://www.youtube.com/@stmiktazkia" target="_blank" rel="noopener noreferrer" title="YouTube" className="text-gray-500 hover:text-red-500 transition-colors flex items-center gap-3">
                     <Youtube size={16} />
-                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>
-                        YouTube
-                    </span>
+                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>YouTube</span>
                 </a>
             </div>
-            {/* --- AKHIR PERUBAHAN --- */}
         </div>
     );
 };
 
-// --- 3. Komponen ChatWindow Diintegrasikan ---
+// --- Komponen ChatWindow ---
 const ChatWindow = ({ messages, isLoading }) => {
     
-    // --- PERBAIKAN: ref dan useEffect DIPINDAHKAN ke ChatPage ---
-
-    // Fungsi untuk mensimulasikan ikon Bot
     const BotAvatar = () => (
         <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600"><path d="M12 2a2 2 0 0 0-2 2v.5L8.5 6h7l-1.5-1.5V4a2 2 0 0 0-2-2z"/><path d="M12 22a2 2 0 0 0 2-2v-.5l1.5-1.5h-7l1.5 1.5V20a2 2 0 0 0 2 2z"/><path d="M21 12a2 2 0 0 0-2-2h-3v4h3a2 2 0 0 0 2-2z"/><path d="M3 12a2 2 0 0 1 2-2h3v4H5a2 2 0 0 1-2-2z"/></svg>
@@ -175,7 +129,7 @@ const ChatWindow = ({ messages, isLoading }) => {
     
     const UserAvatar = ({ initial }) => (
         <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-semibold">
-            {initial}
+            {initial ? initial.charAt(0).toUpperCase() : 'U'}
         </div>
     );
 
@@ -192,32 +146,28 @@ const ChatWindow = ({ messages, isLoading }) => {
     }
 
     return (
-        // --- PERBAIKAN: Tambahkan 'flex-1' agar komponen ini mengisi ruang ---
         <div className="flex-1 p-4 md:p-8 space-y-6">
             {messages.map((msg, index) => {
                 const isUser = msg.role === 'user';
-                const avatar = isUser ? <UserAvatar initial={'A'} /> : <BotAvatar />;
+                const avatar = isUser ? <UserAvatar initial={msg.userName || 'U'} /> : <BotAvatar />;
                 
                 return (
                     <div 
                         key={index} 
                         className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
                     >
-                        {/* Avatar dan konten diatur sesuai role */}
-                        <div className={`flex items-start max-w-lg md:max-w-xl ${isUser ? 'flex-row-reverse' : 'flex-row'} space-x-3 space-x-reverse`}>
+                        <div className={`flex items-start max-w-lg md:max-w-xl ${isUser ? 'flex-row-reverse' : 'flex-row'} ${isUser ? 'space-x-reverse' : 'space-x-3'}`}>
                             
-                            {/* Avatar */}
                             {avatar}
                             
-                            {/* Message Bubble */}
                             <div className={`p-3 md:p-4 rounded-xl max-w-full shadow-md text-sm ${
                                 isUser 
-                                ? 'bg-blue-500 text-white rounded-tr-sm' // User: Biru, Sudut kanan atas flat
-                                : 'bg-white text-gray-800 border border-gray-200 rounded-tl-sm' // Bot: Putih/Abu, Sudut kiri atas flat
+                                ? 'bg-blue-500 text-white rounded-tr-sm' 
+                                : 'bg-white text-gray-800 border border-gray-200 rounded-tl-sm'
                             }`}>
                                 <p>{msg.content}</p>
                                 <p className={`mt-1 text-xs ${isUser ? 'text-blue-200' : 'text-gray-500'} text-right`}>
-                                    {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                    {new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                             </div>
                         </div>
@@ -225,14 +175,13 @@ const ChatWindow = ({ messages, isLoading }) => {
                 );
             })}
             
-            {/* Loading Indicator */}
             {isLoading && (
                 <div className="flex justify-start">
-                    <div className="w-8 h-8 bg-gray-200 rounded-full mr-3 flex items-center justify-center">
+                    <div className="flex items-start space-x-3">
                         <BotAvatar />
-                    </div>
-                    <div className="p-3 bg-white text-gray-800 rounded-xl border border-gray-200 shadow-md animate-pulse">
-                        <span className="text-gray-500">Typing...</span>
+                        <div className="p-3 bg-white text-gray-800 rounded-xl border border-gray-200 shadow-md animate-pulse">
+                            <span className="text-gray-500">Typing...</span>
+                        </div>
                     </div>
                 </div>
             )}
@@ -240,7 +189,7 @@ const ChatWindow = ({ messages, isLoading }) => {
     );
 };
 
-// --- 4. Komponen ChatInput Diintegrasikan ---
+// --- Komponen ChatInput ---
 const ChatInput = ({ onSend, disabled }) => {
     const [input, setInput] = useState('');
 
@@ -256,7 +205,6 @@ const ChatInput = ({ onSend, disabled }) => {
         <div className="p-4 md:p-6 border-t border-gray-200 flex justify-center bg-[#fbf9f6]">
             <form onSubmit={handleSubmit} className="w-full max-w-3xl flex items-center p-2 bg-white border border-gray-300 rounded-full shadow-xl">
                 
-                {/* Ikon Plus (+) di Kiri Input */}
                 <button 
                     type="button"
                     className="p-2 mr-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-colors"
@@ -266,7 +214,6 @@ const ChatInput = ({ onSend, disabled }) => {
                     <Plus size={20} />
                 </button>
 
-                {/* Input */}
                 <input
                     type="text"
                     placeholder="Message Sapa Tazkia"
@@ -276,7 +223,6 @@ const ChatInput = ({ onSend, disabled }) => {
                     disabled={disabled}
                 />
                 
-                {/* Ikon Panah/Kirim di Kanan Input */}
                 <button 
                     type="submit"
                     className={`p-3 text-white rounded-full transition-colors shadow-md ml-2 ${
@@ -295,65 +241,59 @@ const ChatInput = ({ onSend, disabled }) => {
 
 // --- Komponen Utama ChatPage ---
 const ChatPage = () => {
-    const navigate = useNavigate(); // Untuk simulasi New Chat
+    const navigate = useNavigate();
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [currentChatId, setCurrentChatId] = useState(null);
     const [chatHistory, setChatHistory] = useState([]);
-
-    // --- PERBAIKAN: State untuk mengontrol sidebar ---
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mulai dalam keadaan tertutup (ikonik)
-    
-    // --- PERBAIKAN: Pindahkan ref ke sini ---
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
     const chatContainerRef = useRef(null);
 
     const [user] = useState({
-        id: 1,
+        // PENTING: Pastikan ID ini SAMA dengan ID di database Anda (dari Prisma Studio)
+        id: 1, 
         nim: '20210120069',
         fullName: 'Muhammad Ikhsan',
     });
 
-    // ✅ useCallback agar tidak berubah tiap render
     const loadChatHistory = useCallback(async () => {
+        if (!user || !user.id) return; 
+
         try {
-            // Simulasi API call (gunakan axios.get di implementasi Anda)
-            // const response = await axios.get(`http://localhost:5000/api/chat/conversations/${user.id}`);
-            // setChatHistory(response.data.conversations);
-            setChatHistory([
-                { id: '1', title: 'Pertanyaan UTS', createdAt: new Date(Date.now() - 86400000) },
-                { id: '2', title: 'Biaya Kuliah', createdAt: new Date(Date.now() - 3600000) },
-            ]);
+            // --- INI ADALAH KODE YANG TERHUBUNG ---
+            const response = await axios.get(`http://localhost:5000/api/chat/conversations/${user.id}`);
+            setChatHistory(response.data.conversations);
+        
         } catch (error) {
             console.error('Error loading chat history:', error);
             setChatHistory([]);
         }
-    }, []); // <-- DIUBAH: user.id dihapus dari dependency array
+    }, [user]); 
 
     useEffect(() => {
         loadChatHistory();
     }, [loadChatHistory]);
 
-    // --- PERBAIKAN: Pindahkan useEffect auto-scroll ke sini ---
     useEffect(() => {
         if (chatContainerRef.current) {
-            // Perintahkan kontainer untuk scroll ke paling bawah
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
-    }, [messages, isLoading]); // <-- Efek ini berjalan setiap kali 'messages' atau 'isLoading' berubah
+    }, [messages, isLoading]); 
 
     const handleSendMessage = async (messageText) => {
         const userMessage = {
             role: 'user',
             content: messageText,
             createdAt: new Date().toISOString(),
+            userName: user.fullName // Menambahkan nama user ke pesan
         };
         
         setMessages(prev => [...prev, userMessage]);
         setIsLoading(true);
+        setCurrentChatId(prevId => prevId); // Pastikan currentChatId tidak berubah
 
         try {
-            // Simulasi API call (ganti dengan axios.post di implementasi Anda)
-            /*
+            // --- INI ADALAH KODE YANG TERHUBUNG ---
             const response = await axios.post('http://localhost:5000/api/chat', {
                 message: messageText,
                 userId: user.id,
@@ -363,7 +303,7 @@ const ChatPage = () => {
             const botMessage = {
                 role: 'bot',
                 content: response.data.reply,
-                createdAt: new Date().toISOString(),
+                createdAt: response.data.timestamp || new Date().toISOString(),
                 hasPDF: response.data.hasPDF || false,
             };
             
@@ -371,29 +311,18 @@ const ChatPage = () => {
             
             if (response.data.conversationId && !currentChatId) {
                 setCurrentChatId(response.data.conversationId);
-                loadChatHistory();
+                loadChatHistory(); // Muat ulang riwayat jika ini chat baru
             }
-            */
-
-            // SIMULASI RESPONSE (Hapus ini saat menggunakan axios)
-            setTimeout(() => {
-                const botMessage = {
-                    role: 'bot',
-                    content: `Terima kasih! Saya akan memproses pertanyaan tentang "${messageText}". Sebagai simulasi, ini adalah jawaban bot.`,
-                    createdAt: new Date().toISOString(),
-                };
-                setMessages(prev => [...prev, botMessage]);
-                setIsLoading(false);
-            }, 1000);
             
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Error sending message:', error);
             const errorMessage = {
                 role: 'bot',
-                content: 'Maaf, terjadi kesalahan. Silakan coba lagi.',
+                content: 'Maaf, terjadi kesalahan saat mengirim pesan. Silakan coba lagi.',
                 createdAt: new Date().toISOString(),
             };
             setMessages(prev => [...prev, errorMessage]);
+        } finally {
             setIsLoading(false);
         }
     };
@@ -401,37 +330,41 @@ const ChatPage = () => {
     const handleNewChat = () => {
         setMessages([]);
         setCurrentChatId(null);
-        // Opsional: navigasi ulang untuk memastikan reset state
         navigate('/chat'); 
     };
 
     const handleSelectChat = async (chatId) => {
+        if (!chatId || chatId === currentChatId) return;
+        
         setCurrentChatId(chatId);
         setIsLoading(true);
+        setMessages([]); 
         
         try {
-            // Simulasi API call (ganti dengan axios.get di implementasi Anda)
-            /*
+            // --- INI ADALAH KODE YANG TERHUBUNG ---
             const response = await axios.get(`http://localhost:5000/api/chat/history/${chatId}`);
-            setMessages(response.data.messages);
-            */
-            
-            // SIMULASI PESAN LAMA
-            setTimeout(() => {
-                setMessages([
-                    { role: 'user', content: `Simulasi: Pertanyaan chat ${chatId}`, createdAt: new Date(Date.now() - 1000000).toISOString() },
-                    { role: 'bot', content: `Simulasi: Jawaban chat ${chatId}`, createdAt: new Date(Date.now() - 900000).toISOString() },
-                ]);
-                setIsLoading(false);
-            }, 500);
+            if (response.data && Array.isArray(response.data.messages)) {
+                // Menambahkan info nama user ke pesan lama
+                const historyMessages = response.data.messages.map(msg => ({
+                    ...msg,
+                    userName: msg.role === 'user' ? user.fullName : undefined
+                }));
+                setMessages(historyMessages);
+            } else {
+                 console.error('Invalid history data:', response.data);
+                 setMessages([]);
+            }
             
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Error loading chat history:', error);
+            setMessages([
+              { role: 'bot', content: 'Gagal memuat riwayat chat.', createdAt: new Date().toISOString() }
+            ]);
+        } finally {
             setIsLoading(false);
         }
     };
 
-    // --- PERBAIKAN: Fungsi untuk toggle sidebar ---
     const handleToggleSidebar = () => {
         setIsSidebarOpen(prev => !prev);
     };
@@ -439,8 +372,6 @@ const ChatPage = () => {
     return (
         <div className="flex h-screen bg-[#fbf9f6] font-sans">
             
-            {/* 1. Sidebar Kiri (Lebar 20) */}
-            {/* --- PERBAIKAN: Kirim prop state sidebar --- */}
             <CustomSideBar 
                 user={user}
                 chatHistory={chatHistory}
@@ -452,11 +383,8 @@ const ChatPage = () => {
                 onToggleSidebar={handleToggleSidebar}
             />
 
-            {/* 2. Main Content Area */}
-            {/* --- PERBAIKAN: Tambahkan overflow-hidden agar kontainer ini tidak scroll --- */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 
-                {/* Header Chat */}
                 <nav className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200">
                     <h1 
                         className="text-xl font-bold text-gray-800 cursor-pointer hover:text-blue-600 transition-colors"
@@ -464,64 +392,31 @@ const ChatPage = () => {
                     >
                         Sapa Tazkia
                     </h1>
-                    {/* Tombol Logout Dihapus */}
                 </nav>
 
-                {/* Area Utama Chat (ChatWindow) */}
-                {/* --- PERBAIKAN: Div ini HANYA untuk scroll --- */}
                 <div 
                     ref={chatContainerRef} 
                     className="flex-1 overflow-y-auto relative"
                 >
-                    {/* Pembungkus untuk menengahkan ChatWindow */}
-                    {/* --- PERBAIKAN: Tambahkan flex-1 dan flex-col agar 'Mulai Percakapan' bisa di tengah --- */}
                     <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col">
-                        
-                        {/* Jendela Chat (Sekarang di dalam area scroll) */}
-                        <ChatWindow messages={messages} isLoading={isLoading} />
-                        
-                        {/* Input Chat dan Footer DIPINDAHKAN KELUAR dari div ini */}
+                        <ChatWindow 
+                            messages={messages} 
+                            isLoading={isLoading} 
+                        />
                     </div>
                 </div>
 
-                {/* --- PERBAIKAN: Wrapper untuk Input dan Footer (DI LUAR area scroll) --- */}
                 <div>
-                    {/* Input Chat (Sekarang diam di bawah) */}
                     <ChatInput onSend={handleSendMessage} disabled={isLoading} />
                     
-                    {/* Footer (Sekarang diam di bawah) */}
-                    {/* --- PERBAIKAN: Hapus pt-6, tambahkan bg-white agar seragam --- */}
                     <div className="flex justify-center items-center space-x-2 px-6 pb-7 bg-[#fbf9f6]">
-                        {/* Instagram */}
-                        <a 
-                            href="https://www.instagram.com/stmiktazkia_official/" 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            title="Instagram"
-                            className="text-gray-500 hover:text-pink-500 transition-colors"
-                        >
+                        <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors">
                             <Instagram size={16} />
                         </a>
-                        
-                        {/* Website */}
-                        <a 
-                            href="https://stmik.tazkia.ac.id/" 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            title="Website"
-                            className="text-gray-500 hover:text-blue-500 transition-colors"
-                        >
+                        <a href="https://stmik.tazkia.ac.id/" target="_blank" rel="noopener noreferrer" title="Website" className="text-gray-500 hover:text-blue-500 transition-colors">
                             <Globe size={16} />
                         </a>
-                        
-                        {/* YouTube */}
-                        <a 
-                            href="https://www.youtube.com/@stmiktazkia" 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            title="YouTube"
-                            className="text-gray-500 hover:text-red-500 transition-colors"
-                        >
+                        <a href="https://www.youtube.com/@stmiktazkia" target="_blank" rel="noopener noreferrer" title="YouTube" className="text-gray-500 hover:text-red-500 transition-colors">
                             <Youtube size={16} />
                         </a>
                     </div>
@@ -532,4 +427,5 @@ const ChatPage = () => {
 };
 
 export default ChatPage;
+
 
