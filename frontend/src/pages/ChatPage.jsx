@@ -1,107 +1,171 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { Send, Plus, MessageSquare, PenSquare, User, Settings, LogOut } from 'lucide-react';
+// import axios from 'axios'; // <-- DIHAPUS: Tidak terpakai
+// --- PERUBAHAN: Menghapus LogOut yang tidak terpakai ---
+import { Send, Plus, MessageSquare, PenSquare, User, Settings, Instagram, Globe, Youtube } from 'lucide-react';
 
-// --- 1. Komponen Pembantu (Button) Diintegrasikan ---
-const Button = ({ children, onClick, className, variant = 'default', size = 'md', ...props }) => {
-    const baseClasses = 'font-semibold transition-all duration-200 ease-in-out flex items-center justify-center rounded-lg';
+// --- 1. Komponen Pembantu (Button) Dihapus ---
+// Seluruh komponen 'Button' dihapus karena tidak terpakai (no-unused-vars)
 
-    const variantClasses = {
-        default: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
-        primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-md',
-        secondary: 'bg-white text-blue-600 border border-blue-600 hover:bg-blue-50',
-    };
-
-    const sizeClasses = {
-        sm: 'px-3 py-1 text-sm',
-        md: 'px-4 py-2 text-base',
-        lg: 'px-6 py-3 text-lg',
-    };
-
-    const finalClasses = [
-        baseClasses,
-        variantClasses[variant] || variantClasses.default,
-        sizeClasses[size] || sizeClasses.md,
-        className
-    ].filter(Boolean).join(' ');
-
-    return (
-        <button
-            onClick={onClick}
-            className={finalClasses}
-            {...props}
-        >
-            {children}
-        </button>
-    );
-};
 
 // --- 2. Komponen Sidebar Diintegrasikan ---
-const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChatId, navigate }) => {
+// --- PERBAIKAN: Menambahkan prop isSidebarOpen dan onToggleSidebar ---
+const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChatId, navigate, isSidebarOpen, onToggleSidebar }) => {
+    
+    // Komponen Ikon Toggle kustom menggunakan SVG yang Anda berikan
+    const ToggleIcon = ({ open }) => (
+        <img 
+            src="https://www.svgrepo.com/show/493722/sidebar-toggle-nav-side-aside.svg" 
+            alt="Toggle Sidebar" 
+            className={`w-6 h-6 text-gray-700 transition-transform duration-300 ${open ? '' : 'transform rotate-180'}`}
+        />
+    );
+
     return (
-        // BACKGROUND DIUBAH menjadi bg-amber-50
-        <div className="w-20 bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl">
+        // --- PERBAIKAN: Lebar dinamis (w-20 atau w-64) dengan transisi ---
+        <div className={` ${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative`}>
             
-            {/* Tombol Pengaturan (Settings) - Paling Atas */}
-            <div className="flex justify-center mb-8">
-                <button className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors" title="Settings">
-                    <Settings size={24} />
-                </button>
-            </div>
+            {/* --- PERBAIKAN: LOGIKA HEADER SIDEBAR DISAMAKAN DENGAN LANDING PAGE --- */}
+            {isSidebarOpen ? (
+                // --- TAMPILAN TERBUKA: Settings dan Toggle sejajar (HANYA IKON) ---
+                <div className="flex justify-between items-center mb-8">
+                    {/* Tombol Pengaturan (Settings) - HANYA IKON */}
+                    <button className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3" title="Settings">
+                        <Settings size={24} />
+                    </button>
+                    {/* Tombol Toggle Sidebar */}
+                    <button 
+                        onClick={onToggleSidebar} 
+                        className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors" 
+                        title="Tutup Sidebar"
+                    >
+                        <ToggleIcon open={true} />
+                    </button>
+                </div>
+            ) : (
+                // --- TAMPILAN TERTUTUP: HANYA TOMBOL TOGGLE ---
+                <>
+                    {/* Tombol Toggle Sidebar */}
+                    <div className="flex justify-center mb-8">
+                        <button 
+                            onClick={onToggleSidebar} 
+                            className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors" 
+                            title="Buka Sidebar"
+                        >
+                            <ToggleIcon open={false} />
+                        </button>
+                    </div>
+                    {/* Tombol Pengaturan (Settings) DIHAPUS saat tertutup */}
+                </>
+            )}
+            {/* --- AKHIR PERBAIKAN LOGIKA HEADER --- */}
+
 
             {/* Tombol User Profile/Logout */}
+            {/* --- PERBAIKAN: Layout dinamis (w-full/w-12, h-12, justify) --- */}
             <div className="flex justify-center mb-10">
                 <button 
-                    className="w-12 h-12 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all flex items-center justify-center group relative"
+                    className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all flex items-center group relative gap-3`}
                     title={user ? `Logged in as ${user.fullName}` : 'User Profile'}
-                    // Simulasikan Logout/Profile Click
                     onClick={() => console.log('User Profile/Logout clicked')} 
                 >
                     <User size={20} />
+                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
+                        {user ? user.fullName : 'User Profile'}
+                    </span>
                 </button>
             </div>
 
-            {/* Tombol New Chat - TERHUBUNG KE onNewChat */}
-            <div className="flex justify-center space-y-3">
+            {/* Tombol New Chat */}
+            {/* --- PERBAIKAN: Layout dinamis --- */}
+            <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
                 <button 
-                    className="w-12 h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center justify-center group relative"
+                    className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
                     title="New Chat"
                     onClick={onNewChat} // <-- Memicu reset chat state
                 >
                     <PenSquare size={20} />
+                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
+                        New Chat
+                    </span>
                 </button>
             </div>
             
-            {/* Tombol Chats History (Navigasi Simulasi) */}
-            <div className="flex justify-center">
+            {/* Tombol Chats History */}
+            {/* --- PERBAIKAN: Layout dinamis --- */}
+            <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
                 <button 
-                    className="w-12 h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center justify-center group relative"
+                    className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
                     title="Chats"
                     onClick={() => console.log('Open Chat History')} 
                 >
                     <MessageSquare size={20} />
+                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
+                        Riwayat Chat
+                    </span>
                 </button>
             </div>
+
             {/* Area Riwayat Chat (dibiarkan kosong untuk layout ikonik) */}
             <div className="flex-1 overflow-y-auto">
                 {/* Biasanya riwayat chat diletakkan di sini jika sidebar lebih lebar */}
             </div>
 
-            {/* Footer Dots */}
-            <div className="mt-auto flex justify-center flex-col items-center p-2">
-                <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                    <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                </div>
+            {/* --- PERUBAHAN: Footer Dots (Sidebar) diganti Social Links --- */}
+            {/* --- PERBAIKAN: Layout dinamis (flex-row/flex-col, items-start/items-center) --- */}
+            <div className={`mt-auto flex ${isSidebarOpen ? 'flex-col items-start gap-2' : 'flex-row items-center justify-center space-x-2'} pb-4`}>
+                {/* Instagram */}
+                <a 
+                  href="https://www.instagram.com/stmiktazkia_official/" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  title="Instagram"
+                  className="text-gray-500 hover:text-pink-500 transition-colors flex items-center gap-3"
+                >
+                    <Instagram size={16} />
+                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>
+                        Instagram
+                    </span>
+                </a>
+                
+                {/* Website */}
+                <a 
+                  href="https://stmik.tazkia.ac.id/" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  title="Website"
+                  className="text-gray-500 hover:text-blue-500 transition-colors flex items-center gap-3"
+                >
+                    <Globe size={16} />
+                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>
+                        Website
+                    </span>
+                </a>
+                
+                {/* YouTube */}
+                <a 
+                  href="https://www.youtube.com/@stmiktazkia" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  title="YouTube"
+                  className="text-gray-500 hover:text-red-500 transition-colors flex items-center gap-3"
+                >
+                    <Youtube size={16} />
+                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>
+                        YouTube
+                    </span>
+                </a>
             </div>
+            {/* --- AKHIR PERUBAHAN --- */}
         </div>
     );
 };
 
 // --- 3. Komponen ChatWindow Diintegrasikan ---
 const ChatWindow = ({ messages, isLoading }) => {
+    
+    // --- PERBAIKAN: ref dan useEffect DIPINDAHKAN ke ChatPage ---
+
     // Fungsi untuk mensimulasikan ikon Bot
     const BotAvatar = () => (
         <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
@@ -128,7 +192,8 @@ const ChatWindow = ({ messages, isLoading }) => {
     }
 
     return (
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
+        // --- PERBAIKAN: Tambahkan 'flex-1' agar komponen ini mengisi ruang ---
+        <div className="flex-1 p-4 md:p-8 space-y-6">
             {messages.map((msg, index) => {
                 const isUser = msg.role === 'user';
                 const avatar = isUser ? <UserAvatar initial={'A'} /> : <BotAvatar />;
@@ -235,7 +300,13 @@ const ChatPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [currentChatId, setCurrentChatId] = useState(null);
     const [chatHistory, setChatHistory] = useState([]);
+
+    // --- PERBAIKAN: State untuk mengontrol sidebar ---
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mulai dalam keadaan tertutup (ikonik)
     
+    // --- PERBAIKAN: Pindahkan ref ke sini ---
+    const chatContainerRef = useRef(null);
+
     const [user] = useState({
         id: 1,
         nim: '20210120069',
@@ -256,11 +327,19 @@ const ChatPage = () => {
             console.error('Error loading chat history:', error);
             setChatHistory([]);
         }
-    }, [user.id]);
+    }, []); // <-- DIUBAH: user.id dihapus dari dependency array
 
     useEffect(() => {
         loadChatHistory();
     }, [loadChatHistory]);
+
+    // --- PERBAIKAN: Pindahkan useEffect auto-scroll ke sini ---
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            // Perintahkan kontainer untuk scroll ke paling bawah
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [messages, isLoading]); // <-- Efek ini berjalan setiap kali 'messages' atau 'isLoading' berubah
 
     const handleSendMessage = async (messageText) => {
         const userMessage = {
@@ -352,10 +431,16 @@ const ChatPage = () => {
         }
     };
 
+    // --- PERBAIKAN: Fungsi untuk toggle sidebar ---
+    const handleToggleSidebar = () => {
+        setIsSidebarOpen(prev => !prev);
+    };
+
     return (
         <div className="flex h-screen bg-[#fbf9f6] font-sans">
             
             {/* 1. Sidebar Kiri (Lebar 20) */}
+            {/* --- PERBAIKAN: Kirim prop state sidebar --- */}
             <CustomSideBar 
                 user={user}
                 chatHistory={chatHistory}
@@ -363,10 +448,13 @@ const ChatPage = () => {
                 onSelectChat={handleSelectChat}
                 currentChatId={currentChatId}
                 navigate={navigate}
+                isSidebarOpen={isSidebarOpen}
+                onToggleSidebar={handleToggleSidebar}
             />
 
             {/* 2. Main Content Area */}
-            <div className="flex-1 flex flex-col">
+            {/* --- PERBAIKAN: Tambahkan overflow-hidden agar kontainer ini tidak scroll --- */}
+            <div className="flex-1 flex flex-col overflow-hidden">
                 
                 {/* Header Chat */}
                 <nav className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200">
@@ -379,25 +467,63 @@ const ChatPage = () => {
                     {/* Tombol Logout Dihapus */}
                 </nav>
 
-                {/* Area Utama Chat (ChatWindow dan ChatInput) */}
-                <div className="flex-1 flex flex-col overflow-hidden relative">
-                    {/* Pembungkus untuk menengahkan ChatContent dan ChatInput */}
-                    <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col overflow-hidden">
+                {/* Area Utama Chat (ChatWindow) */}
+                {/* --- PERBAIKAN: Div ini HANYA untuk scroll --- */}
+                <div 
+                    ref={chatContainerRef} 
+                    className="flex-1 overflow-y-auto relative"
+                >
+                    {/* Pembungkus untuk menengahkan ChatWindow */}
+                    {/* --- PERBAIKAN: Tambahkan flex-1 dan flex-col agar 'Mulai Percakapan' bisa di tengah --- */}
+                    <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col">
                         
-                        {/* Jendela Chat */}
+                        {/* Jendela Chat (Sekarang di dalam area scroll) */}
                         <ChatWindow messages={messages} isLoading={isLoading} />
                         
-                        {/* Input Chat */}
-                        <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+                        {/* Input Chat dan Footer DIPINDAHKAN KELUAR dari div ini */}
+                    </div>
+                </div>
+
+                {/* --- PERBAIKAN: Wrapper untuk Input dan Footer (DI LUAR area scroll) --- */}
+                <div>
+                    {/* Input Chat (Sekarang diam di bawah) */}
+                    <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+                    
+                    {/* Footer (Sekarang diam di bawah) */}
+                    {/* --- PERBAIKAN: Hapus pt-6, tambahkan bg-white agar seragam --- */}
+                    <div className="flex justify-center items-center space-x-2 px-6 pb-7 bg-[#fbf9f6]">
+                        {/* Instagram */}
+                        <a 
+                            href="https://www.instagram.com/stmiktazkia_official/" 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            title="Instagram"
+                            className="text-gray-500 hover:text-pink-500 transition-colors"
+                        >
+                            <Instagram size={16} />
+                        </a>
                         
-                        {/* Footer Dots di Bawah Input (di Canvas Anda) */}
-                        <div className="flex justify-center p-4">
-                            <div className="flex space-x-2">
-                                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
-                                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                            </div>
-                        </div>
+                        {/* Website */}
+                        <a 
+                            href="https://stmik.tazkia.ac.id/" 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            title="Website"
+                            className="text-gray-500 hover:text-blue-500 transition-colors"
+                        >
+                            <Globe size={16} />
+                        </a>
+                        
+                        {/* YouTube */}
+                        <a 
+                            href="https://www.youtube.com/@stmiktazkia" 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            title="YouTube"
+                            className="text-gray-500 hover:text-red-500 transition-colors"
+                        >
+                            <Youtube size={16} />
+                        </a>
                     </div>
                 </div>
             </div>
@@ -406,3 +532,4 @@ const ChatPage = () => {
 };
 
 export default ChatPage;
+
