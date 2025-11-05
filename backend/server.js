@@ -9,7 +9,9 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000' // Hanya izinkan frontend Anda
+}));
 app.use(express.json());
 
 // Rate limiting map
@@ -51,6 +53,8 @@ function detectIntent(message) {
     return 'beasiswa';
   } else if (lowerMessage.includes('nilai') || lowerMessage.includes('ipk') || lowerMessage.includes('transkrip')) {
     return 'akademik_personal';
+  } else if (lowerMessage.includes('tim developer') || lowerMessage.includes('timdev') || lowerMessage.includes('timdevelop')) {
+    return 'tim_developer';
   } else {
     return 'general';
   }
