@@ -24,14 +24,15 @@ ATURAN PENTING:
 8. Maksimal 3-4 paragraf per response
 
 INFORMASI DASAR STMIK TAZKIA:
-- Lokasi: Jl. Raya Ciawi-Sukabumi KM 4, Sentul, Bogor, Jawa Barat 16720
+- Lokasi: Jalan Raya Dramaga Km.7 Kel. Margajaya, Kec. Bogor Barat
 - Program Studi: Sistem Informasi (S1) dan Teknik Informatika (S1)
-- Status Akreditasi: B (BAN-PT)
+- Status Akreditasi: A
 - Website: www.tazkia.ac.id
 - Email: info@tazkia.ac.id
 - Telepon: (0251) 8240808
 - SPP per Semester: Rp 3.500.000 - Rp 4.500.000
 - Biaya Pendaftaran: Rp 300.000
+- Tim Developer: ican dan kawan kawan
 - Fasilitas: Lab Komputer, Perpustakaan Digital, WiFi Kampus, Masjid, Kantin`;
 
 /**
