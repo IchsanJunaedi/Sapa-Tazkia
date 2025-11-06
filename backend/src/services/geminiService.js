@@ -34,6 +34,7 @@ INFORMASI DASAR STMIK TAZKIA:
 - Biaya Pendaftaran: Rp 300.000
 - Fasilitas: Lab Komputer, Perpustakaan Digital, WiFi Kampus, Masjid, Kantin`;
 
+
 /**
  * Generate AI Response menggunakan Gemini
  */
