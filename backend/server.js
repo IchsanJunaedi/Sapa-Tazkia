@@ -1,221 +1,588 @@
-// M:/Sapa-Tazkia/backend/server.js
 const express = require('express');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
-const PDFDocument = require('pdfkit');
-require('dotenv').config(); // Pastikan variabel .env dimuat
+const { generateGeminiResponse, testGeminiConnection } = require('./src/services/geminiService');
+const { login, logout, verifySession } = require('./src/services/authService');
+const { requireAuth, optionalAuth } = require('./src/middleware/authMiddleware');
+const { getAcademicSummary, getGradesBySemester, getTranscript } = require('./src/services/academicService');
+const { generateTranscriptPDF } = require('./src/services/pdfService');
+require('dotenv').config();
 
-const prisma = new PrismaClient();
 const app = express();
+const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
-app.use(express.json()); // Ini penting untuk membaca body JSON dari request
+app.use(express.json());
 
-// === 1. RUTE AUTENTIKASI (LOGIN) ===
-app.post('/api/auth/login', async (req, res) => {
-  console.log('Login attempt:', req.body);
-  const { nim, password } = req.body;
+// Rate limiting map
+const rateLimitMap = new Map();
 
-  if (!nim || !password) {
-    return res.status(400).json({ success: false, message: "NIM dan password tidak boleh kosong" });
+function rateLimiter(req, res, next) {
+  const userId = req.user?.id || req.body.userId || 'anonymous';
+  const today = new Date().toDateString();
+  const key = `${userId}-${today}`;
+  
+  const count = rateLimitMap.get(key) || 0;
+  
+  if (count >= 100) { // Increased for authenticated users
+    return res.status(429).json({ 
+      error: 'Rate limit exceeded',
+      message: 'Anda telah mencapai batas maksimal request per hari.'
+    });
   }
+  
+  rateLimitMap.set(key, count + 1);
+  next();
+}
 
+// Helper functions
+function detectIntent(message) {
+  const lowerMessage = message.toLowerCase();
+
+  if (lowerMessage.includes('pendaftaran') || lowerMessage.includes('daftar')) {
+    return 'pendaftaran';
+  } else if (lowerMessage.includes('program studi') || lowerMessage.includes('prodi') || lowerMessage.includes('jurusan')) {
+    return 'program_studi';
+  } else if (lowerMessage.includes('biaya') || lowerMessage.includes('uang kuliah') || lowerMessage.includes('spp')) {
+    return 'biaya';
+  } else if (lowerMessage.includes('lokasi') || lowerMessage.includes('alamat') || lowerMessage.includes('dimana')) {
+    return 'lokasi';
+  } else if (lowerMessage.includes('fasilitas') || lowerMessage.includes('lab') || lowerMessage.includes('perpustakaan')) {
+    return 'fasilitas';
+  } else if (lowerMessage.includes('beasiswa')) {
+    return 'beasiswa';
+  } else if (lowerMessage.includes('nilai') || lowerMessage.includes('ipk') || lowerMessage.includes('transkrip')) {
+    return 'akademik_personal';
+  } else {
+    return 'general';
+  }
+}
+
+function requiresAuthentication(message) {
+  const authKeywords = [
+    'nilai saya', 'ipk saya', 'transkrip saya', 'akademik saya', 'data saya', 
+    'jadwal saya', 'krs saya', 'beasiswa saya', 'tagihan saya', 'pembayaran saya'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  return authKeywords.some(keyword => lowerMessage.includes(keyword));
+}
+
+// ==================== HEALTH CHECK ====================
+
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Sapa Tazkia Backend API',
+    version: '3.0.0',
+    status: 'running',
+    ai: 'Google Gemini 2.5 Flash',
+    features: [
+      'AI Chat',
+      'JWT Authentication',
+      'Academic Data',
+      'PDF Export',
+      'RAG Ready'
+    ]
+  });
+});
+
+// ==================== AUTH ROUTES ====================
+
+/**
+ * POST /api/auth/login
+ * Login mahasiswa
+ */
+app.post('/api/auth/login', async (req, res) => {
   try {
-    // 1. Cari user berdasarkan NIM, sertakan Program Studi
-    const user = await prisma.user.findUnique({
-      where: { nim },
-      include: {
-        programStudi: true // Mengambil data relasi ProgramStudi
+    const { nim, password } = req.body;
+
+    // Validation
+    if (!nim || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'NIM dan password harus diisi'
+      });
+    }
+
+    // Get IP and User Agent
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+
+    // Login
+    const result = await login(nim, password, ipAddress, userAgent);
+
+    if (!result.success) {
+      return res.status(401).json(result);
+    }
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Login route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server'
+    });
+  }
+});
+
+/**
+ * POST /api/auth/logout
+ * Logout mahasiswa
+ */
+app.post('/api/auth/logout', requireAuth, async (req, res) => {
+  try {
+    const token = req.headers.authorization?.substring(7);
+    const result = await logout(token);
+    res.json(result);
+  } catch (error) {
+    console.error('Logout route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server'
+    });
+  }
+});
+
+/**
+ * GET /api/auth/verify
+ * Verify token validity
+ */
+app.get('/api/auth/verify', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        valid: false,
+        message: 'Token tidak ditemukan'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    const result = await verifySession(token);
+
+    if (!result.valid) {
+      return res.status(401).json(result);
+    }
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Verify route error:', error);
+    res.status(500).json({
+      valid: false,
+      message: 'Terjadi kesalahan server'
+    });
+  }
+});
+
+/**
+ * GET /api/auth/me
+ * Get current user data
+ */
+app.get('/api/auth/me', requireAuth, async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      user: req.user
+    });
+  } catch (error) {
+    console.error('Get me route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server'
+    });
+  }
+});
+
+// ==================== ACADEMIC ROUTES ====================
+
+/**
+ * GET /api/academic/summary
+ * Get academic summary (IPK, SKS, etc)
+ */
+app.get('/api/academic/summary', requireAuth, async (req, res) => {
+  try {
+    const result = await getAcademicSummary(req.user.id);
+    
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Get academic summary route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server'
+    });
+  }
+});
+
+/**
+ * GET /api/academic/grades
+ * Get grades (all semesters or specific semester)
+ */
+app.get('/api/academic/grades', requireAuth, async (req, res) => {
+  try {
+    const { semester } = req.query;
+    const result = await getGradesBySemester(req.user.id, semester);
+    
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Get grades route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server'
+    });
+  }
+});
+
+/**
+ * GET /api/academic/transcript
+ * Get full transcript data
+ */
+app.get('/api/academic/transcript', requireAuth, async (req, res) => {
+  try {
+    const result = await getTranscript(req.user.id);
+    
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Get transcript route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server'
+    });
+  }
+});
+
+/**
+ * GET /api/academic/transcript/pdf
+ * Download transcript as PDF
+ */
+app.get('/api/academic/transcript/pdf', requireAuth, async (req, res) => {
+  try {
+    const result = await generateTranscriptPDF(req.user.id);
+    
+    if (!result.success) {
+      return res.status(404).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+    // Set headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+
+    // Pipe PDF to response
+    result.doc.pipe(res);
+    result.doc.end();
+
+  } catch (error) {
+    console.error('Generate PDF route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server'
+    });
+  }
+});
+
+// ==================== AI CHAT ROUTES ====================
+
+/**
+ * GET /api/test-gemini
+ * Test Gemini connection
+ */
+app.get('/api/test-gemini', async (req, res) => {
+  try {
+    const result = await testGeminiConnection();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/test-ai
+ * Test AI response
+ */
+app.post('/api/test-ai', async (req, res) => {
+  try {
+    const { message } = req.body;
+    const response = await generateGeminiResponse(message, []);
+    res.json({ response });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/chat
+ * Main chat endpoint dengan AI + Academic Data Integration
+ */
+app.post('/api/chat', optionalAuth, rateLimiter, async (req, res) => {
+  const startTime = Date.now();
+  
+  try {
+    const { message, conversationId } = req.body;
+    const userId = req.user?.id || 1; // Default guest = 1
+    
+    // Validasi input
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ error: 'Pesan tidak boleh kosong' });
+    }
+    
+    if (message.length > 500) {
+      return res.status(400).json({ error: 'Pesan terlalu panjang (maksimal 500 karakter)' });
+    }
+    
+    // Detect intent
+    const intent = detectIntent(message);
+    console.log(`📊 Intent detected: ${intent}`);
+    
+    // Check if requires authentication
+    if (requiresAuthentication(message) && !req.user) {
+      return res.json({
+        reply: 'Untuk mengakses informasi akademik pribadi Anda, silakan login terlebih dahulu dengan mengklik tombol "Login Mahasiswa" di sidebar. 🔐',
+        requiresAuth: true,
+        conversationId: conversationId,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    let conversation;
+    
+    if (conversationId) {
+      conversation = await prisma.conversation.findUnique({
+        where: { id: parseInt(conversationId) }
+      });
+    }
+    
+    if (!conversation) {
+      const title = message.substring(0, 50) + (message.length > 50 ? '...' : '');
+      conversation = await prisma.conversation.create({
+        data: {
+          userId: userId,
+          title: title
+        }
+      });
+    }
+    
+    // Simpan pesan user
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: 'user',
+        content: message
+      }
+    });
+    
+    // Get conversation history
+    const history = await prisma.message.findMany({
+      where: { conversationId: conversation.id },
+      orderBy: { createdAt: 'asc' },
+      take: 10
+    });
+    
+    // Generate AI response
+    console.log('🤖 Generating Gemini response...');
+    let aiReply = await generateGeminiResponse(message, history);
+    
+    // If user authenticated and asking about personal academic data
+    let academicData = null;
+    if (req.user && intent === 'akademik_personal') {
+      try {
+        const summaryResult = await getAcademicSummary(req.user.id);
+        if (summaryResult.success) {
+          academicData = summaryResult.data;
+          
+          // Enhance AI response with actual data
+          aiReply = `Berdasarkan data akademik Anda:\n\n` +
+                    `📊 **IPK**: ${academicData.ipk.toFixed(2)}\n` +
+                    `📚 **Total SKS**: ${academicData.totalSks}\n` +
+                    `📈 **IPS Semester Terakhir**: ${academicData.ipsLastSemester.toFixed(2)}\n` +
+                    `🎓 **Semester Aktif**: ${academicData.semesterActive}\n\n` +
+                    `${aiReply}\n\n` +
+                    `Apakah Anda ingin saya tampilkan nilai per semester dalam bentuk PDF?`;
+        }
+      } catch (error) {
+        console.error('Error fetching academic data:', error);
+      }
+    }
+    
+    const responseTime = (Date.now() - startTime) / 1000;
+    
+    // Simpan pesan bot
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: 'bot',
+        content: aiReply,
+        responseTime: responseTime
+      }
+    });
+    
+    const hasPDF = (req.user && intent === 'akademik_personal') || 
+                   aiReply.toLowerCase().includes('pdf') ||
+                   aiReply.toLowerCase().includes('transkrip');
+    
+    res.json({ 
+      reply: aiReply,
+      conversationId: conversation.id,
+      hasPDF: hasPDF,
+      intent: intent,
+      responseTime: responseTime,
+      academicData: academicData,
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log(`✅ Response sent in ${responseTime.toFixed(2)}s`);
+    
+  } catch (error) {
+    console.error('❌ Chat error:', error);
+    res.status(500).json({ 
+      error: 'Terjadi kesalahan server',
+      message: error.message 
+    });
+  }
+});
+
+// ==================== CHAT HISTORY ROUTES ====================
+
+app.get('/api/chat/history/:conversationId', optionalAuth, async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    
+    const messages = await prisma.message.findMany({
+      where: { 
+        conversationId: parseInt(conversationId) 
+      },
+      orderBy: { 
+        createdAt: 'asc' 
+      },
+      select: {
+        id: true,
+        role: true,
+        content: true,
+        createdAt: true
+      }
+    });
+    
+    res.json({ messages });
+    
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ 
+      error: 'Terjadi kesalahan server' 
+    });
+  }
+});
+
+app.get('/api/chat/conversations/:userId', optionalAuth, async (req, res) => {
+  try {
+    const userId = req.user?.id || parseInt(req.params.userId);
+    
+    const conversations = await prisma.conversation.findMany({
+      where: { 
+        userId: userId
+      },
+      orderBy: { 
+        createdAt: 'desc' 
+      },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        _count: {
+          select: { messages: true }
+        }
+      },
+      take: 20
+    });
+    
+    res.json({ conversations });
+    
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ 
+      error: 'Terjadi kesalahan server' 
+    });
+  }
+});
+
+app.delete('/api/chat/conversation/:conversationId', requireAuth, async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    
+    // Verify ownership
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id: parseInt(conversationId),
+        userId: req.user.id
       }
     });
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: "NIM tidak ditemukan" });
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation tidak ditemukan'
+      });
     }
 
-    // 2. Bandingkan password
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isPasswordValid) {
-      return res.status(401).json({ success: false, message: "Password salah" });
-    }
-
-    // 3. Ambil data IPK dari AcademicSummary
-    const summary = await prisma.academicSummary.findUnique({
-      where: { userId: user.id }
+    await prisma.message.deleteMany({
+      where: { conversationId: parseInt(conversationId) }
     });
-
-    // 4. Buat JSON Web Token (JWT)
-    const token = jwt.sign(
-      { userId: user.id, nim: user.nim },
-      process.env.JWT_SECRET, // Pastikan Anda punya JWT_SECRET di .env
-      { expiresIn: '1d' } // Token berlaku selama 1 hari
-    );
-
-    // 5. Susun respons user sesuai ekspektasi
-    const userResponse = {
-      id: user.id,
-      nim: user.nim,
-      fullName: user.fullName,
-      email: user.email,
-      programStudi: user.programStudi ? user.programStudi.name : null, // Ambil 'name' dari relasi
-      angkatan: user.angkatan,
-      ipk: summary ? summary.ipk.toString() : "0.00", // Ambil IPK dari summary
-      status: user.status
-    };
-
-    // 6. Kirim respons sukses
-    res.json({
+    
+    await prisma.conversation.delete({
+      where: { id: parseInt(conversationId) }
+    });
+    
+    res.json({ 
       success: true,
-      message: "Login berhasil",
-      token: token,
-      user: userResponse
-    });
-
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ success: false, message: "Terjadi kesalahan pada server" });
-  }
-});
-
-// === 2. MIDDLEWARE AUTENTIKASI ===
-// Fungsi ini akan memproteksi rute di bawahnya
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, message: "Akses ditolak. Token tidak disediakan." });
-  }
-
-  const token = authHeader.split(' ')[1]; // Ambil token dari 'Bearer <token>'
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Simpan data user ( { userId, nim } ) ke request
-    next(); // Lanjutkan ke rute berikutnya
-  } catch (error) {
-    res.status(401).json({ success: false, message: "Token tidak valid." });
-  }
-};
-
-// === 3. RUTE AKADEMIK (TERPROTEKSI) ===
-
-// Rute ini menerapkan authMiddleware. Hanya bisa diakses DENGAN token.
-app.use('/api/academic', authMiddleware);
-
-// GET /api/academic/summary
-app.get('/api/academic/summary', async (req, res) => {
-  try {
-    const summary = await prisma.academicSummary.findUnique({
-      where: { userId: req.user.userId } // req.user.userId didapat dari middleware
-    });
-
-    if (!summary) {
-      return res.status(404).json({ success: false, message: "Data summary akademik tidak ditemukan." });
-    }
-    res.json({ success: true, summary });
-  } catch (error) {
-    console.error("Get summary error:", error);
-    res.status(500).json({ success: false, message: "Terjadi kesalahan pada server" });
-  }
-});
-
-// GET /api/academic/grades
-app.get('/api/academic/grades', async (req, res) => {
-  try {
-    const grades = await prisma.academicGrade.findMany({
-      where: { userId: req.user.userId },
-      include: {
-        course: true // Sertakan detail mata kuliah
-      },
-    });
-
-    res.json({ success: true, grades });
-  } catch (error) {
-    console.error("Get grades error:", error);
-    res.status(500).json({ success: false, message: "Terjadi kesalahan pada server" });
-  }
-});
-
-// GET /api/academic/transcript/pdf
-app.get('/api/academic/transcript/pdf', async (req, res) => {
-  try {
-    // 1. Ambil data user dan nilai
-    const userId = req.user.userId;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { programStudi: true }
+      message: 'Conversation deleted successfully' 
     });
     
-    const grades = await prisma.academicGrade.findMany({
-      where: { userId: userId },
-      include: { course: true },
-    });
-    
-    const summary = await prisma.academicSummary.findUnique({
-      where: { userId: userId }
-    });
-
-    // 2. Buat PDF
-    const doc = new PDFDocument({ margin: 50 });
-
-    // Set header respons untuk download PDF
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="transkrip_${user.nim}.pdf"`);
-
-    // Salurkan output PDF ke respons HTTP
-    doc.pipe(res);
-
-    // 3. Isi konten PDF
-    doc.fontSize(18).text('Transkrip Nilai Akademik', { align: 'center' });
-    doc.moveDown();
-    
-    doc.fontSize(12).text(`Nama: ${user.fullName}`);
-    doc.text(`NIM: ${user.nim}`);
-    doc.text(`Program Studi: ${user.programStudi.name}`);
-    doc.moveDown();
-
-    doc.text(`IPK: ${summary ? summary.ipk : 'N/A'}`);
-    doc.text(`Total SKS: ${summary ? summary.totalSks : 'N/A'}`);
-    doc.moveDown();
-
-    doc.fontSize(14).text('Daftar Nilai', { underline: true });
-    doc.moveDown();
-
-    // Header Tabel
-    let y = doc.y;
-    doc.fontSize(10).text('Kode', 50, y);
-    doc.text('Mata Kuliah', 150, y);
-    doc.text('SKS', 350, y);
-    doc.text('Nilai', 400, y);
-    doc.text('Poin', 450, y);
-    doc.moveDown();
-
-    // Isi Tabel
-    for (const grade of grades) {
-      y = doc.y;
-      doc.text(grade.course.code, 50, y);
-      doc.text(grade.course.name, 150, y);
-      doc.text(grade.course.sks, 350, y);
-      doc.text(grade.grade, 400, y);
-      doc.text(grade.gradePoint.toFixed(2), 450, y);
-      doc.moveDown(0.5);
-    }
-
-    // 4. Selesaikan PDF
-    doc.end();
-
   } catch (error) {
-    console.error("Get PDF error:", error);
-    res.status(500).json({ success: false, message: "Gagal membuat PDF" });
+    console.error('Error:', error);
+    res.status(500).json({ 
+      error: 'Terjadi kesalahan server' 
+    });
   }
 });
 
+// ==================== SERVER START ====================
 
-// Menjalankan Server
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
 app.listen(PORT, () => {
-  console.log(`🚀 Server listening on http://localhost:${PORT}`);
+  console.log(`
+  ╔════════════════════════════════════════════╗
+  ║   🚀 Sapa Tazkia Backend Server v3.0      ║
+  ║   📡 Port: ${PORT}                           ║
+  ║   🌐 URL: http://localhost:${PORT}          ║
+  ║   🤖 AI: Google Gemini 2.5 Flash          ║
+  ║   🔐 Auth: JWT Enabled                    ║
+  ║   📊 Database: Connected                   ║
+  ║   ✅ Status: Ready                         ║
+  ╚════════════════════════════════════════════╝
+  `);
 });

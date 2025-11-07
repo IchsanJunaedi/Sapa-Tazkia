@@ -1,6 +1,3 @@
-// M:/Sapa-Tazkia/backend/prisma/seed.js
-// Ini adalah kode LENGKAP yang sudah diperbaiki.
-
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
@@ -124,28 +121,23 @@ async function main() {
       where: { code: gradeData.courseCode }
     });
 
-    // Pastikan course ditemukan sebelum melanjutkan
-    if (course) {
-      await prisma.academicGrade.upsert({
-        where: {
-          userId_courseId_semester: {
-            userId: gradeData.userId,
-            courseId: course.id,
-            semester: gradeData.semester
-          }
-        },
-        update: {},
-        create: {
+    await prisma.academicGrade.upsert({
+      where: {
+        userId_courseId_semester: {
           userId: gradeData.userId,
           courseId: course.id,
-          semester: gradeData.semester,
-          grade: gradeData.grade,
-          gradePoint: gradeData.gradePoint
-        } // <- Kesalahan ketik 't' sudah dihapus dari sini.
-      });
-    } else {
-      console.warn(`⚠️ Course dengan kode ${gradeData.courseCode} tidak ditemukan, seeding grade dilewati.`);
-    }
+          semester: gradeData.semester
+        }
+      },
+      update: {},
+      create: {
+        userId: gradeData.userId,
+        courseId: course.id,
+        semester: gradeData.semester,
+        grade: gradeData.grade,
+        gradePoint: gradeData.gradePoint
+      }
+    });
   }
 
   console.log('✅ Grades created\n');
