@@ -29,7 +29,7 @@ INFORMASI DASAR STMIK TAZKIA:
 - Status Akreditasi: A
 - Website: www.tazkia.ac.id
 - Email: info@tazkia.ac.id
-- Telepon: (0251) 8240808
+- Telepon: +6285123123119 (Admin)
 - SPP per Semester: Rp 3.500.000 - Rp 4.500.000
 - Biaya Pendaftaran: Rp 300.000
 - Tim Developer: ican dan kawan kawan

@@ -205,7 +205,7 @@ app.post('/api/chat', rateLimiter, async (req, res) => {
     console.error('❌ Error:', error);
     res.status(500).json({ 
       error: 'Terjadi kesalahan server',
-      message: error.message 
+      message: error.message
     });
   }
 });
