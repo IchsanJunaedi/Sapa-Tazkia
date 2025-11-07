@@ -35,6 +35,7 @@ INFORMASI DASAR STMIK TAZKIA:
 - Tim Developer: ican dan kawan kawan
 - Fasilitas: Lab Komputer, Perpustakaan Digital, WiFi Kampus, Masjid, Kantin`;
 
+
 /**
  * Generate AI Response menggunakan Gemini
  */
