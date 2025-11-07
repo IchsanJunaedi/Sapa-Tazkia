@@ -253,7 +253,7 @@ const ChatPage = () => {
         // PENTING: Pastikan ID ini SAMA dengan ID di database Anda (dari Prisma Studio)
         id: 1, 
         nim: '20210120069',
-        fullName: 'Muhammad Ikhsan',
+        fullName: 'Muhammad Ichsan',
     });
 
     const loadChatHistory = useCallback(async () => {
