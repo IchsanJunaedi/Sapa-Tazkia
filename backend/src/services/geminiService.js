@@ -1,6 +1,9 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+// --- PERBAIKAN 1: Panggil dotenv di sini ---
+require('dotenv').config(); 
 
 // Initialize Gemini
+// Sekarang process.env.GEMINI_API_KEY sudah terisi
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 /**
@@ -42,13 +45,17 @@ INFORMASI DASAR STMIK TAZKIA:
 async function generateGeminiResponse(userMessage, conversationHistory = []) {
   try {
     // Cek API key
+    // Pengecekan ini sudah benar
     if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'AIzaSy.....') {
       throw new Error('GEMINI_API_KEY tidak valid. Silakan cek file .env');
     }
 
+    // --- PERBAIKAN 2: Nama model salah (ada spasi) ---
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash-preview-09-2025';
+
     // Initialize model dengan system instruction
     const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || 'gemini 2.5-flash',
+      model: modelName,
       systemInstruction: SYSTEM_INSTRUCTION
     });
 
@@ -76,7 +83,7 @@ async function generateGeminiResponse(userMessage, conversationHistory = []) {
 
     // Log untuk monitoring
     console.log('✅ Gemini response generated:', {
-      model: process.env.GEMINI_MODEL,
+      model: modelName,
       responseLength: aiReply.length,
       promptTokens: response.usageMetadata?.promptTokenCount || 0,
       totalTokens: response.usageMetadata?.totalTokenCount || 0
@@ -95,7 +102,9 @@ async function generateGeminiResponse(userMessage, conversationHistory = []) {
     } else if (error.message?.includes('SAFETY')) {
       return 'Maaf, pertanyaan Anda tidak dapat diproses karena alasan keamanan. Silakan ajukan pertanyaan lain.';
     } else {
-      return 'Maaf, saya mengalami kesulitan memproses permintaan Anda. Silakan coba lagi atau hubungi admin kampus di info@tazkia.ac.id';
+      // Ini akan menangkap error "GEMINI_API_KEY tidak valid"
+      // dan menampilkannya dengan lebih rapi ke user
+      return `Maaf, saya mengalami kesulitan: ${error.message}. Silakan coba lagi atau hubungi admin.`;
     }
   }
 }
@@ -107,26 +116,29 @@ async function testGeminiConnection() {
   try {
     // Cek API key
     if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'AIzaSy.....') {
-      return { 
-        success: false, 
-        error: 'GEMINI_API_KEY tidak valid. Pastikan sudah diatur di file .env' 
+      return {
+        success: false,
+        error: 'GEMINI_API_KEY tidak valid. Pastikan sudah diatur di file .env'
       };
     }
 
-    const model = genAI.getGenerativeModel({ 
-      model: process.env.GEMINI_MODEL || 'gemini 2.5-flash'
+    // --- PERBAIKAN 2: Nama model salah (ada spasi) ---
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash-preview-09-2025';
+
+    const model = genAI.getGenerativeModel({
+      model: modelName
     });
-    
+
     const result = await model.generateContent('Say hello in Indonesian');
     const response = result.response.text();
-    
+
     console.log('✅ Gemini connection test successful:', response);
     return { success: true, message: response };
-    
+
   } catch (error) {
     console.error('❌ Gemini connection test failed:', error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error.message,
       details: 'Pastikan GEMINI_API_KEY valid dan koneksi internet tersedia'
     };
