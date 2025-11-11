@@ -4,11 +4,19 @@ const { PrismaClient } = require('@prisma/client');
 // --- Panggil dotenv PALING PERTAMA ---
 require('dotenv').config();
 
+// --- BARU: Impor untuk Passport ---
+const session = require('express-session');
+const passport = require('passport');
+
+// --- Impor Service (Auth Service dihapus) ---
 const { generateGeminiResponse, testGeminiConnection } = require('./src/services/geminiService');
-const { login, logout, verifySession, register } = require('./src/services/authService');
+// const { login, logout, verifySession, register } = require('./src/services/authService'); // <-- DIHAPUS
 const { requireAuth, optionalAuth } = require('./src/middleware/authMiddleware');
 const { getAcademicSummary, getGradesBySemester, getTranscript } = require('./src/services/academicService');
 const { generateTranscriptPDF } = require('./src/services/pdfService');
+
+// --- BARU: Impor Rute Auth ---
+const authRoutes = require('./src/routes/authRoutes');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -16,44 +24,75 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 
-// --- PERBAIKAN CORS LENGKAP ---
-// Ini adalah konfigurasi yang benar untuk mengizinkan
-// origin DAN header 'Authorization'
+// --- Konfigurasi CORS (PERBAIKAN LENGKAP) ---
+// 1. Buat daftar alamat (origin) yang diizinkan
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:3000', // Ambil dari .env ATAU default
+  'http://192.168.100.48:3000' // Tambahkan alamat IP frontend Anda
+];
+
 const corsOptions = {
-  origin: 'http://localhost:3000', // Izinkan frontend Anda
-  methods: 'GET,POST,DELETE,PUT,PATCH', // Izinkan metode ini
-  allowedHeaders: 'Content-Type,Authorization', // Izinkan header ini
+  origin: function (origin, callback) {
+    // Izinkan jika origin ada di daftar 'allowedOrigins'
+    // Izinkan juga jika origin 'undefined' (misal: request dari Postman, atau server-to-server)
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Alamat ini tidak diizinkan oleh CORS'));
+    }
+  },
+  methods: 'GET,POST,DELETE,PUT,PATCH',
+  allowedHeaders: 'Content-Type,Authorization',
+  credentials: true // <-- WAJIB ADA untuk Passport/session
 };
+
 app.use(cors(corsOptions));
-// --- AKHIR PERBAIKAN ---
 
 app.use(express.json());
 
-// Rate limiting map
+// --- BARU: Middleware untuk Session & Passport ---
+// Wajib ada SEBELUM rute auth
+app.use(
+  session({
+    // Tambahkan SESSION_SECRET=... di file .env Anda!
+    secret: process.env.SESSION_SECRET || 'ganti-ini-dengan-rahasia-super-panjang',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production' // 'true' jika pakai HTTPS
+    },
+  })
+);
+
+// Inisialisasi Passport
+app.use(passport.initialize());
+app.use(passport.session());
+// --- AKHIR BLOK BARU ---
+
+
+// Rate limiting map (Tetap sama)
 const rateLimitMap = new Map();
 
 function rateLimiter(req, res, next) {
+  // ... (Logika rateLimiter Anda tetap sama)
   const userId = req.user?.id || req.body.userId || 'anonymous';
   const today = new Date().toDateString();
   const key = `${userId}-${today}`;
-
   const count = rateLimitMap.get(key) || 0;
-
-  if (count >= 100) { // Increased for authenticated users
+  if (count >= 100) {
     return res.status(429).json({
       error: 'Rate limit exceeded',
       message: 'Anda telah mencapai batas maksimal request per hari.'
     });
   }
-
   rateLimitMap.set(key, count + 1);
   next();
 }
 
-// Helper functions
+// Helper functions (Tetap sama)
 function detectIntent(message) {
+  // ... (Logika detectIntent Anda tetap sama)
   const lowerMessage = message.toLowerCase();
-
   if (lowerMessage.includes('pendaftaran') || lowerMessage.includes('daftar')) {
     return 'pendaftaran';
   } else if (lowerMessage.includes('program studi') || lowerMessage.includes('prodi') || lowerMessage.includes('jurusan')) {
@@ -74,18 +113,18 @@ function detectIntent(message) {
 }
 
 function requiresAuthentication(message) {
+  // ... (Logika requiresAuthentication Anda tetap sama)
   const authKeywords = [
     'nilai saya', 'ipk saya', 'transkrip saya', 'akademik saya', 'data saya',
     'jadwal saya', 'krs saya', 'beasiswa saya', 'tagihan saya', 'pembayaran saya'
   ];
-
   const lowerMessage = message.toLowerCase();
   return authKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
 // ==================== HEALTH CHECK ====================
-
 app.get('/', (req, res) => {
+  // ... (Rute Health Check Anda tetap sama)
   res.json({
     message: 'Sapa Tazkia Backend API',
     version: '3.0.0',
@@ -94,6 +133,7 @@ app.get('/', (req, res) => {
     features: [
       'AI Chat',
       'JWT Authentication',
+      'Google OAuth 2.0', // Ditambahkan
       'Academic Data',
       'PDF Export',
       'RAG Ready'
@@ -102,160 +142,28 @@ app.get('/', (req, res) => {
 });
 
 // ==================== AUTH ROUTES ====================
+// DIPERBARUI: Semua rute /api/auth sekarang ditangani oleh file authRoutes.js
+app.use('/api/auth', authRoutes);
 
-/**
- * POST /api/auth/register
- * Register mahasiswa baru
- */
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    // req.body akan berisi { fullName, nim, email, password } dari frontend
-    const result = await register(req.body);
+// --- SEMUA RUTE AUTH YANG LAMA (REGISTER, LOGIN, LOGOUT, VERIFY, ME) DIHAPUS DARI SINI ---
+// ...
+// ... (Blok kode dari /api/auth/register sampai /api/auth/me telah dihapus)
+// ...
 
-    if (!result.success) {
-      // Jika error (misal: user sudah ada), kirim 400
-      return res.status(400).json(result);
-    }
-
-    // Kirim 201 (Created)
-    res.status(201).json(result);
-
-  } catch (error) {
-    console.error('Register route error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Terjadi kesalahan server'
-    });
-  }
-});
-
-
-/**
- * POST /api/auth/login
- * Login mahasiswa
- */
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    // Frontend sekarang mengirim 'nim', ini sudah benar
-    const { nim, password } = req.body;
-
-    // Validation
-    if (!nim || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'NIM dan password harus diisi'
-      });
-    }
-
-    // Get IP and User Agent
-    const ipAddress = req.ip || req.connection.remoteAddress;
-    const userAgent = req.headers['user-agent'];
-
-    // Login
-    // authService.login Anda sudah benar menerima 'nim'
-    const result = await login(nim, password, ipAddress, userAgent);
-
-    if (!result.success) {
-      return res.status(401).json(result);
-    }
-
-    res.json(result);
-
-  } catch (error) {
-    console.error('Login route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Terjadi kesalahan server'
-    });
-  }
-});
-
-/**
- * POST /api/auth/logout
- * Logout mahasiswa
- */
-app.post('/api/auth/logout', requireAuth, async (req, res) => {
-  try {
-    const token = req.headers.authorization?.substring(7);
-    const result = await logout(token);
-    res.json(result);
-  } catch (error) {
-    console.error('Logout route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Terjadi kesalahan server'
-    });
-  }
-});
-
-/**
- * GET /api/auth/verify
- * Verify token validity
- */
-app.get('/api/auth/verify', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        valid: false,
-        message: 'Token tidak ditemukan'
-      });
-    }
-
-    const token = authHeader.substring(7);
-    const result = await verifySession(token);
-
-    if (!result.valid) {
-      return res.status(401).json(result);
-    }
-
-    res.json(result);
-
-  } catch (error) {
-    console.error('Verify route error:', error);
-    res.status(500).json({
-      valid: false,
-      message: 'Terjadi kesalahan server'
-    });
-  }
-});
-
-/**
- * GET /api/auth/me
- * Get current user data
- */
-app.get('/api/auth/me', requireAuth, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      user: req.user // req.user diisi oleh middleware requireAuth
-    });
-  } catch (error) {
-    console.error('Get me route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Terjadi kesalahan server'
-    });
-  }
-});
 
 // ==================== ACADEMIC ROUTES ====================
+// (Rute-rute ini tetap sama dan sudah benar)
 
 /**
  * GET /api/academic/summary
- * Get academic summary (IPK, SKS, etc)
  */
 app.get('/api/academic/summary', requireAuth, async (req, res) => {
   try {
     const result = await getAcademicSummary(req.user.id);
-
     if (!result.success) {
       return res.status(404).json(result);
     }
-
     res.json(result);
-
   } catch (error) {
     console.error('Get academic summary route error:', error);
     res.status(500).json({
@@ -267,19 +175,15 @@ app.get('/api/academic/summary', requireAuth, async (req, res) => {
 
 /**
  * GET /api/academic/grades
- * Get grades (all semesters or specific semester)
  */
 app.get('/api/academic/grades', requireAuth, async (req, res) => {
   try {
     const { semester } = req.query;
     const result = await getGradesBySemester(req.user.id, semester);
-
     if (!result.success) {
       return res.status(404).json(result);
     }
-
     res.json(result);
-
   } catch (error) {
     console.error('Get grades route error:', error);
     res.status(500).json({
@@ -291,18 +195,14 @@ app.get('/api/academic/grades', requireAuth, async (req, res) => {
 
 /**
  * GET /api/academic/transcript
- * Get full transcript data
  */
 app.get('/api/academic/transcript', requireAuth, async (req, res) => {
   try {
     const result = await getTranscript(req.user.id);
-
     if (!result.success) {
       return res.status(404).json(result);
     }
-
     res.json(result);
-
   } catch (error) {
     console.error('Get transcript route error:', error);
     res.status(500).json({
@@ -314,27 +214,20 @@ app.get('/api/academic/transcript', requireAuth, async (req, res) => {
 
 /**
  * GET /api/academic/transcript/pdf
- * Download transcript as PDF
  */
 app.get('/api/academic/transcript/pdf', requireAuth, async (req, res) => {
   try {
     const result = await generateTranscriptPDF(req.user.id);
-
     if (!result.success) {
       return res.status(404).json({
         success: false,
         message: result.message
       });
     }
-
-    // Set headers for PDF download
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
-
-    // Pipe PDF to response
     result.doc.pipe(res);
     result.doc.end();
-
   } catch (error) {
     console.error('Generate PDF route error:', error);
     res.status(500).json({
@@ -345,10 +238,10 @@ app.get('/api/academic/transcript/pdf', requireAuth, async (req, res) => {
 });
 
 // ==================== AI CHAT ROUTES ====================
+// (Rute-rute ini tetap sama dan sudah benar)
 
 /**
  * GET /api/test-gemini
- * Test Gemini connection
  */
 app.get('/api/test-gemini', async (req, res) => {
   try {
@@ -361,7 +254,6 @@ app.get('/api/test-gemini', async (req, res) => {
 
 /**
  * POST /api/test-ai
- * Test AI response
  */
 app.post('/api/test-ai', async (req, res) => {
   try {
@@ -375,35 +267,25 @@ app.post('/api/test-ai', async (req, res) => {
 
 /**
  * POST /api/chat
- * Main chat endpoint dengan AI + Academic Data Integration
  */
 app.post('/api/chat', optionalAuth, rateLimiter, async (req, res) => {
+  // ... (Logika /api/chat Anda tetap sama)
   const startTime = Date.now();
-
   try {
     const { message, conversationId: reqConversationId } = req.body;
-    
-    // --- PERBAIKAN BUG GUEST USER ---
-    // 'userId' akan undefined jika guest, atau berisi ID jika login
-    const userId = req.user?.id; 
-    // --- AKHIR PERBAIKAN ---
-    
+    const userId = req.user?.id;
     let conversationId = reqConversationId ? parseInt(reqConversationId) : null;
 
-    // Validasi input
     if (!message || message.trim().length === 0) {
       return res.status(400).json({ error: 'Pesan tidak boleh kosong' });
     }
-
     if (message.length > 500) {
       return res.status(400).json({ error: 'Pesan terlalu panjang (maksimal 500 karakter)' });
     }
 
-    // Detect intent
     const intent = detectIntent(message);
     console.log(`📊 Intent detected: ${intent}`);
 
-    // Check if requires authentication
     if (requiresAuthentication(message) && !req.user) {
       return res.json({
         reply: 'Untuk mengakses informasi akademik pribadi Anda, silakan login terlebih dahulu dengan mengklik tombol "Login Mahasiswa" di sidebar. 🔐',
@@ -416,27 +298,22 @@ app.post('/api/chat', optionalAuth, rateLimiter, async (req, res) => {
     let conversation = null;
     let history = [];
 
-    // --- PERBAIKAN: HANYA berinteraksi dengan DB jika user LOGIN (userId ada) ---
     if (userId) {
       if (conversationId) {
         conversation = await prisma.conversation.findUnique({
           where: { id: conversationId }
         });
       }
-
-      // Buat conversation baru jika tidak ada
       if (!conversation) {
         const title = message.substring(0, 50) + (message.length > 50 ? '...' : '');
         conversation = await prisma.conversation.create({
           data: {
-            userId: userId, // Ini sekarang aman
+            userId: userId,
             title: title
           }
         });
-        conversationId = conversation.id; // Dapatkan ID baru
+        conversationId = conversation.id;
       }
-
-      // Simpan pesan user (hanya jika login)
       await prisma.message.create({
         data: {
           conversationId: conversationId,
@@ -444,30 +321,22 @@ app.post('/api/chat', optionalAuth, rateLimiter, async (req, res) => {
           content: message
         }
       });
-
-      // Get conversation history (hanya jika login)
       history = await prisma.message.findMany({
         where: { conversationId: conversationId },
         orderBy: { createdAt: 'asc' },
         take: 10
       });
     }
-    // --- AKHIR PERBAIKAN BLOK DATABASE ---
 
-
-    // Generate AI response (Jalan untuk Guest ataupun User Login)
     console.log('🤖 Generating Gemini response...');
     let aiReply = await generateGeminiResponse(message, history);
-
-    // If user authenticated and asking about personal academic data
     let academicData = null;
+
     if (req.user && intent === 'akademik_personal') {
       try {
         const summaryResult = await getAcademicSummary(req.user.id);
         if (summaryResult.success) {
           academicData = summaryResult.data;
-
-          // Enhance AI response with actual data
           aiReply = `Berdasarkan data akademik Anda:\n\n` +
             `📊 **IPK**: ${academicData.ipk.toFixed(2)}\n` +
             `📚 **Total SKS**: ${academicData.totalSks}\n` +
@@ -483,9 +352,7 @@ app.post('/api/chat', optionalAuth, rateLimiter, async (req, res) => {
 
     const responseTime = (Date.now() - startTime) / 1000;
 
-    // --- PERBAIKAN: HANYA simpan pesan bot jika user LOGIN ---
     if (userId) {
-      // Simpan pesan bot
       await prisma.message.create({
         data: {
           conversationId: conversationId,
@@ -495,7 +362,6 @@ app.post('/api/chat', optionalAuth, rateLimiter, async (req, res) => {
         }
       });
     }
-    // --- AKHIR PERBAIKAN ---
 
     const hasPDF = (req.user && intent === 'akademik_personal') ||
       aiReply.toLowerCase().includes('pdf') ||
@@ -503,7 +369,7 @@ app.post('/api/chat', optionalAuth, rateLimiter, async (req, res) => {
 
     res.json({
       reply: aiReply,
-      conversationId: conversationId, // Kirim ID-nya (bisa null jika guest)
+      conversationId: conversationId,
       hasPDF: hasPDF,
       intent: intent,
       responseTime: responseTime,
@@ -523,14 +389,17 @@ app.post('/api/chat', optionalAuth, rateLimiter, async (req, res) => {
 });
 
 // ==================== CHAT HISTORY ROUTES ====================
-
-app.get('/api/chat/history/:conversationId', optionalAuth, async (req, res) => {
+// PERBAIKAN: Mengganti optionalAuth menjadi requireAuth untuk keamanan
+app.get('/api/chat/history/:conversationId', requireAuth, async (req, res) => {
   try {
     const { conversationId } = req.params;
-
     const messages = await prisma.message.findMany({
       where: {
-        conversationId: parseInt(conversationId)
+        conversationId: parseInt(conversationId),
+        // PERBAIKAN KEAMANAN: Pastikan conversation ini milik user yang login
+        conversation: {
+          userId: req.user.id
+        }
       },
       orderBy: {
         createdAt: 'asc'
@@ -542,9 +411,7 @@ app.get('/api/chat/history/:conversationId', optionalAuth, async (req, res) => {
         createdAt: true
       }
     });
-
     res.json({ messages });
-
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({
@@ -553,10 +420,12 @@ app.get('/api/chat/history/:conversationId', optionalAuth, async (req, res) => {
   }
 });
 
-app.get('/api/chat/conversations/:userId', optionalAuth, async (req, res) => {
+// PERBAIKAN: Hapus :userId dari URL, kita akan gunakan req.user.id
+// PERBAIKAN: Mengganti optionalAuth menjadi requireAuth
+app.get('/api/chat/conversations', requireAuth, async (req, res) => {
   try {
-    const userId = req.user?.id || parseInt(req.params.userId);
-
+    // PERBAIKAN: Selalu gunakan ID dari user yang terotentikasi, jangan dari parameter
+    const userId = req.user.id;
     const conversations = await prisma.conversation.findMany({
       where: {
         userId: userId
@@ -574,9 +443,7 @@ app.get('/api/chat/conversations/:userId', optionalAuth, async (req, res) => {
       },
       take: 20
     });
-
     res.json({ conversations });
-
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({
@@ -586,38 +453,31 @@ app.get('/api/chat/conversations/:userId', optionalAuth, async (req, res) => {
 });
 
 app.delete('/api/chat/conversation/:conversationId', requireAuth, async (req, res) => {
+  // ... (Logika /api/chat/conversation/:conversationId Anda tetap sama)
   try {
     const { conversationId } = req.params;
-
-    // Verify ownership
     const conversation = await prisma.conversation.findFirst({
       where: {
         id: parseInt(conversationId),
         userId: req.user.id
       }
     });
-
     if (!conversation) {
-      // Perbaikan: 404 Not Found
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
         message: 'Conversation tidak ditemukan'
       });
     }
-
     await prisma.message.deleteMany({
       where: { conversationId: parseInt(conversationId) }
     });
-
     await prisma.conversation.delete({
       where: { id: parseInt(conversationId) }
     });
-
     res.json({
       success: true,
       message: 'Conversation deleted successfully'
     });
-
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({
@@ -628,20 +488,21 @@ app.delete('/api/chat/conversation/:conversationId', requireAuth, async (req, re
 
 // ==================== SERVER START ====================
 
-// Graceful shutdown
+// Graceful shutdown (Tetap sama)
 process.on('SIGINT', async () => {
   await prisma.$disconnect();
   process.exit(0);
 });
 
 app.listen(PORT, () => {
+  // ... (Logika startup Anda tetap sama)
   console.log(`
   ╔════════════════════════════════════════════╗
-  ║   🚀 Sapa Tazkia Backend Server v3.0       ║
+  ║   🚀 Sapa Tazkia Backend Server v3.0     ║
   ║   📡 Port: ${PORT}                         ║
-  ║   🌐 URL: http://localhost:${PORT}         ║
+  ║   🌐 URL: http://localhost:${PORT}             ║
   ║   🤖 AI: Google Gemini 2.5 Flash           ║
-  ║   🔐 Auth: JWT Enabled                     ║
+  ║   🔐 Auth: JWT & Google OAuth Enabled      ║
   ║   📊 Database: Connected                   ║
   ║   ✅ Status: Ready                         ║
   ╚════════════════════════════════════════════╝

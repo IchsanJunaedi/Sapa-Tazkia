@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-// --- PERUBAHAN: Import useAuth ---
+// --- PERBAIKAN: Menambah ekstensi .js agar file ditemukan ---
 import { useAuth } from '../context/AuthContext.js';
-import { Send, Plus, MessageSquare, PenSquare, User, Settings, X, Mail, Instagram, Globe, Youtube } from 'lucide-react';
+import { Send, Plus, MessageSquare, PenSquare, User, Settings, X, Instagram, Globe, Youtube } from 'lucide-react';
 
-// --- Komponen GradientText (Sudah dibersihkan) ---
+// --- Komponen GradientText (Sudah Benar) ---
 const GradientText = ({ children, className = '' }) => {
   return (
     <span
@@ -16,7 +16,7 @@ const GradientText = ({ children, className = '' }) => {
   );
 };
 
-// --- Komponen Button (Sudah dibersihkan) ---
+// --- Komponen Button (Sudah Benar) ---
 const Button = ({ children, onClick, className, variant = 'default', size = 'md', ...props }) => {
   const baseClasses = 'font-semibold transition-all duration-200 ease-in-out flex items-center justify-center rounded-lg';
   const variantClasses = {
@@ -46,7 +46,7 @@ const Button = ({ children, onClick, className, variant = 'default', size = 'md'
   );
 };
 
-// --- Komponen Sidebar (Sudah dibersihkan) ---
+// --- Komponen Sidebar (Sudah diperbaiki) ---
 const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout }) => {
 
   // Komponen Ikon Toggle kustom
@@ -93,12 +93,14 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
           // Jika sudah login
           <button
             className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-green-500 text-white rounded-xl shadow-lg hover:bg-green-600 transition-all flex items-center group relative gap-3`}
-            title={`Logged in as ${user.fullName}. Click to logout.`}
+            // ✅ PERBAIKAN 1: Ganti `user.fullName` menjadi `user.name`
+            title={`Logged in as ${user?.name || 'User'}. Click to logout.`}
             onClick={onLogout} // Memicu logout
           >
             <User size={20} />
             <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-              {user.fullName.split(' ')[0]} {/* Tampilkan nama depan */}
+              {/* ✅ PERBAIKAN 2 (Error Asli): Ganti `user.fullName.split` menjadi `user?.name?.split` */}
+              {user?.name?.split(' ')[0] || 'User'}
             </span>
           </button>
         ) : (
@@ -116,7 +118,7 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
         )}
       </div>
 
-      {/* Tombol New Chat */}
+      {/* Tombol New Chat (Sudah Benar) */}
       <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
         <button
           className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
@@ -129,7 +131,7 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
         </button>
       </div>
 
-      {/* Tombol Chats History */}
+      {/* Tombol Chats History (Sudah Benar) */}
       <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
         <button
           className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
@@ -142,7 +144,7 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
         </button>
       </div>
 
-      {/* Social Links di Footer */}
+      {/* Social Links di Footer (Sudah Benar) */}
       <div className={`mt-auto flex ${isSidebarOpen ? 'flex-col items-start gap-2' : 'flex-row items-center justify-center space-x-2'} pb-4`}>
         <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors flex items-center gap-3">
           <Instagram size={16} />
@@ -161,7 +163,7 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
   );
 };
 
-// --- Komponen GoogleIcon (Sudah dibersihkan) ---
+// --- Komponen GoogleIcon (Sudah Benar) ---
 const GoogleIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-6 h-6 mr-3">
     <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.343c-1.896,3.101-5.466,6.17-11.343,6.17 c-6.958,0-12.632-5.673-12.632-12.632c0-6.958,5.674-12.632,12.632-12.632c3.23,0,6.347,1.385,8.441,3.483l5.882-5.882 C34.004,5.946,29.351,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20 C44,22.659,43.834,21.32,43.611,20.083z" />
@@ -172,17 +174,18 @@ const GoogleIcon = () => (
 );
 
 
-// --- Komponen AuthModal (Sudah dibersihkan) ---
+// --- Komponen AuthModal (Sudah diperbaiki) ---
 const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFunction }) => {
   const [step, setStep] = useState(initialStep);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  
-  // --- PERBAIKAN: Tambahkan state untuk form registrasi ---
-  const [fullName, setFullName] = useState('');
-  const [nim, setNim] = useState('');
-  // Kita akan gunakan state 'password' yang sudah ada untuk registrasi juga
-  
+
+  // --- ✅ PERBAIKAN 3: State dipisahkan untuk Login dan Register ---
+  const [loginNim, setLoginNim] = useState(''); // State untuk NIM di form Login
+  const [password, setPassword] = useState(''); // State untuk Password (dipakai Login & Register)
+
+  const [fullName, setFullName] = useState(''); // State untuk Register
+  const [nim, setNim] = useState(''); // State untuk NIM di form Register
+  const [email, setEmail] = useState(''); // State untuk Email di form Register
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -190,10 +193,11 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
   useEffect(() => {
     if (isOpen) {
       setStep(initialStep);
-      // Reset state
+      // Reset semua state
+      // ✅ PERBAIKAN 4: Reset state loginNim
+      setLoginNim('');
       setEmail('');
       setPassword('');
-      // --- PERBAIKAN: Reset state baru ---
       setFullName('');
       setNim('');
       setError(null);
@@ -203,16 +207,18 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
 
   if (!isOpen) return null;
 
-  // Fungsi handleLogin
+  // --- ✅ PERBAIKAN 5: handleLogin disesuaikan untuk NIM ---
   const handleLogin = async () => {
-    if (!email || !password) {
-      setError('Email and password are required.');
+    // Validasi menggunakan loginNim
+    if (!loginNim || !password) {
+      setError('NIM and password are required.');
       return;
     }
     setIsLoading(true);
     setError(null);
     try {
-      await loginFunction(email, password);
+      // Kirim loginNim dan password ke AuthContext
+      await loginFunction(loginNim, password);
       onClose();
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
@@ -220,8 +226,9 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
     }
   };
 
-  // --- PERBAIKAN: Fungsi handleSignUp kini diimplementasikan ---
+  // --- Fungsi handleSignUp (Sudah Benar) ---
   const handleSignUp = async () => {
+    // Validasi menggunakan state register (fullName, nim, email, password)
     if (!fullName || !nim || !email || !password) {
       setError('All fields are required.');
       return;
@@ -231,16 +238,26 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
     try {
       // Panggil fungsi register dari AuthContext
       await registerFunction({ fullName, nim, email, password });
-      
-      // Jika berhasil, pindah ke step verifikasi
-      // (Atau tutup modal jika registerFunction sudah menangani login)
-      // Untuk sekarang, kita pindah ke step 2
-      setStep(2); 
+
+      // Pindah ke step verifikasi
+      setStep(2);
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // --- ✅ PERBAIKAN 6: Tambahkan handleGoogleLogin ---
+  const handleGoogleLogin = () => {
+    setIsLoading(true);
+    console.log("Mengarahkan ke Google Login...");
+
+    // Ambil API URL dari environment atau hardcode
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+    // Arahkan ke endpoint Google backend Anda
+    window.location.href = `${API_URL}/api/auth/google`;
   };
 
 
@@ -258,11 +275,12 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
               </div>
             )}
 
+            {/* --- ✅ PERBAIKAN 7: Ubah Input Email menjadi NIM --- */}
             <input
-              type="email"
-              placeholder="Enter your email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="Enter your NIM"
+              value={loginNim}
+              onChange={(e) => setLoginNim(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none mb-4"
               disabled={isLoading}
             />
@@ -277,9 +295,10 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
             <button
               onClick={handleLogin}
               className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${
-                (email && password && !isLoading) ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
+                // --- ✅ PERBAIKAN 8: Update validasi disabled ---
+                (loginNim && password && !isLoading) ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
                 }`}
-              disabled={!email || !password || isLoading}
+              disabled={!loginNim || !password || isLoading}
             >
               {isLoading ? 'Logging in...' : 'Continue'}
             </button>
@@ -291,14 +310,17 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
             </div>
 
             <div className="space-y-3">
-              <button className="w-full py-3 flex items-center justify-center border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors" disabled={isLoading}>
+              {/* --- ✅ PERBAIKAN 9: Tambahkan onClick ke tombol Google --- */}
+              <button
+                onClick={handleGoogleLogin}
+                className="w-full py-3 flex items-center justify-center border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                disabled={isLoading}
+              >
                 <GoogleIcon />
                 Continue with google
               </button>
-              <button className="w-full py-3 flex items-center justify-center border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors" disabled={isLoading}>
-                <Mail size={20} className="mr-3 text-gray-500" />
-                Email and password
-              </button>
+
+              {/* --- ✅ PERBAIKAN 10: Hapus tombol "Email and password" yang membingungkan --- */}
             </div>
 
             <p className="text-sm text-center text-gray-600 mt-6">
@@ -313,66 +335,65 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
           </>
         );
 
-      case 1: // Signup Step 1
+      case 1: // Signup Step 1 (Form Registrasi)
         return (
           <>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Create Your Account</h2>
             <p className="text-sm text-gray-600 mb-6">Get smarter academic responses and guidance from Sapa Tazkia.</p>
 
-            {/* --- PERBAIKAN: Tampilkan error --- */}
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
                 <span className="block sm:inline">{error}</span>
               </div>
             )}
 
-            {/* --- PERBAIKAN: Hubungkan input ke state --- */}
-            <input 
-              type="text" 
-              placeholder="Full Name" 
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4" 
+            {/* Input-input ini sudah benar terhubung ke state register */}
+            <input
+              type="text"
+              placeholder="Full Name"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               disabled={isLoading}
             />
-            <input 
-              type="text" 
-              placeholder="NIM" 
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4" 
+            <input
+              type="text"
+              placeholder="NIM"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
               value={nim}
               onChange={(e) => setNim(e.target.value)}
               disabled={isLoading}
             />
-            <input 
-              type="email" 
-              placeholder="Email" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4" 
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
               disabled={isLoading}
             />
-            <input 
-              type="password" 
-              placeholder="Password" 
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4" 
+            <input
+              type="password"
+              placeholder="Password"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
             />
 
             <button
-              onClick={handleSignUp} // Panggil fungsi register di sini
+              onClick={handleSignUp} // Panggil fungsi register
               className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${
                 (email && password && fullName && nim && !isLoading) ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
-              }`}
+                }`}
               disabled={!email || !password || !fullName || !nim || isLoading}
             >
               {isLoading ? 'Creating account...' : 'Continue'}
             </button>
             <p className="text-sm text-center text-gray-600 mt-6">
               Already have an account?
-              <button 
-                onClick={() => setStep(0)} 
+              <button
+                onClick={() => setStep(0)}
                 className="text-orange-500 hover:underline font-semibold ml-1 focus:outline-none"
                 disabled={isLoading}
               >
@@ -382,7 +403,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
           </>
         );
 
-      case 2: // Signup Step 2: Verify Code
+      case 2: // Signup Step 2: Verify Code (Sudah Benar)
         return (
           <>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Enter Your Code</h2>
@@ -415,7 +436,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
 };
 
 
-// --- Komponen Utama Landing Page ---
+// --- Komponen Utama Landing Page (Sudah Benar) ---
 const LandingPage = () => {
   const navigate = useNavigate();
   const { user, login, register, logout, loading } = useAuth();
@@ -455,10 +476,6 @@ const LandingPage = () => {
         onLogout={logout} // Kirim fungsi logout
       />
 
-      {/* ===================================================================
-        ✅ PERBAIKAN: Menambahkan <div ...> pembungkus ini kembali 
-        untuk memperbaiki layout yang "acak-acakan".
-      =================================================================== */}
       <div className="flex-1 flex flex-col">
 
         <nav className="flex items-center justify-between p-6">
@@ -555,8 +572,8 @@ const LandingPage = () => {
 
       </div>
       {/* ===================================================================
-        ✅ AKHIR DARI DIV PEMBUNGKUS YANG HILANG
-      =================================================================== */}
+        ✅ AKHIR DARI DIV PEMBUNGKUS
+      =================================================================== */}
 
       <AuthModal
         isOpen={isModalOpen}

@@ -1,62 +1,137 @@
+// --- BAGIAN IMPORT ---
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
+// BARU: Import Passport dan Strategi Google
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+
 const prisma = new PrismaClient();
 
-// Fungsi untuk membuat JWT (Token)
+// ========================================================
+// KONFIGURASI PASSPORT (GOOGLE STRATEGY)
+// ========================================================
+
+// BARU: Logika utama Google OAuth
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.GOOGLE_CALLBACK_URL,
+      scope: ['profile', 'email'],
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        // 1. Cek apakah user sudah ada berdasarkan Google ID
+        let user = await prisma.user.findUnique({
+          where: { googleId: profile.id },
+        });
+
+        if (user) {
+          return done(null, user); // User ditemukan, login
+        }
+
+        // 2. Jika tidak ada, cek berdasarkan email
+        const userEmail = profile.emails[0].value;
+        user = await prisma.user.findUnique({
+          where: { email: userEmail },
+        });
+
+        if (user) {
+          // User ada tapi belum terhubung ke Google. Update datanya.
+          const updatedUser = await prisma.user.update({
+            where: { email: userEmail },
+            data: { googleId: profile.id },
+          });
+          return done(null, updatedUser);
+        }
+
+        // 3. Jika tidak ada sama sekali, buat user baru
+        // Ini HANYA akan berhasil jika Anda sudah mengubah schema.prisma
+        const newUser = await prisma.user.create({
+          data: {
+            googleId: profile.id,
+            email: userEmail,
+            fullName: profile.displayName,
+            nim: null, // Dibuat null karena login via Google
+            passwordHash: null, // Dibuat null karena login via Google
+          },
+        });
+
+        return done(null, newUser);
+      } catch (error) {
+        return done(error, false);
+      }
+    }
+  )
+);
+
+// DIPERBARUI: Serializer (menyimpan user ID ke session)
+// user.id Anda sekarang Int, ini tidak masalah
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+// DIPERBARUI: Deserializer (mengambil data user dari session)
+passport.deserializeUser(async (id, done) => {
+  try {
+    // ID dari session mungkin string, ubah ke Int untuk query
+    const userId = parseInt(id, 10); 
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
+
+// ========================================================
+// FUNGSI TOKEN (TETAP SAMA)
+// ========================================================
 const generateToken = (userId) => {
-  // Pastikan Anda menambahkan JWT_SECRET di file .env Anda!
-  // Contoh: JWT_SECRET=inirahasiabanget
+  // userId Anda sekarang Int, JWT tidak masalah
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: '30d', // Token berlaku 30 hari
+    expiresIn: '30d',
   });
 };
 
 // ========================================================
-// FUNGSI REGISTER (YANG HILANG)
+// FUNGSI REGISTER (TETAP SAMA)
 // ========================================================
 const register = async (userData) => {
   const { fullName, nim, email, password } = userData;
 
-  // 1. Cek validasi dasar
   if (!fullName || !nim || !email || !password) {
-    // Kirim objek error yang konsisten
     return { success: false, message: 'All fields are required' };
   }
 
   try {
-    // 2. Cek apakah email sudah ada
     const emailExists = await prisma.user.findUnique({ where: { email } });
     if (emailExists) {
       return { success: false, message: 'User already exists with this email' };
     }
 
-    // 3. Cek apakah NIM sudah ada
     const nimExists = await prisma.user.findUnique({ where: { nim } });
     if (nimExists) {
       return { success: false, message: 'User already exists with this NIM' };
     }
 
-    // 4. Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 5. Buat user di database
     const user = await prisma.user.create({
       data: {
         fullName,
         nim,
         email,
-        // --- PERBAIKAN: Mengubah 'password' menjadi 'passwordHash' ---
         passwordHash: hashedPassword,
       },
     });
 
-    // 6. Buat token dan kirim kembali data (auto-login)
     if (user) {
-      const token = generateToken(user.id);
+      const token = generateToken(user.id); // user.id (Int)
       return {
         success: true,
         message: 'Registration successful',
@@ -78,32 +153,29 @@ const register = async (userData) => {
 };
 
 // ========================================================
-// FUNGSI LOGIN (YANG SUDAH ANDA MILIKI)
+// FUNGSI LOGIN (DIPERBARUI)
 // ========================================================
 const login = async (nim, password, ipAddress, userAgent) => {
-  // 1. Cari user berdasarkan NIM
   const user = await prisma.user.findUnique({
     where: { nim },
   });
 
-  // 2. Jika user ada DAN password cocok
-  // --- PERBAIKAN: Mengubah 'user.password' menjadi 'user.passwordHash' ---
-  if (user && (await bcrypt.compare(password, user.passwordHash))) {
-    // 3. Buat token
-    const token = generateToken(user.id);
+  // DIPERBARUI: Tambahkan cek 'user.passwordHash'
+  // Ini untuk mencegah error jika user Google (passwordHash=null) mencoba login
+  if (user && user.passwordHash && (await bcrypt.compare(password, user.passwordHash))) {
+    
+    const token = generateToken(user.id); // user.id (Int)
 
-    // 4. (Opsional) Catat sesi login di database
     await prisma.session.create({
       data: {
         userId: user.id,
-        token, // Simpan token untuk referensi (bisa di-hash)
+        token,
         ipAddress: ipAddress || 'unknown',
         userAgent: userAgent || 'unknown',
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 hari
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
 
-    // 5. Kirim data
     return {
       success: true,
       message: 'Login berhasil',
@@ -116,7 +188,6 @@ const login = async (nim, password, ipAddress, userAgent) => {
       },
     };
   } else {
-    // 6. Jika tidak, kirim error
     return {
       success: false,
       message: 'NIM atau password salah',
@@ -125,10 +196,9 @@ const login = async (nim, password, ipAddress, userAgent) => {
 };
 
 // ========================================================
-// FUNGSI LOGOUT (YANG SUDAH ANDA MILIKI)
+// FUNGSI LOGOUT (TETAP SAMA)
 // ========================================================
 const logout = async (token) => {
-  // Hapus sesi dari database
   await prisma.session.deleteMany({
     where: { token: token },
   });
@@ -139,14 +209,13 @@ const logout = async (token) => {
 };
 
 // ========================================================
-// FUNGSI VERIFY (YANG SUDAH ANDA MILIKI)
+// FUNGSI VERIFY (TETAP SAMA)
 // ========================================================
 const verifySession = async (token) => {
   try {
-    // 1. Verifikasi token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // 2. Cari user
+    // decoded.id sekarang Int
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: {
@@ -167,12 +236,14 @@ const verifySession = async (token) => {
   }
 };
 
-
-// --- INI BAGIAN PALING PENTING ---
-// Pastikan 'register' ada di sini
+// ========================================================
+// EXPORTS
+// ========================================================
 module.exports = {
-  register, // <-- PASTIKAN INI ADA
+  register,
   login,
   logout,
   verifySession,
+  generateToken, // BARU: Ekspor generateToken
+  passport, // BARU: Ekspor passport
 };
