@@ -1,141 +1,190 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-// Import instance axios Anda
-import api from 'api/axiosConfig';
+import api from '../api/axiosConfig';
 
 // 1. Buat Context
 const AuthContext = createContext(null);
 
+// Komponen Loading Sederhana
+const AuthLoading = () => (
+  <div style={{
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100vh',
+    fontSize: '18px'
+  }}>
+    Loading user data...
+  </div>
+);
+
 // 2. Buat Provider (Pembungkus)
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // Mulai dengan loading
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Cek apakah ada token di localStorage saat aplikasi pertama kali dimuat
-  useEffect(() => {
-    const checkLoggedInUser = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          // --- PERBAIKAN (PENTING) ---
-          // Set header default axios SEBELUM membuat panggilan API
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          // --- AKHIR PERBAIKAN ---
+  // Fungsi untuk menyimpan token dan mengupdate header axios
+  const setAuthToken = (newToken) => {
+    if (newToken) {
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
+      setIsAuthenticated(true);
+      // Set header Authorization untuk semua request axios
+      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+    } else {
+      localStorage.removeItem('token');
+      setToken(null);
+      setIsAuthenticated(false);
+      delete api.defaults.headers.common['Authorization'];
+    }
+  };
 
-          // Sekarang panggilan ini akan berhasil
-          const response = await api.get('/auth/me');
-          setUser(response.data.user);
-        } catch (error) {
-          // Token tidak valid/expire
-          console.error("Token invalid, logging out");
-          // Panggil fungsi logout yang sudah diperbaiki
-          logout(); 
-        }
-      }
-      setLoading(false);
-    };
+  // Cek apakah user sudah login saat aplikasi pertama kali dimuat
+  useEffect(() => {
+    const checkLoggedInUser = async () => {
+      const storedToken = localStorage.getItem('token');
+      
+      if (storedToken) {
+        try {
+          console.log('🔍 [AUTH CONTEXT] Checking user with token:', storedToken.substring(0, 20) + '...');
+          
+          // Set token untuk request ini
+          api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+          
+          // Panggil endpoint /me untuk verifikasi token
+          const response = await api.get('/auth/me');
+          
+          console.log('✅ [AUTH CONTEXT] User verified:', response.data.user);
+          
+          setUser(response.data.user);
+          setToken(storedToken);
+          setIsAuthenticated(true);
+          
+        } catch (error) {
+          console.error('❌ [AUTH CONTEXT] Token invalid or expired:', error);
+          // Token tidak valid, clear semua data
+          setAuthToken(null);
+          setUser(null);
+        }
+      } else {
+        console.log('🔍 [AUTH CONTEXT] No token found');
+      }
+      
+      setLoading(false);
+    };
 
-    checkLoggedInUser();
-  }, []); // Dependency array [] sudah benar
+    checkLoggedInUser();
+  }, []);
 
+  // Fungsi Login
+  const login = async (token, userData) => {
+    try {
+      console.log('🔍 [AUTH CONTEXT] Login called with:', { 
+        token: token.substring(0, 20) + '...', 
+        userData 
+      });
 
-  // --- FUNGSI LOGIN (DIPERBARUI TOTAL) ---
-  // Sekarang bisa menangani login(nim, password) DAN login(token)
-  const login = async (nimOrToken, password) => {
-    setLoading(true);
-    try {
-      let token;
-      let userData;
+      // Simpan token dan user data
+      setAuthToken(token);
+      setUser(userData);
+      
+      // Simpan user data di localStorage untuk persistensi
+      localStorage.setItem('user', JSON.stringify(userData));
+      
+      console.log('✅ [AUTH CONTEXT] Login successful');
+      
+      return true;
+    } catch (error) {
+      console.error('❌ [AUTH CONTEXT] Login failed:', error);
+      setAuthToken(null);
+      setUser(null);
+      throw error;
+    }
+  };
 
-      if (password) {
-        // --- Skenario 1: Login Lokal (NIM & Password) ---
-        // Dipanggil dari LoginPage.jsx
-        // PERBAIKAN: Menggunakan 'nim' sesuai backend
-        const response = await api.post('/auth/login', { nim: nimOrToken, password });
-        
-        token = response.data.token;
-        userData = response.data.user;
+  // Fungsi Login dengan NIM & Password (jika masih dibutuhkan)
+  const loginWithCredentials = async (nim, password) => {
+    setLoading(true);
+    try {
+      console.log('🔍 [AUTH CONTEXT] Login with credentials:', { nim });
+      
+      const response = await api.post('/auth/login', { nim, password });
+      const { token, user } = response.data;
+      
+      await login(token, user);
+      
+      return true;
+    } catch (error) {
+      console.error('❌ [AUTH CONTEXT] Credential login failed:', error);
+      setAuthToken(null);
+      setUser(null);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      } else {
-        // --- Skenario 2: Login Google (Hanya Token) ---
-        // Dipanggil dari AuthCallback.jsx
-        token = nimOrToken;
+  // Fungsi Register
+  const register = async (userData) => {
+    setLoading(true);
+    try {
+      console.log('🔍 [AUTH CONTEXT] Register called:', userData);
+      
+      const response = await api.post('/auth/register', userData);
+      const { token, user } = response.data;
+      
+      await login(token, user);
+      
+      return true;
+    } catch (error) {
+      console.error('❌ [AUTH CONTEXT] Registration failed:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        // Set token dulu agar 'me' berhasil
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        // Ambil data user secara manual
-        const response = await api.get('/auth/me');
-        userData = response.data.user;
-      }
+  // Fungsi Logout
+  const logout = () => {
+    console.log('🔍 [AUTH CONTEXT] Logout called');
+    
+    // Clear semua data
+    setAuthToken(null);
+    setUser(null);
+    localStorage.removeItem('user');
+    
+    // Redirect ke login page
+    window.location.href = '/login';
+  };
 
-      // --- Logika Umum untuk KEDUA Skenario ---
-      localStorage.setItem('token', token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      setUser(userData);
+  // Value yang disediakan ke context
+  const value = {
+    user,
+    token,
+    loading,
+    isAuthenticated,
+    login,
+    loginWithCredentials,
+    register,
+    logout,
+    setAuthToken
+  };
 
-      return true; // Sukses (untuk LoginPage)
-
-    } catch (error) {
-      console.error("Login failed:", error.response?.data?.message || error.message);
-      logout(); // Pastikan bersih-bersih jika gagal
-      throw error; // Lempar error agar bisa ditangkap di LoginPage
-    } finally {
-      setLoading(false);
-    }
-  };
-  // --- AKHIR FUNGSI LOGIN BARU ---
-
-  // FUNGSI REGISTER
-  const register = async (userData) => {
-    setLoading(true);
-    try {
-      const response = await api.post('/auth/register', userData);
-      
-      // Auto-login setelah register
-      localStorage.setItem('token', response.data.token);
-      // PERBAIKAN: Set header axios juga
-      api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-      setUser(response.data.user);
-
-    } catch (error) {
-      console.error("Registration failed:", error.response?.data?.message || error.message);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- FUNGSI LOGOUT (DIPERBARUI) ---
-  const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
-    // --- PERBAIKAN (PENTING) ---
-    // Hapus juga default header axios
-    delete api.defaults.headers.common['Authorization'];
-    // --- AKHIR PERBAIKAN ---
-  };
-
-  // 3. Sediakan value ke children
-  const value = {
-    user,
-    loading,
-    login,
-    register,
-    logout,
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
+  return (
+    <AuthContext.Provider value={value}>
+      {loading ? <AuthLoading /> : children}
+    </AuthContext.Provider>
+  );
 };
 
-// 4. Buat Hook kustom (useAuth - Tetap sama, sudah benar)
+// 3. Custom Hook untuk menggunakan AuthContext
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
+
+export default AuthContext;
