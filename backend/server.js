@@ -1,21 +1,20 @@
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
-// --- Panggil dotenv PALING PERTAMA ---
-require('dotenv').config();
+const passport = require('passport'); // Import Passport
+require('dotenv').config(); // Panggil dotenv PALING PERTAMA
 
-// --- BARU: Impor untuk Passport ---
-const session = require('express-session');
-const passport = require('passport');
+// --- PENTING: Memuat Konfigurasi Passport, Serializer, dan Strategi ---
+// Passport dan strateginya (GoogleStrategy) harus dijalankan sekali di awal.
+require('./src/services/authService');
 
-// --- Impor Service (Auth Service dihapus) ---
+// --- Impor Service & Middleware ---
 const { generateGeminiResponse, testGeminiConnection } = require('./src/services/geminiService');
-// const { login, logout, verifySession, register } = require('./src/services/authService'); // <-- DIHAPUS
-const { requireAuth, optionalAuth } = require('./src/middleware/authMiddleware');
+const { requireAuth, optionalAuth } = require('./src/middleware/authMiddleware'); // Pastikan authMiddleware Anda bekerja dengan JWT
 const { getAcademicSummary, getGradesBySemester, getTranscript } = require('./src/services/academicService');
 const { generateTranscriptPDF } = require('./src/services/pdfService');
 
-// --- BARU: Impor Rute Auth ---
+// --- Impor Rute Auth ---
 const authRoutes = require('./src/routes/authRoutes');
 
 const app = express();
@@ -25,16 +24,13 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 
 // --- Konfigurasi CORS (PERBAIKAN LENGKAP) ---
-// 1. Buat daftar alamat (origin) yang diizinkan
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:3000', // Ambil dari .env ATAU default
-  'http://192.168.100.48:3000' // Tambahkan alamat IP frontend Anda
+  process.env.FRONTEND_URL || 'http://localhost:3000',
+  'http://192.168.100.48:3000' 
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Izinkan jika origin ada di daftar 'allowedOrigins'
-    // Izinkan juga jika origin 'undefined' (misal: request dari Postman, atau server-to-server)
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -43,38 +39,21 @@ const corsOptions = {
   },
   methods: 'GET,POST,DELETE,PUT,PATCH',
   allowedHeaders: 'Content-Type,Authorization',
-  credentials: true // <-- WAJIB ADA untuk Passport/session
+  credentials: true // Dipertahankan untuk header 'Authorization'
 };
 
 app.use(cors(corsOptions));
 
 app.use(express.json());
 
-// --- BARU: Middleware untuk Session & Passport ---
-// Wajib ada SEBELUM rute auth
-app.use(
-  session({
-    // Tambahkan SESSION_SECRET=... di file .env Anda!
-    secret: process.env.SESSION_SECRET || 'ganti-ini-dengan-rahasia-super-panjang',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production' // 'true' jika pakai HTTPS
-    },
-  })
-);
-
-// Inisialisasi Passport
+// Inisialisasi Passport (Tanpa session, karena kita pakai JWT)
 app.use(passport.initialize());
-app.use(passport.session());
-// --- AKHIR BLOK BARU ---
-
+// app.use(passport.session()); <-- Dihapus karena kita pakai JWT/Token
 
 // Rate limiting map (Tetap sama)
 const rateLimitMap = new Map();
 
 function rateLimiter(req, res, next) {
-  // ... (Logika rateLimiter Anda tetap sama)
   const userId = req.user?.id || req.body.userId || 'anonymous';
   const today = new Date().toDateString();
   const key = `${userId}-${today}`;
@@ -91,7 +70,6 @@ function rateLimiter(req, res, next) {
 
 // Helper functions (Tetap sama)
 function detectIntent(message) {
-  // ... (Logika detectIntent Anda tetap sama)
   const lowerMessage = message.toLowerCase();
   if (lowerMessage.includes('pendaftaran') || lowerMessage.includes('daftar')) {
     return 'pendaftaran';
@@ -113,7 +91,6 @@ function detectIntent(message) {
 }
 
 function requiresAuthentication(message) {
-  // ... (Logika requiresAuthentication Anda tetap sama)
   const authKeywords = [
     'nilai saya', 'ipk saya', 'transkrip saya', 'akademik saya', 'data saya',
     'jadwal saya', 'krs saya', 'beasiswa saya', 'tagihan saya', 'pembayaran saya'
@@ -124,7 +101,6 @@ function requiresAuthentication(message) {
 
 // ==================== HEALTH CHECK ====================
 app.get('/', (req, res) => {
-  // ... (Rute Health Check Anda tetap sama)
   res.json({
     message: 'Sapa Tazkia Backend API',
     version: '3.0.0',
@@ -133,7 +109,7 @@ app.get('/', (req, res) => {
     features: [
       'AI Chat',
       'JWT Authentication',
-      'Google OAuth 2.0', // Ditambahkan
+      'Google OAuth 2.0',
       'Academic Data',
       'PDF Export',
       'RAG Ready'
@@ -142,17 +118,9 @@ app.get('/', (req, res) => {
 });
 
 // ==================== AUTH ROUTES ====================
-// DIPERBARUI: Semua rute /api/auth sekarang ditangani oleh file authRoutes.js
 app.use('/api/auth', authRoutes);
 
-// --- SEMUA RUTE AUTH YANG LAMA (REGISTER, LOGIN, LOGOUT, VERIFY, ME) DIHAPUS DARI SINI ---
-// ...
-// ... (Blok kode dari /api/auth/register sampai /api/auth/me telah dihapus)
-// ...
-
-
 // ==================== ACADEMIC ROUTES ====================
-// (Rute-rute ini tetap sama dan sudah benar)
 
 /**
  * GET /api/academic/summary
@@ -238,7 +206,6 @@ app.get('/api/academic/transcript/pdf', requireAuth, async (req, res) => {
 });
 
 // ==================== AI CHAT ROUTES ====================
-// (Rute-rute ini tetap sama dan sudah benar)
 
 /**
  * GET /api/test-gemini
@@ -250,6 +217,14 @@ app.get('/api/test-gemini', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        service: 'Sapa Tazkia Backend'
+    });
 });
 
 /**
@@ -269,7 +244,6 @@ app.post('/api/test-ai', async (req, res) => {
  * POST /api/chat
  */
 app.post('/api/chat', optionalAuth, rateLimiter, async (req, res) => {
-  // ... (Logika /api/chat Anda tetap sama)
   const startTime = Date.now();
   try {
     const { message, conversationId: reqConversationId } = req.body;
@@ -389,14 +363,13 @@ app.post('/api/chat', optionalAuth, rateLimiter, async (req, res) => {
 });
 
 // ==================== CHAT HISTORY ROUTES ====================
-// PERBAIKAN: Mengganti optionalAuth menjadi requireAuth untuk keamanan
 app.get('/api/chat/history/:conversationId', requireAuth, async (req, res) => {
   try {
     const { conversationId } = req.params;
     const messages = await prisma.message.findMany({
       where: {
         conversationId: parseInt(conversationId),
-        // PERBAIKAN KEAMANAN: Pastikan conversation ini milik user yang login
+        // KEAMANAN: Pastikan conversation ini milik user yang login
         conversation: {
           userId: req.user.id
         }
@@ -420,11 +393,8 @@ app.get('/api/chat/history/:conversationId', requireAuth, async (req, res) => {
   }
 });
 
-// PERBAIKAN: Hapus :userId dari URL, kita akan gunakan req.user.id
-// PERBAIKAN: Mengganti optionalAuth menjadi requireAuth
 app.get('/api/chat/conversations', requireAuth, async (req, res) => {
   try {
-    // PERBAIKAN: Selalu gunakan ID dari user yang terotentikasi, jangan dari parameter
     const userId = req.user.id;
     const conversations = await prisma.conversation.findMany({
       where: {
@@ -453,7 +423,6 @@ app.get('/api/chat/conversations', requireAuth, async (req, res) => {
 });
 
 app.delete('/api/chat/conversation/:conversationId', requireAuth, async (req, res) => {
-  // ... (Logika /api/chat/conversation/:conversationId Anda tetap sama)
   try {
     const { conversationId } = req.params;
     const conversation = await prisma.conversation.findFirst({
@@ -495,12 +464,11 @@ process.on('SIGINT', async () => {
 });
 
 app.listen(PORT, () => {
-  // ... (Logika startup Anda tetap sama)
   console.log(`
   ╔════════════════════════════════════════════╗
   ║   🚀 Sapa Tazkia Backend Server v3.0     ║
-  ║   📡 Port: ${PORT}                         ║
-  ║   🌐 URL: http://localhost:${PORT}             ║
+  ║   📡 Port: ${PORT}                      ║
+  ║   🌐 URL: http://localhost:${PORT}          ║
   ║   🤖 AI: Google Gemini 2.5 Flash           ║
   ║   🔐 Auth: JWT & Google OAuth Enabled      ║
   ║   📊 Database: Connected                   ║

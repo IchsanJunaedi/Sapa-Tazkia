@@ -1,22 +1,31 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-
-// 1. IMPORT AuthProvider-NYA
-import { AuthProvider } from './context/AuthContext'; // Pastikan path ini benar!
-
+import { AuthProvider } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
 import ChatPage from './pages/ChatPage';
-import LoginPage from './pages/LoginPage';
+import AuthCallback from './pages/AuthCallback';
+import ProtectedRoute from './components/common/ProtectedRoute';
 
 function App() {
   return (
     <Router>
-      {/* 2. BUNGKUS SEMUA <Routes> DENGAN <AuthProvider> */}
       <AuthProvider>
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          
+          {/* Protected Routes - hanya bisa diakses jika sudah login */}
+          <Route 
+            path="/chat" 
+            element={
+              <ProtectedRoute>
+                <ChatPage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Fallback route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

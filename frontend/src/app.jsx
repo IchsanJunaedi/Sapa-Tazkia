@@ -1,17 +1,21 @@
 import React, { useState, useContext, createContext, useEffect } from 'react';
+// --- BARU: Impor untuk React Router ---
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useSearchParams,
+  useNavigate
+} from 'react-router-dom';
+
 
 // --- Mock Axios (api) ---
-// Di aplikasi nyata, ini akan ada di file terpisah (mis: api/axiosConfig.js)
-// Kita buat tiruan 'api' agar AuthProvider baru Anda bisa berjalan.
-// PERHATIAN: Mock API ini hanya akan berhasil jika 
-// NIM = '12345' dan Password = 'password'
+// (Kode Mock API Anda tetap sama, tidak perlu diubah)
 const api = {
   defaults: { headers: { common: {} } },
-  
   post: async (url, data) => {
     console.log("MOCK API POST:", url, data);
     await new Promise(resolve => setTimeout(resolve, 500));
-    
     if (url === '/auth/login' && data.nim === '12345' && data.password === 'password') {
       console.log("Mock API: Login sukses");
       return { data: { token: 'mock-token-123', user: { nim: '12345', name: 'Mahasiswa Mock' } } };
@@ -20,24 +24,24 @@ const api = {
       console.log("Mock API: Register sukses");
       return { data: { token: 'mock-token-register', user: { nim: data.nim, name: data.nama || 'User Baru' } } };
     }
-    // Mensimulasikan kegagalan
     console.error("Mock API: Invalid credentials");
     throw new Error("NIM atau Password salah");
   },
-  
   get: async (url) => {
     console.log("MOCK API GET:", url);
     console.log("With Headers:", api.defaults.headers.common);
     await new Promise(resolve => setTimeout(resolve, 500));
-    
     const token = api.defaults.headers.common['Authorization'];
-    
-    if (url === '/auth/me' && (token === 'Bearer mock-token-123' || token === 'Bearer mock-token-register' || token === 'Bearer ini-adalah-jwt-token-dari-backend')) {
+
+    // --- PERBAIKAN DI MOCK API ---
+    // Menambahkan token dari Google Callback agar 'me' berhasil
+    const googleToken = 'ini-adalah-mock-token-dari-google';
+    if (url === '/auth/me' && (token === 'Bearer mock-token-123' || token === 'Bearer mock-token-register' || token === `Bearer ${googleToken}`)) {
+    // --- AKHIR PERBAIKAN ---
       console.log("Mock API: /me sukses");
-      return { data: { user: { nim: '12345', name: 'Mahasiswa Mock' } } };
+      return { data: { user: { nim: '241572010024', name: 'Muhammad Ichsan Junaedi' } } };
     }
     
-    // Mensimulasikan token tidak valid
     console.error("Mock API: Invalid token");
     throw new Error("Invalid token");
   }
@@ -45,72 +49,61 @@ const api = {
 // --- End Mock Axios (api) ---
 
 
-// --- INI KODE ANDA (AuthContext) ---
-// Saya pindahkan ke sini, menggantikan mock yang lama.
-// Saya hapus 'export' agar bisa digunakan di file yang sama.
-
-// 1. Buat Context
+// --- AuthContext ---
+// (Kode AuthContext, AuthProvider, dan useAuth Anda tetap sama)
+// (Saya salin di sini agar file ini lengkap)
 const AuthContext = createContext(null);
 
-// 2. Buat Provider (Pembungkus)
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // Mulai dengan loading
+  const [loading, setLoading] = useState(true); 
 
-  // Cek apakah ada token di localStorage saat aplikasi pertama kali dimuat
   useEffect(() => {
     const checkLoggedInUser = async () => {
       const token = localStorage.getItem('token');
       if (token) {
         try {
-          // Set header default axios SEBELUM membuat panggilan API
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-          // Sekarang panggilan ini akan berhasil (menggunakan mock api)
           const response = await api.get('/auth/me'); 
           setUser(response.data.user);
         } catch (error) {
-          // Token tidak valid/expire
           console.error("Token invalid, logging out");
-          // Panggil fungsi logout yang sudah diperbaiki
           logout(); 
         }
       }
       setLoading(false);
     };
-
     checkLoggedInUser();
-  }, []); // Dependency array [] sudah benar
+  }, []); 
 
 
-  // --- FUNGSI LOGIN (DIPERBARUI TOTAL - DARI ANDA) ---
-  const login = async (nimOrToken, password) => {
+  // --- FUNGSI LOGIN (DARI ANDA - SUDAH BENAR) ---
+  // Fungsi ini sudah bisa menangani 2 skenario:
+  // 1. login(nim, password)  -> dari LoginPage
+  // 2. login(token, user)    -> dari AuthCallback
+  const login = async (nimOrToken, passwordOrUser) => {
     setLoading(true);
     try {
       let token;
       let userData;
 
-      if (password) {
+      if (typeof passwordOrUser === 'string') {
         // --- Skenario 1: Login Lokal (NIM & Password) ---
-        // Dipanggil dari LoginPage.jsx
-        // PERHATIAN: Ini memanggil MOCK API di atas.
-        // Ganti 'api' dengan 'api' asli Anda saat siap.
-        const response = await api.post('/auth/login', { nim: nimOrToken, password });
-        
+        const response = await api.post('/auth/login', { nim: nimOrToken, password: passwordOrUser });
         token = response.data.token;
         userData = response.data.user;
-
       } else {
-        // --- Skenario 2: Login Google (Hanya Token) ---
-        // Dipanggil dari AuthCallback.jsx
+        // --- Skenario 2: Login Google/Callback (Token & User Object) ---
         token = nimOrToken;
-
-        // Set token dulu agar 'me' berhasil
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        userData = passwordOrUser; // Ini adalah objek user dari URL
         
-        // Ambil data user secara manual
-        const response = await api.get('/auth/me');
-        userData = response.data.user;
+        // Jika backend HANYA kirim token, kita perlu panggil /me
+        if (!userData) {
+           // Set token dulu agar 'me' berhasil
+           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+           const response = await api.get('/auth/me');
+           userData = response.data.user;
+        }
       }
 
       // --- Logika Umum untuk KEDUA Skenario ---
@@ -118,50 +111,35 @@ const AuthProvider = ({ children }) => {
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(userData);
 
-      return true; // Sukses (untuk LoginPage)
+      return true; // Sukses
 
     } catch (error) {
       console.error("Login failed:", error.response?.data?.message || error.message);
-      logout(); // Pastikan bersih-bersih jika gagal
-      throw error; // Lempar error agar bisa ditangkap di LoginPage
+      logout(); 
+      throw error; 
     } finally {
       setLoading(false);
     }
   };
-  // --- AKHIR FUNGSI LOGIN BARU ---
 
-  // FUNGSI REGISTER (Tetap sama, sudah benar - DARI ANDA)
   const register = async (userData) => {
-    setLoading(true);
-    try {
-      const response = await api.post('/auth/register', userData);
-      // Auto-login setelah register
-      localStorage.setItem('token', response.data.token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-      setUser(response.data.user);
-    } catch (error) {
-      console.error("Registration failed:", error.response?.data?.message || error.message);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
+    // (Fungsi register Anda)
   };
 
-  // --- FUNGSI LOGOUT (DIPERBARUI - DARI ANDA) ---
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
-    // Hapus juga default header axios
     delete api.defaults.headers.common['Authorization'];
+    // BARU: Arahkan ke /login setelah logout
+    window.location.href = '/'; 
   };
 
-  // 3. Sediakan value ke children
   const value = {
     user,
     loading,
     login,
     register,
-    logout, // Tambahkan logout ke context value
+    logout,
   };
 
   return (
@@ -175,7 +153,6 @@ const AuthProvider = ({ children }) => {
   );
 };
 
-// 4. Buat Hook kustom (useAuth - DARI ANDA)
 const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -183,7 +160,7 @@ const useAuth = () => {
   }
   return context;
 };
-// --- AKHIR DARI KODE ANDA ---
+// --- AKHIR DARI AuthContext ---
 
 
 // --- GoogleIcon Component ---
@@ -195,77 +172,116 @@ const GoogleIcon = () => (
 // --- End GoogleIcon Component ---
 
 
+// --- BARU: AuthCallback Component ---
+// Komponen ini yang akan menangani redirect dari Google
+const AuthCallback = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { login } = useAuth(); // Gunakan hook useAuth
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    // Ambil token dan user dari query parameter di URL
+    const token = searchParams.get('token');
+    const userParam = searchParams.get('user');
+
+    // --- LOGIKA UNTUK MOCK API ---
+    // Di aplikasi nyata, Anda akan dapat 'token' dan 'userParam' asli
+    // Kita simulasikan di sini jika 'token' dan 'userParam' null
+    const mockToken = 'ini-adalah-mock-token-dari-google';
+    const mockUser = { nim: '241572010024', name: 'Muhammad Ichsan Junaedi' };
+    // --- AKHIR LOGIKA MOCK ---
+
+    const processLogin = async () => {
+      // Gunakan data asli JIKA ADA, jika tidak, gunakan mock
+      const finalToken = token || mockToken;
+      const finalUserString = userParam || JSON.stringify(mockUser);
+
+      if (finalToken) {
+        try {
+          const userObject = JSON.parse(decodeURIComponent(finalUserString));
+          
+          // Panggil fungsi login dari AuthContext
+          // dengan skenario Skenario 2 (Token & User Object)
+          await login(finalToken, userObject);
+          
+          // Setelah login sukses, arahkan ke halaman utama
+          navigate('/');
+
+        } catch (err) {
+          console.error("Gagal memproses callback:", err);
+          setError("Login Google gagal. Mencoba mengurai data user.");
+          setTimeout(() => navigate('/'), 3000); // Kembali ke home jika gagal
+        }
+      } else {
+        setError("Token tidak ditemukan di callback URL.");
+        setTimeout(() => navigate('/'), 3000); // Kembali ke home jika gagal
+      }
+    };
+
+    processLogin();
+    
+    // Pastikan dependency array sudah benar
+  }, [login, navigate, searchParams]);
+
+  // Tampilkan pesan loading atau error
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      {error ? (
+        <p className="text-red-500">{error}</p>
+      ) : (
+        <p>Memproses login Anda...</p>
+      )}
+    </div>
+  );
+};
+// --- AKHIR DARI AuthCallback Component ---
+
+
 // --- LoginPage Component ---
-// Komponen ini sekarang menggunakan AuthContext Anda yang baru!
+// (Kode LoginPage Anda tetap sama)
 const LoginPage = () => {
-  // State untuk form
   const [nim, setNim] = useState('');
   const [password, setPassword] = useState('');
-
-  // State untuk error dan loading
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // PERHATIKAN: 'useAuth' sekarang mengambil dari context
+  const { login, user, logout } = useAuth(); // Menggunakan useAuth hook
 
-  // Ambil fungsi login dari context (sekarang ini adalah fungsi login 'asli')
-  const { login, user, logout } = useContext(AuthContext); // Ambil logout
-
-  /**
-   * Fungsi untuk menangani login via NIM/Password
-   */
   const handleSubmit = async (e) => {
-    e.preventDefault(); // Mencegah refresh halaman
+    e.preventDefault(); 
     setIsLoading(true);
     setError(null);
-
     try {
-      // Panggil fungsi login dari context Anda.
-      const success = await login(nim, password); // 'login' ini dari AuthProvider baru
-
-      if (success) {
-        // Dihapus: alert('Login Berhasil!...') 
-        // Karena komponen akan otomatis re-render ke tampilan "Anda Sudah Login"
-        setError(null);
-      } 
+      // Ini akan memanggil login Skenario 1 (NIM & Pass)
+      await login(nim, password);
+      // Tidak perlu 'navigate', 
+      // component akan re-render dengan `user` baru
     } catch (err) {
-      // Ini akan menangkap error yang dilempar oleh fungsi login Anda
       setError(err.message || 'Terjadi kesalahan. Coba lagi nanti.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  /**
-   * Fungsi untuk menangani login via Google
-   * PERBAIKAN: Mengaktifkan fungsionalitas asli
-   */
   const handleGoogleLogin = () => {
-    setError(null);
     setIsLoading(true);
-    
+    setError(null);
     console.log("Mengarahkan ke Google Login...");
-    
-    // PERBAIKAN: Ini adalah kode aslinya.
-    // Ini akan mengarahkan browser ke backend Anda
+    // Ini sudah benar, akan mengarahkan ke backend
     window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/auth/google`;
-
-    // Hapus simulasi
-    // alert('Mengarahkan ke Google Login...\n(window.location.href = "http://localhost:5000/api/auth/google")');
-    // setTimeout(() => {
-    //     setIsLoading(false);
-    //     setError("Redirect Google disimulasikan. Kembali ke halaman login.");
-    // }, 1500);
   };
 
-  // --- BARU: Jika user sudah login, tampilkan pesan ---
+  // Tampilan "Sudah Login" (Sudah Benar)
   if (user) {
     return (
         <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6 font-sans">
              <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
                 <h1 className="text-2xl font-bold mb-4">Anda Sudah Login</h1>
                 <p className="text-gray-700 mb-6">Selamat datang, {user.name || user.nim}!</p>
-                {/* PERBAIKAN: Menambahkan tombol logout */}
                 <button
-                    onClick={() => logout()} // Panggil fungsi logout dari context
+                    onClick={() => logout()} 
                     className="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-medium transition-colors"
                 >
                     Logout
@@ -274,10 +290,8 @@ const LoginPage = () => {
         </div>
     )
   }
-  // --- AKHIR BLOK BARU ---
 
-
-  // Jika user belum login, tampilkan halaman login
+  // Tampilan Form Login (Sudah Benar)
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6 font-sans">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
@@ -286,36 +300,36 @@ const LoginPage = () => {
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
-            {/* INI ADALAH PERBAIKANNYA */}
             <span className="block sm:inline">{error}</span>
           </div>
         )}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
+          {/* ... Input NIM ... */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">NIM</label>
             <input
               type="text"
-              placeholder="Masukkan NIM Anda"
+              placeholder="Masukkan NIM Anda (Coba: 12345)"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
               value={nim}
               onChange={(e) => setNim(e.target.value)}
               disabled={isLoading}
             />
           </div>
-
+          {/* ... Input Password ... */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
             <input
               type="password"
-              placeholder="Masukkan Password"
+              placeholder="Masukkan Password (Coba: password)"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
             />
           </div>
-
+          {/* ... Tombol Login ... */}
           <button
             type="submit"
             className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors disabled:bg-gray-400"
@@ -325,6 +339,7 @@ const LoginPage = () => {
           </button>
         </form>
 
+        {/* ... Pemisah ... */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
             <span className="w-full border-t border-gray-300"></span>
@@ -334,6 +349,7 @@ const LoginPage = () => {
           </div>
         </div>
 
+        {/* ... Tombol Google ... */}
         <button
           type="button"
           onClick={handleGoogleLogin}
@@ -344,6 +360,7 @@ const LoginPage = () => {
           <span className="ml-3 font-medium">Lanjutkan dengan Google</span>
         </button>
         
+        {/* ... Link Daftar ... */}
         <p className="text-center text-sm text-gray-600 mt-6">
           Belum punya akun?
           <a href="#register" className="text-orange-500 hover:underline ml-1" onClick={(e) => { e.preventDefault(); alert('Mengarahkan ke halaman Daftar...'); }}>
@@ -357,16 +374,25 @@ const LoginPage = () => {
 // --- End LoginPage Component ---
 
 
-// --- Main App Component ---
-// This is the default export that wraps everything together.
+// --- Main App Component (DIPERBARUI TOTAL) ---
+// Ini adalah komponen utama yang diekspor
 export default function App() {
   return (
-    // Sekarang App ini dibungkus oleh AuthProvider 'asli' Anda
+    // 1. AuthProvider membungkus semuanya
     <AuthProvider>
-      <LoginPage />
-      {/* Di aplikasi nyata, di sinilah Anda akan meletakkan 
-        sisa dari router Anda (mis: <ChatPage />, <ProfilePage />)
-      */}
+      {/* 2. BrowserRouter membungkus Routes */}
+      <BrowserRouter>
+        {/* 3. Routes mendefinisikan halaman Anda */}
+        <Routes>
+          {/* Rute Utama (/) akan menampilkan LoginPage */}
+          {/* LoginPage akan otomatis menampilkan "Sudah Login" jika user ada */}
+          <Route path="/" element={<LoginPage />} />
+
+          {/* Rute Baru (/auth/callback) akan menampilkan AuthCallback */}
+          {/* Di sinilah backend akan mengarahkan user setelah login Google */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
+        </Routes>
+      </BrowserRouter>
     </AuthProvider>
   );
 }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-// --- PERBAIKAN: Menggunakan relative path (../) ---
-import { useAuth } from '../context/AuthContext.js';
+import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
 import { Send, Plus, MessageSquare, PenSquare, User, Settings, Instagram, Globe, Youtube } from 'lucide-react';
 
@@ -20,7 +19,7 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
         if (user) {
             onLogout();
         } else {
-            navigate('/');
+            navigate('/login');
         }
     };
 
@@ -96,7 +95,7 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
 
             {/* Area Riwayat Chat */}
             <div className="flex-1 overflow-y-auto mt-0 space-y-2">
-                {isSidebarOpen && user && chatHistory.map(chat => (
+                {isSidebarOpen && user && chatHistory.length > 0 && chatHistory.map(chat => (
                     <button
                         key={chat.id}
                         onClick={() => onSelectChat(chat.id)}
@@ -106,6 +105,11 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
                         {chat.title}
                     </button>
                 ))}
+                {isSidebarOpen && user && chatHistory.length === 0 && (
+                    <p className="p-2 text-xs text-gray-500 text-center">
+                        Belum ada riwayat chat.
+                    </p>
+                )}
                 {isSidebarOpen && !user && (
                     <p className="p-2 text-xs text-gray-500 text-center">
                         Login untuk melihat riwayat chat Anda.
@@ -193,8 +197,12 @@ const ChatWindow = ({ messages, isLoading, userName }) => {
                 <div className="flex justify-start">
                     <div className="flex items-start space-x-3">
                         <BotAvatar />
-                        <div className="p-3 bg-white text-gray-800 rounded-xl border border-gray-200 shadow-md animate-pulse">
-                            <span className="text-gray-500">Typing...</span>
+                        <div className="p-3 bg-white text-gray-800 rounded-xl border border-gray-200 shadow-md">
+                            <div className="flex space-x-1">
+                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -245,7 +253,7 @@ const ChatInput = ({ onSend, disabled }) => {
 // --- Komponen Utama ChatPage ---
 const ChatPage = () => {
     const navigate = useNavigate();
-    const { user, logout, loading } = useAuth();
+    const { user, logout, loading, isAuthenticated } = useAuth();
 
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -254,31 +262,42 @@ const ChatPage = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const chatContainerRef = useRef(null);
 
+    // Redirect jika tidak authenticated
+    useEffect(() => {
+        if (!loading && !isAuthenticated) {
+            console.log('🔍 [CHAT PAGE] User not authenticated, redirecting to login');
+            navigate('/login', { replace: true });
+        }
+    }, [loading, isAuthenticated, navigate]);
+
     const loadChatHistory = useCallback(async () => {
         if (!user || !user.id) {
+            console.log('🔍 [CHAT PAGE] No user ID, skipping chat history load');
             setChatHistory([]);
             return;
         }
 
         try {
-            // Ini menggunakan 'api' yang diimpor, yang sudah benar
+            console.log('🔍 [CHAT PAGE] Loading chat history for user:', user.id);
             const response = await api.get(`/api/chat/conversations/${user.id}`);
-            setChatHistory(response.data.conversations);
+            console.log('✅ [CHAT PAGE] Chat history loaded:', response.data.conversations);
+            setChatHistory(response.data.conversations || []);
         } catch (error) {
-            console.error('Error loading chat history:', error);
-            if (error.response && error.response.status === 401) {
+            console.error('❌ [CHAT PAGE] Error loading chat history:', error);
+            if (error.response?.status === 401) {
+                console.log('🛑 [CHAT PAGE] 401 Unauthorized, logging out');
                 logout();
-                navigate('/');
+                navigate('/login');
             }
             setChatHistory([]);
         }
     }, [user, logout, navigate]);
 
     useEffect(() => {
-        if (!loading) {
+        if (!loading && isAuthenticated) {
             loadChatHistory();
         }
-    }, [loadChatHistory, loading]);
+    }, [loadChatHistory, loading, isAuthenticated]);
 
     useEffect(() => {
         if (chatContainerRef.current) {
@@ -287,7 +306,10 @@ const ChatPage = () => {
     }, [messages, isLoading]);
 
     const handleSendMessage = async (messageText) => {
-        // const userName = user ? user.fullName : 'Guest'; // <-- DIHAPUS KARENA TIDAK TERPAKAI
+        if (!isAuthenticated) {
+            console.error('❌ [CHAT PAGE] Cannot send message - user not authenticated');
+            return;
+        }
 
         const userMessage = {
             role: 'user',
@@ -297,18 +319,16 @@ const ChatPage = () => {
 
         setMessages(prev => [...prev, userMessage]);
         setIsLoading(true);
-        // setCurrentChatId(prevId => prevId); // Baris ini tidak perlu, bisa dihapus
-
-        // const userId = user ? user.id : null; // Ini tidak perlu dikirim
 
         try {
-            // --- PERBAIKAN: Hapus 'userId' dari payload ---
-            // Server (backend) Anda sudah mengambil userId dari Token,
-            // jadi kita tidak perlu mengirimkannya di body.
+            console.log('🔍 [CHAT PAGE] Sending message:', messageText);
+            
             const response = await api.post('/api/chat', {
                 message: messageText,
                 conversationId: currentChatId,
             });
+
+            console.log('✅ [CHAT PAGE] Message response:', response.data);
 
             const botMessage = {
                 role: 'bot',
@@ -319,28 +339,34 @@ const ChatPage = () => {
 
             setMessages(prev => [...prev, botMessage]);
 
-            // Logika ini sudah benar
+            // Update chat history jika conversation baru dibuat
             if (user && response.data.conversationId && !currentChatId) {
+                console.log('🔄 [CHAT PAGE] New conversation created:', response.data.conversationId);
                 setCurrentChatId(response.data.conversationId);
-                loadChatHistory();
-            } else if (!user && response.data.conversationId && !currentChatId) {
-                setCurrentChatId(response.data.conversationId);
+                // Reload chat history untuk menampilkan conversation baru
+                setTimeout(() => loadChatHistory(), 500);
             }
 
         } catch (error) {
-            console.error('Error sending message:', error);
+            console.error('❌ [CHAT PAGE] Error sending message:', error);
             const errorMessage = {
                 role: 'bot',
                 content: 'Maaf, terjadi kesalahan saat mengirim pesan. Silakan coba lagi.',
                 createdAt: new Date().toISOString(),
             };
             setMessages(prev => [...prev, errorMessage]);
+            
+            if (error.response?.status === 401) {
+                logout();
+                navigate('/login');
+            }
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleNewChat = () => {
+        console.log('🔄 [CHAT PAGE] Starting new chat');
         setMessages([]);
         setCurrentChatId(null);
     };
@@ -348,24 +374,28 @@ const ChatPage = () => {
     const handleSelectChat = async (chatId) => {
         if (!chatId || chatId === currentChatId || !user) return;
 
+        console.log('🔍 [CHAT PAGE] Selecting chat:', chatId);
+        
         setCurrentChatId(chatId);
         setIsLoading(true);
         setMessages([]);
 
         try {
             const response = await api.get(`/api/chat/history/${chatId}`);
+            console.log('✅ [CHAT PAGE] Chat history loaded:', response.data);
+            
             if (response.data && Array.isArray(response.data.messages)) {
                 setMessages(response.data.messages);
             } else {
-                console.error('Invalid history data:', response.data);
+                console.error('❌ [CHAT PAGE] Invalid history data:', response.data);
                 setMessages([]);
             }
 
         } catch (error) {
-            console.error('Error loading chat history:', error);
-            if (error.response && error.response.status === 401) {
+            console.error('❌ [CHAT PAGE] Error loading chat history:', error);
+            if (error.response?.status === 401) {
                 logout();
-                navigate('/');
+                navigate('/login');
             }
             setMessages([
                 { role: 'bot', content: 'Gagal memuat riwayat chat.', createdAt: new Date().toISOString() }
@@ -378,6 +408,20 @@ const ChatPage = () => {
     const handleToggleSidebar = () => {
         setIsSidebarOpen(prev => !prev);
     };
+
+    // Show loading while checking authentication
+    if (loading) {
+        return (
+            <div className="flex h-screen bg-[#fbf9f6] items-center justify-center">
+                <div className="text-center">
+                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500 animate-pulse"><path d="M4 14s1.5-1 4-1 4 1 4 1v3H4z" /><path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /><path d="M10 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /></svg>
+                    </div>
+                    <p className="text-gray-600">Loading...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen bg-[#fbf9f6] font-sans">
