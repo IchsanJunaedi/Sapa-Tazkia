@@ -278,8 +278,9 @@ const ChatPage = () => {
         }
 
         try {
-            console.log('🔍 [CHAT PAGE] Loading chat history for user:', user.id);
-            const response = await api.get(`/api/chat/conversations/${user.id}`);
+            console.log('🔍 [CHAT PAGE] Loading chat history for user');
+            // PERBAIKAN: Menggunakan route yang benar tanpa user ID di URL
+            const response = await api.get('/api/chat/conversations');
             console.log('✅ [CHAT PAGE] Chat history loaded:', response.data.conversations);
             setChatHistory(response.data.conversations || []);
         } catch (error) {
