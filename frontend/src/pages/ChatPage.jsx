@@ -268,7 +268,11 @@ const ChatPage = () => {
     const [isGuest, setIsGuest] = useState(false);
     const chatContainerRef = useRef(null);
 
-    // ✅ FUNCTION DEFINITIONS - Urutan yang benar
+    // ✅ FIX: Tambahkan ref untuk mencegah multiple executions
+    const hasProcessedInitialMessage = useRef(false);
+    const hasProcessedUrlMessage = useRef(false);
+
+    // ✅ FUNCTION DEFINITIONS
 
     const loadChatHistory = useCallback(async () => {
         if (isGuest || !user || !user.id) {
@@ -381,6 +385,10 @@ const ChatPage = () => {
         setMessages([]);
         setCurrentChatId(null);
         
+        // ✅ FIX: Reset processing flags untuk new chat
+        hasProcessedInitialMessage.current = false;
+        hasProcessedUrlMessage.current = false;
+        
         if (isGuest) {
             setIsGuest(false);
             navigate('/chat');
@@ -431,32 +439,34 @@ const ChatPage = () => {
         setIsSidebarOpen(prev => !prev);
     };
 
-    // ✅ USE EFFECTS - Urutan yang benar
+    // ✅ FIX: USE EFFECTS dengan proper guards
 
-    // 1. FIRST: Set guest mode from location state
+    // 1. FIRST: Set guest mode from location state - HANYA SEKALI
     useEffect(() => {
         const guestMode = location.state?.isGuest;
         console.log('🔍 [CHAT PAGE] Checking location state for guest mode:', guestMode);
 
-        if (guestMode) {
+        if (guestMode && !isGuest) {
             console.log('👤 [CHAT PAGE] Setting guest mode from location state');
             setIsGuest(true);
         }
-    }, [location.state]);
+    }, [location.state, isGuest]);
 
-    // 2. SECOND: Handle initial message after guest mode is set
+    // 2. SECOND: Handle initial message - DENGAN GUARD
     useEffect(() => {
         const initialMessage = location.state?.initialMessage;
         const guestMode = location.state?.isGuest;
 
-        console.log('📨 [CHAT PAGE] Processing initial message:', { 
+        console.log('📨 [CHAT PAGE] Processing initial message check:', { 
             initialMessage, 
             guestMode,
-            currentGuestState: isGuest
+            currentGuestState: isGuest,
+            hasProcessed: hasProcessedInitialMessage.current
         });
 
-        if (initialMessage) {
-            console.log('📨 [CHAT PAGE] Processing initial message:', initialMessage);
+        if (initialMessage && !hasProcessedInitialMessage.current) {
+            console.log('🚨 [CHAT PAGE] Processing initial message:', initialMessage);
+            hasProcessedInitialMessage.current = true;
             
             const userMessage = {
                 id: Date.now(),
@@ -470,84 +480,85 @@ const ChatPage = () => {
             setMessages([userMessage]);
             handleAIMessage(initialMessage, guestMode || isGuest);
         }
-    }, [location, handleAIMessage, isGuest]);
+    }, [location.state, handleAIMessage, isGuest]);
 
-    // 3. THIRD: Auth check - NOW isGuest should be correctly set
+    // 3. THIRD: Auth check - dengan guest mode protection
     useEffect(() => {
-    console.log('🔍 [CHAT PAGE] Auth Status Check:', {
-        loading,
-        isAuthenticated,
-        user: user ? { id: user.id, name: user.fullName } : 'No user',
-        tokenLength: token?.length,
-        isGuest: isGuest,
-        locationState: location.state,
-        locationSearch: location.search
-    });
+        console.log('🔍 [CHAT PAGE] Auth Status Check:', {
+            loading,
+            isAuthenticated,
+            user: user ? { id: user.id, name: user.fullName } : 'No user',
+            tokenLength: token?.length,
+            isGuest: isGuest,
+            locationState: location.state,
+            locationSearch: location.search
+        });
 
-    // ✅ CEK SEMUA SUMBER untuk guest mode
-    const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
-    const guestFromState = location.state?.isGuest;
-    
-    if (guestFromUrl || guestFromState) {
-        console.log('👤 [CHAT PAGE] Guest mode detected - skipping auth checks');
-        setIsGuest(true);
-        return;
-    }
-
-    // ✅ JIKA GUEST MODE SUDAH AKTIF, SKIP
-    if (isGuest) {
-        console.log('👤 [CHAT PAGE] Guest mode active - skipping auth checks');
-        return;
-    }
-
-    // ✅ HANYA JALANKAN AUTH CHECKS JIKA BUKAN GUEST
-    if (!loading && !isAuthenticated) {
-        console.log('❌ [CHAT PAGE] User not authenticated and not guest, redirecting to home');
-        navigate('/', { replace: true });
-        return;
-    }
-
-    // ... sisa auth checks
-}, [loading, isAuthenticated, user, token, navigate, logout, isGuest, location.state, location.search]);
-
-    useEffect(() => {
-    // ✅ CEK URL PARAMETERS untuk guest mode
-    const urlParams = new URLSearchParams(location.search);
-    const guestFromUrl = urlParams.get('guest') === 'true';
-    const messageFromUrl = urlParams.get('message');
-
-    console.log('🔗 [CHAT PAGE] URL Parameters:', { 
-        guestFromUrl, 
-        messageFromUrl,
-        locationSearch: location.search 
-    });
-
-    if (guestFromUrl) {
-        console.log('👤 [CHAT PAGE] Guest mode detected from URL');
-        setIsGuest(true);
+        // ✅ CEK SEMUA SUMBER untuk guest mode
+        const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
+        const guestFromState = location.state?.isGuest;
         
-        if (messageFromUrl) {
-            console.log('📨 [CHAT PAGE] Processing message from URL:', messageFromUrl);
-            
-            const userMessage = {
-                id: Date.now(),
-                content: decodeURIComponent(messageFromUrl),
-                sender: 'user',
-                role: 'user',
-                timestamp: new Date().toISOString(),
-                isGuest: true
-            };
-
-            setMessages([userMessage]);
-            handleAIMessage(decodeURIComponent(messageFromUrl), true);
-            
-            // ✅ HAPUS PARAMETERS dari URL setelah diproses
-            navigate('/chat', { replace: true });
+        if (guestFromUrl || guestFromState) {
+            console.log('👤 [CHAT PAGE] Guest mode detected - skipping auth checks');
+            setIsGuest(true);
+            return;
         }
-    }
-}, [location.search, navigate, handleAIMessage]);
 
-    // 4. Load chat history for authenticated users
+        // ✅ JIKA GUEST MODE SUDAH AKTIF, SKIP
+        if (isGuest) {
+            console.log('👤 [CHAT PAGE] Guest mode active - skipping auth checks');
+            return;
+        }
+
+        // ✅ HANYA JALANKAN AUTH CHECKS JIKA BUKAN GUEST
+        if (!loading && !isAuthenticated) {
+            console.log('❌ [CHAT PAGE] User not authenticated and not guest, redirecting to home');
+            navigate('/', { replace: true });
+            return;
+        }
+    }, [loading, isAuthenticated, user, token, navigate, logout, isGuest, location.state, location.search]);
+
+    // 4. FOURTH: Handle URL parameters - DENGAN GUARD
+    useEffect(() => {
+        // ✅ CEK URL PARAMETERS untuk guest mode
+        const urlParams = new URLSearchParams(location.search);
+        const guestFromUrl = urlParams.get('guest') === 'true';
+        const messageFromUrl = urlParams.get('message');
+
+        console.log('🔗 [CHAT PAGE] URL Parameters:', { 
+            guestFromUrl, 
+            messageFromUrl,
+            locationSearch: location.search,
+            hasProcessed: hasProcessedUrlMessage.current
+        });
+
+        if (guestFromUrl && !hasProcessedUrlMessage.current) {
+            console.log('👤 [CHAT PAGE] Guest mode detected from URL');
+            setIsGuest(true);
+            
+            if (messageFromUrl) {
+                console.log('🚨 [CHAT PAGE] Processing message from URL:', messageFromUrl);
+                hasProcessedUrlMessage.current = true;
+                
+                const userMessage = {
+                    id: Date.now(),
+                    content: decodeURIComponent(messageFromUrl),
+                    sender: 'user',
+                    role: 'user',
+                    timestamp: new Date().toISOString(),
+                    isGuest: true
+                };
+
+                setMessages([userMessage]);
+                handleAIMessage(decodeURIComponent(messageFromUrl), true);
+                
+                // ✅ HAPUS PARAMETERS dari URL setelah diproses
+                navigate('/chat', { replace: true });
+            }
+        }
+    }, [location.search, navigate, handleAIMessage]);
+
+    // 5. Load chat history for authenticated users
     useEffect(() => {
         if (!loading && isAuthenticated && user && user.id && !isGuest) {
             console.log('🔄 [CHAT PAGE] Loading chat history...');
@@ -555,7 +566,7 @@ const ChatPage = () => {
         }
     }, [loadChatHistory, loading, isAuthenticated, user, isGuest]);
 
-    // 5. Auto-scroll to bottom
+    // 6. Auto-scroll to bottom
     useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
