@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, ArrowRight } from 'lucide-react';
 
 const ChatInput = ({ onSend, disabled = false }) => {
   const [input, setInput] = useState('');
@@ -37,7 +37,7 @@ const ChatInput = ({ onSend, disabled = false }) => {
           disabled={!input.trim() || disabled}
           className="flex-shrink-0 w-12 h-12 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white rounded-xl flex items-center justify-center"
         >
-          {disabled ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+          {disabled ? <Loader2 size={20} className="animate-spin" /> : <ArrowRight size={20} />}
         </button>
       </div>
     </div>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
-import { Send, Plus, MessageSquare, PenSquare, User, Settings, Instagram, Globe, Youtube } from 'lucide-react';
+import { sendMessageToAI } from '../api/aiService';
+import { Plus, MessageSquare, PenSquare, User, Settings, Instagram, Globe, Youtube, ArrowUp } from 'lucide-react';
 
 // --- Komponen Sidebar ---
 const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChatId, navigate, isSidebarOpen, onToggleSidebar, onLogout }) => {
@@ -19,7 +20,7 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
         if (user) {
             onLogout();
         } else {
-            navigate('/login');
+            navigate('/');
         }
     };
 
@@ -61,7 +62,7 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
                 >
                     <User size={20} />
                     <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-                        {user ? user.fullName : 'Login Mahasiswa'}
+                        {user ? (user.fullName || 'User') : 'Login Mahasiswa'}
                     </span>
                 </button>
             </div>
@@ -137,7 +138,7 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
 };
 
 // --- Komponen ChatWindow ---
-const ChatWindow = ({ messages, isLoading, userName }) => {
+const ChatWindow = ({ messages, isLoading, userName, isGuest = false }) => {
 
     const BotAvatar = () => (
         <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
@@ -145,9 +146,9 @@ const ChatWindow = ({ messages, isLoading, userName }) => {
         </div>
     );
 
-    const UserAvatar = ({ initial }) => (
-        <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-semibold">
-            {initial ? initial.charAt(0).toUpperCase() : 'G'}
+    const UserAvatar = ({ initial, isGuest }) => (
+        <div className={`w-8 h-8 ${isGuest ? 'bg-purple-500' : 'bg-blue-500'} text-white rounded-full flex items-center justify-center text-sm font-semibold`}>
+            {isGuest ? 'G' : (initial ? initial.charAt(0).toUpperCase() : 'U')}
         </div>
     );
 
@@ -158,9 +159,12 @@ const ChatWindow = ({ messages, isLoading, userName }) => {
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><path d="M4 14s1.5-1 4-1 4 1 4 1v3H4z" /><path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /><path d="M10 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /></svg>
                 </div>
                 <h2 className="text-lg font-semibold text-gray-700">
-                    {userName ? `Selamat datang, ${userName}!` : 'Mulai percakapan'}
+                    {isGuest ? 'Selamat datang di Mode Tamu!' : (userName ? `Selamat datang, ${userName}!` : 'Mulai percakapan')}
                 </h2>
                 <p className="text-sm">Tanyakan apa saja tentang STMIK Tazkia</p>
+                {isGuest && (
+                    <p className="text-xs text-blue-500 mt-2">Login untuk menyimpan riwayat chat</p>
+                )}
             </div>
         );
     }
@@ -168,8 +172,8 @@ const ChatWindow = ({ messages, isLoading, userName }) => {
     return (
         <div className="flex-1 p-4 md:p-8 space-y-6">
             {messages.map((msg, index) => {
-                const isUser = msg.role === 'user';
-                const avatar = isUser ? <UserAvatar initial={userName} /> : <BotAvatar />;
+                const isUser = msg.sender === 'user' || msg.role === 'user';
+                const avatar = isUser ? <UserAvatar initial={userName} isGuest={msg.isGuest} /> : <BotAvatar />;
 
                 return (
                     <div
@@ -180,12 +184,12 @@ const ChatWindow = ({ messages, isLoading, userName }) => {
                             {avatar}
                             <div className={`p-3 md:p-4 rounded-xl max-w-full shadow-md text-sm ${
                                 isUser
-                                    ? 'bg-blue-500 text-white rounded-tr-sm'
+                                    ? `${msg.isGuest ? 'bg-purple-500' : 'bg-blue-500'} text-white rounded-tr-sm`
                                     : 'bg-white text-gray-800 border border-gray-200 rounded-tl-sm'
                                 }`}>
                                 <p>{msg.content}</p>
-                                <p className={`mt-1 text-xs ${isUser ? 'text-blue-200' : 'text-gray-500'} text-right`}>
-                                    {new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                <p className={`mt-1 text-xs ${isUser ? (msg.isGuest ? 'text-purple-200' : 'text-blue-200') : 'text-gray-500'} text-right`}>
+                                    {new Date(msg.timestamp || msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                             </div>
                         </div>
@@ -214,7 +218,7 @@ const ChatWindow = ({ messages, isLoading, userName }) => {
 // --- Komponen ChatInput ---
 const ChatInput = ({ onSend, disabled }) => {
     const [input, setInput] = useState('');
-
+    
     const handleSubmit = (e) => {
         e.preventDefault();
         if (input.trim() && !disabled) {
@@ -243,7 +247,7 @@ const ChatInput = ({ onSend, disabled }) => {
                     aria-label="Send Message"
                     disabled={!input.trim() || disabled}
                 >
-                    <Send size={20} className="transform -rotate-45" />
+                    <ArrowUp size={20} />
                 </button>
             </form>
         </div>
@@ -253,6 +257,7 @@ const ChatInput = ({ onSend, disabled }) => {
 // --- Komponen Utama ChatPage ---
 const ChatPage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, logout, loading, isAuthenticated, token } = useAuth();
 
     const [messages, setMessages] = useState([]);
@@ -260,187 +265,114 @@ const ChatPage = () => {
     const [currentChatId, setCurrentChatId] = useState(null);
     const [chatHistory, setChatHistory] = useState([]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isGuest, setIsGuest] = useState(false);
     const chatContainerRef = useRef(null);
 
-    // ✅ PERBAIKAN: Enhanced Auth Handling dengan Debugging
-    useEffect(() => {
-        console.log('🔍 [CHAT PAGE] Auth Status Check:', {
-            loading,
-            isAuthenticated,
-            user: user ? { id: user.id, name: user.fullName } : 'No user',
-            tokenLength: token?.length,
-            tokenPreview: token ? token.substring(0, 20) + '...' : 'No token'
-        });
-
-        // Jika loading selesai dan tidak authenticated, redirect
-        if (!loading && !isAuthenticated) {
-            console.log('❌ [CHAT PAGE] User not authenticated, redirecting to home');
-            navigate('/', { replace: true });
-            return;
-        }
-
-        // Jika token terlalu pendek (invalid), clear dan redirect
-        if (token && token.length < 20) {
-            console.log('❌ [CHAT PAGE] Token too short/invalid, clearing auth data');
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            navigate('/', { replace: true });
-            return;
-        }
-
-        // Jika authenticated tapi user data tidak lengkap
-        if (isAuthenticated && (!user || !user.id)) {
-            console.log('⚠️ [CHAT PAGE] Authenticated but missing user data, checking localStorage');
-            const storedUser = localStorage.getItem('user');
-            if (storedUser) {
-                try {
-                    const parsedUser = JSON.parse(storedUser);
-                    console.log('✅ [CHAT PAGE] User data restored from localStorage:', parsedUser);
-                } catch (error) {
-                    console.error('❌ [CHAT PAGE] Error parsing stored user:', error);
-                    logout();
-                    navigate('/');
-                }
-            } else {
-                console.log('❌ [CHAT PAGE] No user data found, logging out');
-                logout();
-                navigate('/');
-            }
-        }
-    }, [loading, isAuthenticated, user, token, navigate, logout]);
+    // ✅ FUNCTION DEFINITIONS - Urutan yang benar
 
     const loadChatHistory = useCallback(async () => {
-        if (!user || !user.id) {
-            console.log('🔍 [CHAT PAGE] No user ID, skipping chat history load');
+        if (isGuest || !user || !user.id) {
+            console.log('🔍 [CHAT PAGE] Guest mode or no user ID, skipping chat history load');
             setChatHistory([]);
             return;
         }
 
         try {
             console.log('🔍 [CHAT PAGE] Loading chat history for user:', user.id);
-            
-            // Debug token sebelum request
-            const currentToken = localStorage.getItem('token');
-            console.log('🔍 [CHAT PAGE] Token for request:', {
-                hasToken: !!currentToken,
-                length: currentToken?.length,
-                preview: currentToken ? currentToken.substring(0, 20) + '...' : 'No token'
-            });
-
-            const response = await api.get('/api/chat/conversations');
+            const response = await api.get('/api/ai/conversations');
             console.log('✅ [CHAT PAGE] Chat history loaded:', response.data.conversations);
             setChatHistory(response.data.conversations || []);
         } catch (error) {
             console.error('❌ [CHAT PAGE] Error loading chat history:', error);
             
-            // Enhanced error handling
             if (error.response?.status === 401) {
                 console.log('🛑 [CHAT PAGE] 401 Unauthorized - Token invalid, logging out');
                 logout();
                 navigate('/');
             } else if (error.response?.status === 404) {
-                console.log('🔍 [CHAT PAGE] 404 - No conversations found (this is normal for new users)');
+                console.log('🔍 [CHAT PAGE] 404 - No conversations found');
                 setChatHistory([]);
             } else {
                 console.error('❌ [CHAT PAGE] Other error:', error.response?.data || error.message);
                 setChatHistory([]);
             }
         }
-    }, [user, logout, navigate]);
-    
-    // ✅ PERBAIKAN: Load chat history hanya ketika authenticated dan user tersedia
-    useEffect(() => {
-        if (!loading && isAuthenticated && user && user.id) {
-            console.log('🔄 [CHAT PAGE] Loading chat history...');
-            loadChatHistory();
-        }
-    }, [loadChatHistory, loading, isAuthenticated, user]);
+    }, [user, logout, navigate, isGuest]);
 
-    // Auto-scroll to bottom
-    useEffect(() => {
-        if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-        }
-    }, [messages, isLoading]);
-
-    const handleSendMessage = async (messageText) => {
-        // ✅ PERBAIKAN: Enhanced pre-check sebelum send message
-        if (!isAuthenticated || !user) {
-            console.error('❌ [CHAT PAGE] Cannot send message - user not authenticated');
-            navigate('/');
-            return;
-        }
-
-        // Check token validity
-        const currentToken = localStorage.getItem('token');
-        if (!currentToken || currentToken.length < 20) {
-            console.error('❌ [CHAT PAGE] Invalid token, cannot send message');
-            logout();
-            navigate('/');
-            return;
-        }
-
-        const userMessage = {
-            role: 'user',
-            content: messageText,
-            createdAt: new Date().toISOString(),
-        };
-
-        setMessages(prev => [...prev, userMessage]);
+    const handleAIMessage = useCallback(async (messageText, isGuestMode = false) => {
         setIsLoading(true);
 
         try {
-            console.log('🔍 [CHAT PAGE] Sending message:', messageText);
-            console.log('🔍 [CHAT PAGE] Request details:', {
-                conversationId: currentChatId,
-                user: user.id,
-                tokenLength: currentToken.length
-            });
-            
-            const response = await api.post('/api/chat', {
-                message: messageText,
-                conversationId: currentChatId,
-            });
-
-            console.log('✅ [CHAT PAGE] Message response:', response.data);
+            console.log('🤖 [CHAT PAGE] Sending to AI:', { messageText, isGuestMode });
+            const response = await sendMessageToAI(messageText, isGuestMode);
+            console.log('✅ [CHAT PAGE] AI Response:', response);
 
             const botMessage = {
+                id: Date.now() + 1,
+                content: response.message || response.reply || 'Maaf, tidak ada respons dari AI.',
+                sender: 'ai',
                 role: 'bot',
-                content: response.data.reply,
-                createdAt: response.data.timestamp || new Date().toISOString(),
-                hasPDF: response.data.hasPDF || false,
+                timestamp: response.timestamp || new Date().toISOString(),
             };
 
             setMessages(prev => [...prev, botMessage]);
 
-            // Update chat history jika conversation baru dibuat
-            if (user && response.data.conversationId && !currentChatId) {
-                console.log('🔄 [CHAT PAGE] New conversation created:', response.data.conversationId);
-                setCurrentChatId(response.data.conversationId);
-                // Reload chat history untuk menampilkan conversation baru
+            if (!isGuestMode && user && response.conversationId && !currentChatId) {
+                console.log('🔄 [CHAT PAGE] New conversation created:', response.conversationId);
+                setCurrentChatId(response.conversationId);
                 setTimeout(() => loadChatHistory(), 500);
             }
 
         } catch (error) {
-            console.error('❌ [CHAT PAGE] Error sending message:', error);
-            
-            // Enhanced error handling
-            if (error.response?.status === 401) {
-                console.log('🛑 [CHAT PAGE] 401 Unauthorized during message send');
-                logout();
-                navigate('/');
-                return;
-            }
+            console.error('❌ [CHAT PAGE] Error sending message to AI:', error);
             
             const errorMessage = {
-                role: 'bot',
+                id: Date.now() + 1,
                 content: 'Maaf, terjadi kesalahan saat mengirim pesan. Silakan coba lagi.',
-                createdAt: new Date().toISOString(),
+                sender: 'ai',
+                role: 'bot',
+                timestamp: new Date().toISOString(),
+                isError: true
             };
             setMessages(prev => [...prev, errorMessage]);
             
         } finally {
             setIsLoading(false);
+        }
+    }, [user, currentChatId, loadChatHistory]);
+
+    const handleSendMessage = async (messageText) => {
+        if (!isGuest && (!isAuthenticated || !user)) {
+            console.error('❌ [CHAT PAGE] Cannot send message - user not authenticated');
+            navigate('/');
+            return;
+        }
+
+        if (!isGuest) {
+            const currentToken = localStorage.getItem('token');
+            if (!currentToken || currentToken.length < 20) {
+                console.error('❌ [CHAT PAGE] Invalid token, cannot send message');
+                logout();
+                navigate('/');
+                return;
+            }
+        }
+
+        const userMessage = {
+            id: Date.now(),
+            content: messageText,
+            sender: 'user',
+            role: 'user',
+            timestamp: new Date().toISOString(),
+            isGuest: isGuest
+        };
+
+        setMessages(prev => [...prev, userMessage]);
+        
+        if (isGuest) {
+            await handleAIMessage(messageText, true);
+        } else {
+            await handleAIMessage(messageText, false);
         }
     };
 
@@ -448,10 +380,15 @@ const ChatPage = () => {
         console.log('🔄 [CHAT PAGE] Starting new chat');
         setMessages([]);
         setCurrentChatId(null);
+        
+        if (isGuest) {
+            setIsGuest(false);
+            navigate('/chat');
+        }
     };
 
     const handleSelectChat = async (chatId) => {
-        if (!chatId || chatId === currentChatId || !user) return;
+        if (!chatId || chatId === currentChatId || !user || isGuest) return;
 
         console.log('🔍 [CHAT PAGE] Selecting chat:', chatId);
         
@@ -460,7 +397,7 @@ const ChatPage = () => {
         setMessages([]);
 
         try {
-            const response = await api.get(`/api/chat/history/${chatId}`);
+            const response = await api.get(`/api/ai/history/${chatId}`);
             console.log('✅ [CHAT PAGE] Chat history loaded:', response.data);
             
             if (response.data && Array.isArray(response.data.messages)) {
@@ -477,7 +414,13 @@ const ChatPage = () => {
                 navigate('/');
             }
             setMessages([
-                { role: 'bot', content: 'Gagal memuat riwayat chat.', createdAt: new Date().toISOString() }
+                { 
+                    id: Date.now(),
+                    role: 'bot', 
+                    sender: 'ai',
+                    content: 'Gagal memuat riwayat chat.', 
+                    timestamp: new Date().toISOString() 
+                }
             ]);
         } finally {
             setIsLoading(false);
@@ -488,8 +431,139 @@ const ChatPage = () => {
         setIsSidebarOpen(prev => !prev);
     };
 
-    // Show loading while checking authentication
-    if (loading) {
+    // ✅ USE EFFECTS - Urutan yang benar
+
+    // 1. FIRST: Set guest mode from location state
+    useEffect(() => {
+        const guestMode = location.state?.isGuest;
+        console.log('🔍 [CHAT PAGE] Checking location state for guest mode:', guestMode);
+
+        if (guestMode) {
+            console.log('👤 [CHAT PAGE] Setting guest mode from location state');
+            setIsGuest(true);
+        }
+    }, [location.state]);
+
+    // 2. SECOND: Handle initial message after guest mode is set
+    useEffect(() => {
+        const initialMessage = location.state?.initialMessage;
+        const guestMode = location.state?.isGuest;
+
+        console.log('📨 [CHAT PAGE] Processing initial message:', { 
+            initialMessage, 
+            guestMode,
+            currentGuestState: isGuest
+        });
+
+        if (initialMessage) {
+            console.log('📨 [CHAT PAGE] Processing initial message:', initialMessage);
+            
+            const userMessage = {
+                id: Date.now(),
+                content: initialMessage,
+                sender: 'user',
+                role: 'user',
+                timestamp: new Date().toISOString(),
+                isGuest: guestMode || isGuest
+            };
+
+            setMessages([userMessage]);
+            handleAIMessage(initialMessage, guestMode || isGuest);
+        }
+    }, [location, handleAIMessage, isGuest]);
+
+    // 3. THIRD: Auth check - NOW isGuest should be correctly set
+    useEffect(() => {
+    console.log('🔍 [CHAT PAGE] Auth Status Check:', {
+        loading,
+        isAuthenticated,
+        user: user ? { id: user.id, name: user.fullName } : 'No user',
+        tokenLength: token?.length,
+        isGuest: isGuest,
+        locationState: location.state,
+        locationSearch: location.search
+    });
+
+    // ✅ CEK SEMUA SUMBER untuk guest mode
+    const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
+    const guestFromState = location.state?.isGuest;
+    
+    if (guestFromUrl || guestFromState) {
+        console.log('👤 [CHAT PAGE] Guest mode detected - skipping auth checks');
+        setIsGuest(true);
+        return;
+    }
+
+    // ✅ JIKA GUEST MODE SUDAH AKTIF, SKIP
+    if (isGuest) {
+        console.log('👤 [CHAT PAGE] Guest mode active - skipping auth checks');
+        return;
+    }
+
+    // ✅ HANYA JALANKAN AUTH CHECKS JIKA BUKAN GUEST
+    if (!loading && !isAuthenticated) {
+        console.log('❌ [CHAT PAGE] User not authenticated and not guest, redirecting to home');
+        navigate('/', { replace: true });
+        return;
+    }
+
+    // ... sisa auth checks
+}, [loading, isAuthenticated, user, token, navigate, logout, isGuest, location.state, location.search]);
+
+    useEffect(() => {
+    // ✅ CEK URL PARAMETERS untuk guest mode
+    const urlParams = new URLSearchParams(location.search);
+    const guestFromUrl = urlParams.get('guest') === 'true';
+    const messageFromUrl = urlParams.get('message');
+
+    console.log('🔗 [CHAT PAGE] URL Parameters:', { 
+        guestFromUrl, 
+        messageFromUrl,
+        locationSearch: location.search 
+    });
+
+    if (guestFromUrl) {
+        console.log('👤 [CHAT PAGE] Guest mode detected from URL');
+        setIsGuest(true);
+        
+        if (messageFromUrl) {
+            console.log('📨 [CHAT PAGE] Processing message from URL:', messageFromUrl);
+            
+            const userMessage = {
+                id: Date.now(),
+                content: decodeURIComponent(messageFromUrl),
+                sender: 'user',
+                role: 'user',
+                timestamp: new Date().toISOString(),
+                isGuest: true
+            };
+
+            setMessages([userMessage]);
+            handleAIMessage(decodeURIComponent(messageFromUrl), true);
+            
+            // ✅ HAPUS PARAMETERS dari URL setelah diproses
+            navigate('/chat', { replace: true });
+        }
+    }
+}, [location.search, navigate, handleAIMessage]);
+
+    // 4. Load chat history for authenticated users
+    useEffect(() => {
+        if (!loading && isAuthenticated && user && user.id && !isGuest) {
+            console.log('🔄 [CHAT PAGE] Loading chat history...');
+            loadChatHistory();
+        }
+    }, [loadChatHistory, loading, isAuthenticated, user, isGuest]);
+
+    // 5. Auto-scroll to bottom
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [messages, isLoading]);
+
+    // Show loading while checking authentication (only for non-guest)
+    if (loading && !isGuest) {
         return (
             <div className="flex h-screen bg-[#fbf9f6] items-center justify-center">
                 <div className="text-center">
@@ -502,8 +576,7 @@ const ChatPage = () => {
         );
     }
 
-    // ✅ PERBAIKAN: Additional protection - jika tidak authenticated, jangan render
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !isGuest) {
         return (
             <div className="flex h-screen bg-[#fbf9f6] items-center justify-center">
                 <div className="text-center">
@@ -518,7 +591,6 @@ const ChatPage = () => {
 
     return (
         <div className="flex h-screen bg-[#fbf9f6] font-sans">
-
             <CustomSideBar
                 user={user}
                 chatHistory={chatHistory}
@@ -532,7 +604,6 @@ const ChatPage = () => {
             />
 
             <div className="flex-1 flex flex-col overflow-hidden">
-
                 <nav className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200">
                     <h1
                         className="text-xl font-bold text-gray-800 cursor-pointer hover:text-blue-600 transition-colors"
@@ -540,6 +611,19 @@ const ChatPage = () => {
                     >
                         Sapa Tazkia
                     </h1>
+                    <div className="flex items-center space-x-4">
+                        {isGuest ? (
+                            <span className="text-purple-500 font-medium">Mode Tamu</span>
+                        ) : user ? (
+                            <span className="text-gray-600">Halo, {user.fullName || 'User'}</span>
+                        ) : null}
+                        <button
+                            onClick={() => navigate('/')}
+                            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                        >
+                            Kembali
+                        </button>
+                    </div>
                 </nav>
 
                 <div
@@ -551,6 +635,7 @@ const ChatPage = () => {
                             messages={messages}
                             isLoading={isLoading}
                             userName={user ? user.fullName : null}
+                            isGuest={isGuest}
                         />
                     </div>
                 </div>
