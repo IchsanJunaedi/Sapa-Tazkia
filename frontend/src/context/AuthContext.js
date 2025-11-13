@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
           api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
           
           // Panggil endpoint /me untuk verifikasi token
-          const response = await api.get('/auth/me');
+          const response = await api.get('api/auth/me');
           
           console.log('✅ [AUTH CONTEXT] User verified:', response.data.user);
           
@@ -109,7 +109,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔍 [AUTH CONTEXT] Login with credentials:', { nim });
       
-      const response = await api.post('/auth/login', { nim, password });
+      const response = await api.post('api/auth/login', { nim, password });
       const { token, user } = response.data;
       
       await login(token, user);
@@ -131,7 +131,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔍 [AUTH CONTEXT] Register called:', userData);
       
-      const response = await api.post('/auth/register', userData);
+      const response = await api.post('api/auth/register', userData);
       const { token, user } = response.data;
       
       await login(token, user);
