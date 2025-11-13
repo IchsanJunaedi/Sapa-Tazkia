@@ -253,7 +253,7 @@ const ChatInput = ({ onSend, disabled }) => {
 // --- Komponen Utama ChatPage ---
 const ChatPage = () => {
     const navigate = useNavigate();
-    const { user, logout, loading, isAuthenticated } = useAuth();
+    const { user, logout, loading, isAuthenticated, token } = useAuth();
 
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -262,13 +262,52 @@ const ChatPage = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const chatContainerRef = useRef(null);
 
-    // Redirect jika tidak authenticated
+    // ✅ PERBAIKAN: Enhanced Auth Handling dengan Debugging
     useEffect(() => {
+        console.log('🔍 [CHAT PAGE] Auth Status Check:', {
+            loading,
+            isAuthenticated,
+            user: user ? { id: user.id, name: user.fullName } : 'No user',
+            tokenLength: token?.length,
+            tokenPreview: token ? token.substring(0, 20) + '...' : 'No token'
+        });
+
+        // Jika loading selesai dan tidak authenticated, redirect
         if (!loading && !isAuthenticated) {
-            console.log('🔍 [CHAT PAGE] User not authenticated, redirecting to login');
-            navigate('/login', { replace: true });
+            console.log('❌ [CHAT PAGE] User not authenticated, redirecting to home');
+            navigate('/', { replace: true });
+            return;
         }
-    }, [loading, isAuthenticated, navigate]);
+
+        // Jika token terlalu pendek (invalid), clear dan redirect
+        if (token && token.length < 20) {
+            console.log('❌ [CHAT PAGE] Token too short/invalid, clearing auth data');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            navigate('/', { replace: true });
+            return;
+        }
+
+        // Jika authenticated tapi user data tidak lengkap
+        if (isAuthenticated && (!user || !user.id)) {
+            console.log('⚠️ [CHAT PAGE] Authenticated but missing user data, checking localStorage');
+            const storedUser = localStorage.getItem('user');
+            if (storedUser) {
+                try {
+                    const parsedUser = JSON.parse(storedUser);
+                    console.log('✅ [CHAT PAGE] User data restored from localStorage:', parsedUser);
+                } catch (error) {
+                    console.error('❌ [CHAT PAGE] Error parsing stored user:', error);
+                    logout();
+                    navigate('/');
+                }
+            } else {
+                console.log('❌ [CHAT PAGE] No user data found, logging out');
+                logout();
+                navigate('/');
+            }
+        }
+    }, [loading, isAuthenticated, user, token, navigate, logout]);
 
     const loadChatHistory = useCallback(async () => {
         if (!user || !user.id) {
@@ -278,28 +317,46 @@ const ChatPage = () => {
         }
 
         try {
-            console.log('🔍 [CHAT PAGE] Loading chat history for user');
-            // PERBAIKAN: Menggunakan route yang benar tanpa user ID di URL
+            console.log('🔍 [CHAT PAGE] Loading chat history for user:', user.id);
+            
+            // Debug token sebelum request
+            const currentToken = localStorage.getItem('token');
+            console.log('🔍 [CHAT PAGE] Token for request:', {
+                hasToken: !!currentToken,
+                length: currentToken?.length,
+                preview: currentToken ? currentToken.substring(0, 20) + '...' : 'No token'
+            });
+
             const response = await api.get('/api/chat/conversations');
             console.log('✅ [CHAT PAGE] Chat history loaded:', response.data.conversations);
             setChatHistory(response.data.conversations || []);
         } catch (error) {
             console.error('❌ [CHAT PAGE] Error loading chat history:', error);
+            
+            // Enhanced error handling
             if (error.response?.status === 401) {
-                console.log('🛑 [CHAT PAGE] 401 Unauthorized, logging out');
+                console.log('🛑 [CHAT PAGE] 401 Unauthorized - Token invalid, logging out');
                 logout();
-                navigate('/login');
+                navigate('/');
+            } else if (error.response?.status === 404) {
+                console.log('🔍 [CHAT PAGE] 404 - No conversations found (this is normal for new users)');
+                setChatHistory([]);
+            } else {
+                console.error('❌ [CHAT PAGE] Other error:', error.response?.data || error.message);
+                setChatHistory([]);
             }
-            setChatHistory([]);
         }
     }, [user, logout, navigate]);
-
+    
+    // ✅ PERBAIKAN: Load chat history hanya ketika authenticated dan user tersedia
     useEffect(() => {
-        if (!loading && isAuthenticated) {
+        if (!loading && isAuthenticated && user && user.id) {
+            console.log('🔄 [CHAT PAGE] Loading chat history...');
             loadChatHistory();
         }
-    }, [loadChatHistory, loading, isAuthenticated]);
+    }, [loadChatHistory, loading, isAuthenticated, user]);
 
+    // Auto-scroll to bottom
     useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -307,8 +364,19 @@ const ChatPage = () => {
     }, [messages, isLoading]);
 
     const handleSendMessage = async (messageText) => {
-        if (!isAuthenticated) {
+        // ✅ PERBAIKAN: Enhanced pre-check sebelum send message
+        if (!isAuthenticated || !user) {
             console.error('❌ [CHAT PAGE] Cannot send message - user not authenticated');
+            navigate('/');
+            return;
+        }
+
+        // Check token validity
+        const currentToken = localStorage.getItem('token');
+        if (!currentToken || currentToken.length < 20) {
+            console.error('❌ [CHAT PAGE] Invalid token, cannot send message');
+            logout();
+            navigate('/');
             return;
         }
 
@@ -323,6 +391,11 @@ const ChatPage = () => {
 
         try {
             console.log('🔍 [CHAT PAGE] Sending message:', messageText);
+            console.log('🔍 [CHAT PAGE] Request details:', {
+                conversationId: currentChatId,
+                user: user.id,
+                tokenLength: currentToken.length
+            });
             
             const response = await api.post('/api/chat', {
                 message: messageText,
@@ -350,6 +423,15 @@ const ChatPage = () => {
 
         } catch (error) {
             console.error('❌ [CHAT PAGE] Error sending message:', error);
+            
+            // Enhanced error handling
+            if (error.response?.status === 401) {
+                console.log('🛑 [CHAT PAGE] 401 Unauthorized during message send');
+                logout();
+                navigate('/');
+                return;
+            }
+            
             const errorMessage = {
                 role: 'bot',
                 content: 'Maaf, terjadi kesalahan saat mengirim pesan. Silakan coba lagi.',
@@ -357,10 +439,6 @@ const ChatPage = () => {
             };
             setMessages(prev => [...prev, errorMessage]);
             
-            if (error.response?.status === 401) {
-                logout();
-                navigate('/login');
-            }
         } finally {
             setIsLoading(false);
         }
@@ -396,7 +474,7 @@ const ChatPage = () => {
             console.error('❌ [CHAT PAGE] Error loading chat history:', error);
             if (error.response?.status === 401) {
                 logout();
-                navigate('/login');
+                navigate('/');
             }
             setMessages([
                 { role: 'bot', content: 'Gagal memuat riwayat chat.', createdAt: new Date().toISOString() }
@@ -419,6 +497,20 @@ const ChatPage = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500 animate-pulse"><path d="M4 14s1.5-1 4-1 4 1 4 1v3H4z" /><path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /><path d="M10 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /></svg>
                     </div>
                     <p className="text-gray-600">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // ✅ PERBAIKAN: Additional protection - jika tidak authenticated, jangan render
+    if (!isAuthenticated) {
+        return (
+            <div className="flex h-screen bg-[#fbf9f6] items-center justify-center">
+                <div className="text-center">
+                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </div>
+                    <p className="text-gray-600">Redirecting...</p>
                 </div>
             </div>
         );

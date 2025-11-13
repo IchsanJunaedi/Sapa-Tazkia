@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 // --- PERBAIKAN: Menambah ekstensi .js agar file ditemukan ---
-import { useAuth } from '../context/AuthContext.js';
+import { useAuth } from '../context/AuthContext';
 import { Send, Plus, MessageSquare, PenSquare, User, Settings, X, Instagram, Globe, Youtube } from 'lucide-react';
 
 // --- Komponen GradientText (Sudah Benar) ---
@@ -208,23 +208,23 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
   if (!isOpen) return null;
 
   // --- ✅ PERBAIKAN 5: handleLogin disesuaikan untuk NIM ---
-  const handleLogin = async () => {
-    // Validasi menggunakan loginNim
-    if (!loginNim || !password) {
-      setError('NIM and password are required.');
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Kirim loginNim dan password ke AuthContext
-      await loginFunction(loginNim, password);
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
-      setIsLoading(false);
-    }
-  };
+const handleLogin = async () => {
+  // Validasi menggunakan loginNim
+  if (!loginNim || !password) {
+    setError('NIM and password are required.');
+    return;
+  }
+  setIsLoading(true);
+  setError(null);
+  try {
+    // Kirim loginNim dan password ke AuthContext
+    await loginFunction(loginNim, password); // ← Ini harusnya loginWithCredentials
+    onClose();
+  } catch (err) {
+    setError(err.response?.data?.message || 'Login failed. Please try again.');
+    setIsLoading(false);
+  }
+};
 
   // --- Fungsi handleSignUp (Sudah Benar) ---
   const handleSignUp = async () => {
@@ -439,11 +439,13 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
 // --- Komponen Utama Landing Page (Sudah Benar) ---
 const LandingPage = () => {
   const navigate = useNavigate();
-  const { user, login, register, logout, loading } = useAuth();
+  // ✅ PERBAIKAN: Tambahkan loginWithCredentials
+  const { user, loginWithCredentials, register, logout, loading } = useAuth();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [initialModalStep, setInitialModalStep] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
 
   useEffect(() => {
     if (user) {
@@ -558,31 +560,32 @@ const LandingPage = () => {
         </div>
 
         {/* Footer Social Links (Tetap Sama) */}
-        <div className="flex justify-center p-6 space-x-6">
-          <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors">
-            <Instagram size={14} />
-          </a>
-          <a href="https://stmik.tazkia.ac.id/" target="_blank" rel="noopener noreferrer" title="Website" className="text-gray-500 hover:text-blue-500 transition-colors">
-            <Globe size={14} />
-          </a>
-          <a href="https://www.youtube.com/@stmiktazkia" target="_blank" rel="noopener noreferrer" title="YouTube" className="text-gray-500 hover:text-red-500 transition-colors">
-            <Youtube size={14} />
-          </a>
-        </div>
+<div className="flex justify-center p-6 space-x-6">
+  <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors">
+    <Instagram size={14} />
+  </a>
+  <a href="https://stmik.tazkia.ac.id/" target="_blank" rel="noopener noreferrer" title="Website" className="text-gray-500 hover:text-blue-500 transition-colors">
+    <Globe size={14} />
+  </a>
+  <a href="https://www.youtube.com/@stmiktazkia" target="_blank" rel="noopener noreferrer" title="YouTube" className="text-gray-500 hover:text-red-500 transition-colors">
+    <Youtube size={14} />
+  </a>
+</div>
 
-      </div>
-      {/* ===================================================================
-        ✅ AKHIR DARI DIV PEMBUNGKUS
-      =================================================================== */}
+</div>
+{/* ===================================================================
+  ✅ AKHIR DARI DIV PEMBUNGKUS
+=================================================================== */}
 
-      <AuthModal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        initialStep={initialModalStep}
-        loginFunction={login}
-        registerFunction={register}
-      />
-    </div>
+<AuthModal
+  isOpen={isModalOpen}
+  onClose={closeModal}
+  initialStep={initialModalStep}
+  loginFunction={loginWithCredentials}
+  registerFunction={register}
+/>
+</div>
+
   );
 };
 
