@@ -1,7 +1,7 @@
 const { generateGeminiResponse, testGeminiConnection } = require('../services/geminiService');
-const { validationResult } = require('express-validator');
+const prisma = require('../../config/prisma');
 
-// ✅ FUNCTION TEST AI YANG DIPERBAIKI - PANGGIL GEMINI
+// ✅ FUNCTION TEST AI - PANGGIL GEMINI
 const testAI = async (req, res) => {
   try {
     const { message } = req.body;
@@ -15,14 +15,14 @@ const testAI = async (req, res) => {
 
     console.log('🔍 AI Test Request:', message);
 
-    // ✅ PERBAIKAN: PANGGIL GEMINI SERVICE
+    // ✅ PANGGIL GEMINI SERVICE
     const aiResponse = await generateGeminiResponse(message);
 
     res.json({
       success: true,
       message: "AI test successful",
       input: message,
-      response: aiResponse  // Response dari Gemini, bukan static text
+      response: aiResponse
     });
 
   } catch (error) {
@@ -35,12 +35,11 @@ const testAI = async (req, res) => {
   }
 };
 
-// ✅ FUNCTION TEST GEMINI CONNECTION YANG DIPERBAIKI
+// ✅ FUNCTION TEST GEMINI CONNECTION
 const testGeminiConnectionHandler = async (req, res) => {
   try {
     console.log('🔍 Gemini Connection Test');
     
-    // ✅ PERBAIKAN: PANGGIL GEMINI SERVICE
     const result = await testGeminiConnection();
     
     if (result.success) {
@@ -67,7 +66,7 @@ const testGeminiConnectionHandler = async (req, res) => {
   }
 };
 
-// ✅ FUNCTION SEND CHAT YANG DIPERBAIKI - PANGGIL GEMINI
+// ✅ FUNCTION SEND CHAT - SEKARANG PAKAI PRISMADAN SIMPAN KE DATABASE
 const sendChat = async (req, res) => {
   try {
     const { message, conversationId } = req.body;
@@ -83,18 +82,96 @@ const sendChat = async (req, res) => {
       });
     }
 
-    // ✅ PERBAIKAN: PANGGIL GEMINI SERVICE
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication required"
+      });
+    }
+
+    // ✅ PANGGIL GEMINI SERVICE
     const aiResponse = await generateGeminiResponse(message);
     
+    let currentConversationId;
+    const conversationTitle = message.substring(0, 50) + (message.length > 50 ? '...' : '');
+
+    if (!conversationId) {
+      // ✅ BUAT CONVERSATION BARU + SIMPAN MESSAGES
+      const newConversation = await prisma.conversation.create({
+        data: {
+          userId: userId,
+          title: conversationTitle,
+          messages: {
+            create: [
+              {
+                role: 'user',
+                content: message
+              },
+              {
+                role: 'bot',
+                content: aiResponse
+              }
+            ]
+          }
+        }
+      });
+      currentConversationId = newConversation.id;
+    } else {
+      // ✅ UPDATE CONVERSATION YANG SUDAH ADA
+      currentConversationId = parseInt(conversationId);
+      
+      // Verifikasi conversation milik user
+      const existingConversation = await prisma.conversation.findFirst({
+        where: {
+          id: currentConversationId,
+          userId: userId
+        }
+      });
+
+      if (!existingConversation) {
+        return res.status(404).json({
+          success: false,
+          message: "Conversation not found"
+        });
+      }
+
+      // Tambahkan messages baru
+      await prisma.message.createMany({
+        data: [
+          {
+            conversationId: currentConversationId,
+            role: 'user',
+            content: message
+          },
+          {
+            conversationId: currentConversationId,
+            role: 'bot',
+            content: aiResponse
+          }
+        ]
+      });
+
+      // Update judul conversation
+      await prisma.conversation.update({
+        where: {
+          id: currentConversationId
+        },
+        data: {
+          title: conversationTitle,
+          updatedAt: new Date()
+        }
+      });
+    }
+
     const responseData = {
       success: true,
-      reply: aiResponse,  // Response dari Gemini
-      conversationId: conversationId || `conv-${Date.now()}`,
+      reply: aiResponse,
+      conversationId: currentConversationId, // Sekarang ID integer dari database
       timestamp: new Date().toISOString(),
       hasPDF: false
     };
 
-    console.log('✅ Chat Response sent');
+    console.log('✅ Chat Response saved to database');
     res.json(responseData);
 
   } catch (error) {
@@ -107,30 +184,56 @@ const sendChat = async (req, res) => {
   }
 };
 
-// ✅ FUNCTION GET CONVERSATIONS
+// ✅ FUNCTION GET CONVERSATIONS - SEKARANG AMBIL DARI DATABASE
 const getConversations = async (req, res) => {
   try {
     const userId = req.user?.id;
     console.log('📋 Get Conversations for user:', userId);
 
-    const mockConversations = [
-      {
-        id: 'conv-1',
-        title: 'Pertanyaan tentang jurusan',
-        lastMessage: 'Apa saja jurusan di STMIK Tazkia?',
-        updatedAt: new Date().toISOString()
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication required"
+      });
+    }
+
+    // ✅ AMBIL DARI DATABASE - AWALNYA KOSONG KALAU BELUM ADA CHAT
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        userId: userId
       },
-      {
-        id: 'conv-2', 
-        title: 'Informasi lokasi kampus',
-        lastMessage: 'Dimana lokasi STMIK Tazkia?',
-        updatedAt: new Date().toISOString()
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        messages: {
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 1,
+          select: {
+            content: true
+          }
+        }
+      },
+      orderBy: {
+        updatedAt: 'desc'
       }
-    ];
+    });
+
+    // Format response
+    const formattedConversations = conversations.map(conv => ({
+      id: conv.id,
+      title: conv.title,
+      lastMessage: conv.messages[0]?.content || 'No messages',
+      updatedAt: conv.updatedAt,
+      createdAt: conv.createdAt
+    }));
 
     res.json({
       success: true,
-      conversations: mockConversations
+      conversations: formattedConversations
     });
 
   } catch (error) {
@@ -143,7 +246,7 @@ const getConversations = async (req, res) => {
   }
 };
 
-// ✅ FUNCTION GET CHAT HISTORY
+// ✅ FUNCTION GET CHAT HISTORY - SEKARANG AMBIL DARI DATABASE
 const getChatHistory = async (req, res) => {
   try {
     const { chatId } = req.params;
@@ -151,22 +254,43 @@ const getChatHistory = async (req, res) => {
 
     console.log('📜 Get Chat History:', { userId, chatId });
 
-    const mockMessages = [
-      {
-        role: 'user',
-        content: 'Halo, apa saja jurusan di STMIK Tazkia?',
-        createdAt: new Date().toISOString()
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication required"
+      });
+    }
+
+    // ✅ AMBIL DARI DATABASE - VERIFIKASI CONVERSATION MILIK USER
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id: parseInt(chatId),
+        userId: userId
       },
-      {
-        role: 'bot', 
-        content: 'STMIK Tazkia memiliki jurusan Sistem Informasi (S1) dan Teknik Informatika (S1) dengan akreditasi A.',
-        createdAt: new Date().toISOString()
+      include: {
+        messages: {
+          select: {
+            role: true,
+            content: true,
+            createdAt: true
+          },
+          orderBy: {
+            createdAt: 'asc'
+          }
+        }
       }
-    ];
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found"
+      });
+    }
 
     res.json({
       success: true,
-      messages: mockMessages
+      messages: conversation.messages
     });
 
   } catch (error) {
@@ -179,17 +303,67 @@ const getChatHistory = async (req, res) => {
   }
 };
 
-// ✅ PASTIKAN EXPORTS FUNCTION, BUKAN OBJECT
+// ✅ FUNCTION DELETE CONVERSATION - TAMBAHAN BARU
+const deleteConversation = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication required"
+      });
+    }
+
+    // Hapus messages terlebih dahulu
+    await prisma.message.deleteMany({
+      where: {
+        conversationId: parseInt(chatId)
+      }
+    });
+
+    // Hapus conversation
+    const result = await prisma.conversation.deleteMany({
+      where: {
+        id: parseInt(chatId),
+        userId: userId
+      }
+    });
+
+    if (result.count === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Conversation deleted successfully"
+    });
+
+  } catch (error) {
+    console.error('❌ Delete Conversation Error:', error);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting conversation",
+      error: error.message
+    });
+  }
+};
+
+// ✅ EXPORTS FUNCTION
 module.exports = {
   testAI,
-  testGeminiConnection: testGeminiConnectionHandler, // Perhatikan nama di sini
+  testGeminiConnection: testGeminiConnectionHandler,
   sendChat,
   getConversations,
-  getChatHistory
+  getChatHistory,
+  deleteConversation
 };
 
 // Test di akhir file
 console.log('✅ AI Controller loaded successfully');
 console.log('- testAI is function:', typeof testAI === 'function');
 console.log('- sendChat is function:', typeof sendChat === 'function');
-console.log('- generateGeminiResponse available:', typeof generateGeminiResponse === 'function');
