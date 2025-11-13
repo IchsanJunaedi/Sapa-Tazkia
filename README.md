@@ -49,10 +49,6 @@ HTTPS / REST API
 │ Qdrant (VectorDB) │ ← Embedding dokumen kampus
 └──────────────────────┘
 
-yaml
-Copy code
-
----
 
 ## 🛠️ Teknologi yang Digunakan
 
@@ -218,10 +214,3 @@ Tim Pengembang STMIK Tazkia — Kontributor Sistem & Data Akademik
 🌐 Website: https://sapatazkia.ac.id
 📬 Kontak: admin@sapatazkia.ac.id
 🧾 Dokumentasi lengkap tersedia di folder /docs
-
-yaml
-Copy code
-
----
-
-Apakah kamu mau saya buatkan versi **README.md yang langsung bisa diunduh (.md file)** juga biar bisa langsung upload ke Git
