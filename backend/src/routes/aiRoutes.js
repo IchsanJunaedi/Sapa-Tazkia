@@ -8,6 +8,9 @@ router.post('/chat', authMiddleware.requireAuth, aiController.sendChat);
 router.get('/conversations', authMiddleware.requireAuth, aiController.getConversations);
 router.get('/history/:chatId', authMiddleware.requireAuth, aiController.getChatHistory);
 
+// ✅ NEW: DELETE conversation route
+router.delete('/conversations/:chatId', authMiddleware.requireAuth, aiController.deleteConversation);
+
 // ✅ TEST ROUTES - tanpa auth untuk testing
 router.post('/test-ai', aiController.testAI);
 router.get('/test-gemini', aiController.testGeminiConnection);

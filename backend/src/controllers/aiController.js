@@ -91,6 +91,54 @@ const sendChat = async (req, res) => {
       });
     }
 
+    const deleteConversation = async (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const userId = req.user.id;
+
+        console.log(`🗑️ [AI CONTROLLER] Deleting conversation: ${chatId} for user: ${userId}`);
+
+        // Cari conversation di database
+        const conversation = await Conversation.findById(chatId);
+
+        if (!conversation) {
+            console.log(`❌ [AI CONTROLLER] Conversation not found: ${chatId}`);
+            return res.status(404).json({
+                success: false,
+                message: 'Conversation not found'
+            });
+        }
+
+        // Validasi: Pastikan conversation milik user yang login
+        if (conversation.userId.toString() !== userId) {
+            console.log(`🚫 [AI CONTROLLER] Unauthorized delete attempt. User: ${userId}, Conversation Owner: ${conversation.userId}`);
+            return res.status(403).json({
+                success: false,
+                message: 'Not authorized to delete this conversation'
+            });
+        }
+
+        // Hapus conversation dari database
+        await Conversation.findByIdAndDelete(chatId);
+        
+        console.log(`✅ [AI CONTROLLER] Conversation deleted successfully: ${chatId}`);
+
+        res.json({
+            success: true,
+            message: 'Conversation deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('❌ [AI CONTROLLER] Error deleting conversation:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while deleting conversation',
+            error: error.message
+        });
+    }
+};
+
+
     // ✅ PANGGIL GEMINI SERVICE
     const aiResponse = await generateGeminiResponse(message);
     

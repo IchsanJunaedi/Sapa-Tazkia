@@ -3,10 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
 import { sendMessageToAI } from '../api/aiService';
-import { Plus, MessageSquare, PenSquare, User, Settings, Instagram, Globe, Youtube, ArrowUp } from 'lucide-react';
+import { Plus, MessageSquare, PenSquare, User, Settings, Instagram, Globe, Youtube, ArrowUp, Trash2 } from 'lucide-react';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 // --- Komponen Sidebar ---
-const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChatId, navigate, isSidebarOpen, onToggleSidebar, onLogout }) => {
+const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChatId, navigate, isSidebarOpen, onToggleSidebar, onLogout, onDeleteChat, isDeleting }) => {
 
     const ToggleIcon = ({ open }) => (
         <img
@@ -97,14 +98,26 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
             {/* Area Riwayat Chat */}
             <div className="flex-1 overflow-y-auto mt-0 space-y-2">
                 {isSidebarOpen && user && chatHistory.length > 0 && chatHistory.map(chat => (
-                    <button
-                        key={chat.id}
-                        onClick={() => onSelectChat(chat.id)}
-                        className={`w-full text-left p-2 rounded-lg truncate text-sm ${currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'}`}
-                        title={chat.title}
-                    >
-                        {chat.title}
-                    </button>
+                    <div key={chat.id} className="flex items-center group">
+                        <button
+                            onClick={() => onSelectChat(chat.id)}
+                            className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
+                                currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
+                            }`}
+                            title={chat.title}
+                            disabled={isDeleting}
+                        >
+                            {chat.title}
+                        </button>
+                        <button
+                            onClick={() => onDeleteChat(chat.id)}
+                            className="p-1 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 ml-1 disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Hapus chat"
+                            disabled={isDeleting}
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
                 ))}
                 {isSidebarOpen && user && chatHistory.length === 0 && (
                     <p className="p-2 text-xs text-gray-500 text-center">
@@ -266,6 +279,12 @@ const ChatPage = () => {
     const [chatHistory, setChatHistory] = useState([]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isGuest, setIsGuest] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    
+    // ✅ STATE BARU untuk Modal Confirmation
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [chatToDelete, setChatToDelete] = useState(null);
+    
     const chatContainerRef = useRef(null);
 
     // ✅ FIX: Tambahkan ref untuk mencegah multiple executions
@@ -302,6 +321,63 @@ const ChatPage = () => {
             }
         }
     }, [user, logout, navigate, isGuest]);
+
+    // ✅ FUNGSI BARU: Handle Delete dengan Modal Confirmation
+    const handleDeleteClick = (chatId) => {
+        setChatToDelete(chatId);
+        setShowDeleteModal(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!chatToDelete || !user || isGuest) {
+            setShowDeleteModal(false);
+            setChatToDelete(null);
+            return;
+        }
+
+        setIsDeleting(true);
+        
+        // ✅ OPTIMISTIC UPDATE: Langsung update UI
+        const previousChatHistory = [...chatHistory];
+        setChatHistory(prev => prev.filter(chat => chat.id !== chatToDelete));
+        
+        // Jika chat yang dihapus sedang aktif, reset ke new chat
+        if (currentChatId === chatToDelete) {
+            setCurrentChatId(null);
+            setMessages([]);
+        }
+
+        try {
+            console.log('🗑️ [CHAT PAGE] Deleting chat:', chatToDelete);
+            await api.delete(`/api/ai/conversations/${chatToDelete}`);
+            console.log('✅ [CHAT PAGE] Chat deleted successfully');
+
+        } catch (error) {
+            console.error('❌ [CHAT PAGE] Error deleting chat:', error);
+            
+            // ✅ ROLLBACK jika backend gagal
+            setChatHistory(previousChatHistory);
+            
+            if (error.response?.status === 401) {
+                console.log('🛑 [CHAT PAGE] 401 Unauthorized - Token invalid, logging out');
+                logout();
+                navigate('/');
+            } else if (error.response?.status === 404) {
+                console.log('🔍 [CHAT PAGE] 404 - Chat not found, no rollback needed');
+            } else {
+                alert('Gagal menghapus chat. Data dikembalikan.');
+            }
+        } finally {
+            setIsDeleting(false);
+            setShowDeleteModal(false);
+            setChatToDelete(null);
+        }
+    };
+
+    const handleCancelDelete = () => {
+        setShowDeleteModal(false);
+        setChatToDelete(null);
+    };
 
     const handleAIMessage = useCallback(async (messageText, isGuestMode = false) => {
         setIsLoading(true);
@@ -602,6 +678,18 @@ const ChatPage = () => {
 
     return (
         <div className="flex h-screen bg-[#fbf9f6] font-sans">
+            {/* ✅ MODAL KONFIRMASI HAPUS */}
+            <ConfirmationModal
+                isOpen={showDeleteModal}
+                onClose={handleCancelDelete}
+                onConfirm={handleConfirmDelete}
+                title="Hapus Chat"
+                message="Apakah Anda yakin ingin menghapus chat ini? Tindakan ini tidak dapat dibatalkan."
+                confirmText="Hapus"
+                cancelText="Batal"
+                isDeleting={isDeleting}
+            />
+
             <CustomSideBar
                 user={user}
                 chatHistory={chatHistory}
@@ -612,6 +700,8 @@ const ChatPage = () => {
                 isSidebarOpen={isSidebarOpen}
                 onToggleSidebar={handleToggleSidebar}
                 onLogout={logout}
+                onDeleteChat={handleDeleteClick} // ✅ GANTI dengan handleDeleteClick
+                isDeleting={isDeleting}
             />
 
             <div className="flex-1 flex flex-col overflow-hidden">
@@ -652,7 +742,7 @@ const ChatPage = () => {
                 </div>
 
                 <div>
-                    <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+                    <ChatInput onSend={handleSendMessage} disabled={isLoading || isDeleting} />
 
                     <div className="flex justify-center items-center space-x-2 px-6 pb-7 bg-[#fbf9f6]">
                         <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors">
