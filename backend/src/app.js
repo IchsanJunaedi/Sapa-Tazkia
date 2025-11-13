@@ -4,13 +4,13 @@ const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 require('dotenv').config();
 
-// Import services dan passport
-const authService = require('./services/authService');
-
-// Import routes - ✅ HANYA IMPORT ROUTES YANG ADA
+// Import routes
 const authRoutes = require('./routes/authRoutes');
 const aiRoutes = require('./routes/aiRoutes');
-// ❌ HAPUS academicRoutes dan chatRoutes karena tidak ada
+const guestRoutes = require('./routes/guestRoutes');
+
+// Import services
+const authService = require('./services/authService');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -19,36 +19,75 @@ const prisma = new PrismaClient();
 // MIDDLEWARE SETUP
 // ========================================================
 
-// CORS configuration - ✅ PERBAIKI UNTUK MULTIPLE ORIGINS
+// CORS configuration - Updated for better security
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
   'http://127.0.0.1:3000',
-  'http://192.168.100.48:3000', // IP dari kode Anda
-  'http://192.168.100.11:3000'  // <-- SAYA TAMBAHKAN IP INI dari error Anda sebelumnya
+  'http://192.168.100.48:3000',
+  'http://192.168.100.11:3000'
 ];
 
+// Enhanced CORS configuration
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, postman, server-to-server)
     if (!origin) return callback(null, true);
     
-    // Logika Anda sudah benar
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+    // Check if origin is in allowed list
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    } else {
+      const msg = `CORS policy: Origin ${origin} not allowed`;
+      console.log('🔒 CORS Blocked:', origin);
       return callback(new Error(msg), false);
     }
-    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Content-Length', 'Authorization'],
+  maxAge: 86400 // 24 hours
 }));
 
-// Body parser middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Handle preflight requests
+app.options('*', cors());
 
-// Session configuration - ✅ PERBAIKI SESSION CONFIG
+// Body parser middleware with better limits
+app.use(express.json({ 
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: '10mb',
+  parameterLimit: 100
+}));
+
+// Security headers middleware
+app.use((req, res, next) => {
+  // Remove sensitive headers
+  res.removeHeader('X-Powered-By');
+  
+  // Security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  
+  // CORS headers are handled by cors middleware
+  next();
+});
+
+// Session configuration - Enhanced security
 app.use(session({
   name: 'sapa-tazkia.sid',
   secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || 'fallback-session-secret-12345-change-in-production',
@@ -58,18 +97,28 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    domain: process.env.NODE_ENV === 'production' ? '.tazkia.ac.id' : undefined
   },
   store: process.env.NODE_ENV === 'production' ? 
-    // Untuk production, gunakan session store yang persistent
-    // new (require('connect-pg-simple')(session))() 
-    // Untuk development, gunakan MemoryStore
     new session.MemoryStore() : new session.MemoryStore()
 }));
 
-// Passport middleware - ✅ PERBAIKI PASSPORT INIT
+// Passport middleware
 app.use(authService.passport.initialize());
 app.use(authService.passport.session());
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log('🌐 [REQUEST]', {
+    method: req.method,
+    url: req.url,
+    ip: req.ip,
+    userAgent: req.get('User-Agent'),
+    timestamp: new Date().toISOString()
+  });
+  next();
+});
 
 // ========================================================
 // BASIC ROUTES & HEALTH CHECKS
@@ -80,40 +129,66 @@ app.get('/', (req, res) => {
   res.json({
     success: true,
     message: '🚀 Sapa Tazkia Backend API',
-    version: '3.0.0',
+    version: '3.1.0',
     status: 'running',
     timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
     endpoints: {
       auth: '/api/auth',
-      ai: '/api',
+      ai: '/api/ai',
+      guest: '/api/guest',
       health: '/health',
-      session: '/session-debug'
+      status: '/status'
     }
   });
 });
 
-// Health check endpoint
+// Health check endpoint - Enhanced
 app.get('/health', async (req, res) => {
+  const healthCheck = {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    services: {}
+  };
+
   try {
     // Test database connection
     await prisma.$queryRaw`SELECT 1`;
+    healthCheck.services.database = 'Connected';
     
-    res.json({ 
-      status: 'OK', 
-      message: 'Server is running',
-      database: 'Connected',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development'
-    });
+    // Test Gemini connection if API key exists
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSy.....') {
+      healthCheck.services.gemini = 'Configured';
+    } else {
+      healthCheck.services.gemini = 'Not Configured';
+    }
+    
+    res.json(healthCheck);
   } catch (error) {
     console.error('Health check error:', error);
-    res.status(500).json({
-      status: 'ERROR',
-      message: 'Server has issues',
-      database: 'Disconnected',
-      error: error.message
-    });
+    healthCheck.status = 'ERROR';
+    healthCheck.services.database = 'Disconnected';
+    healthCheck.error = error.message;
+    
+    res.status(503).json(healthCheck);
   }
+});
+
+// Status endpoint with more details
+app.get('/status', (req, res) => {
+  res.json({
+    status: 'operational',
+    serverTime: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    memory: process.memoryUsage(),
+    features: {
+      authentication: !!process.env.GOOGLE_CLIENT_ID,
+      ai: !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSy.....'),
+      database: !!process.env.DATABASE_URL
+    }
+  });
 });
 
 // Session debug endpoint
@@ -126,7 +201,8 @@ app.get('/session-debug', (req, res) => {
     passport: {
       initialized: !!authService.passport,
       session: !!req._passport
-    }
+    },
+    cookies: req.headers.cookie || 'No cookies'
   });
 });
 
@@ -136,56 +212,88 @@ app.get('/test', (req, res) => {
     success: true,
     message: 'Test route working!',
     session: req.sessionID ? 'Active' : 'No session',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    headers: {
+      origin: req.headers.origin,
+      'user-agent': req.headers['user-agent']
+    }
   });
 });
 
 // ========================================================
-// API ROUTES - ✅ HANYA REGISTER ROUTES YANG ADA
+// API ROUTES - UPDATED WITH BETTER ORGANIZATION
 // ========================================================
 
-// Auth routes
+// Auth routes - User authentication
 app.use('/api/auth', authRoutes);
 
-// AI Chat routes - ✅ INI SAJA YANG DIPAKAI
-app.use('/api', aiRoutes);
+// Guest routes - For non-authenticated users
+app.use('/api/guest', guestRoutes);
 
-// ❌ HAPUS academicRoutes dan chatRoutes karena tidak ada
+// AI routes - For authenticated AI interactions
+app.use('/api/ai', aiRoutes);
 
 // ========================================================
-// ERROR HANDLING MIDDLEWARE
+// ERROR HANDLING MIDDLEWARE - ENHANCED
 // ========================================================
 
-// 404 Handler - harus di akhir sebelum global error handler
+// 404 Handler - Enhanced with better error information
 app.use('*', (req, res) => {
+  console.log('❌ [404] Route not found:', req.method, req.originalUrl);
+  
   res.status(404).json({ 
     success: false,
     message: `Route not found: ${req.method} ${req.originalUrl}`,
-    availableEndpoints: [
-      'GET  /',
-      'GET  /health',
-      'GET  /test',
-      'GET  /session-debug',
-      'POST /api/auth/login',
-      'POST /api/auth/register',
-      'GET  /api/auth/google',
-      'GET  /api/auth/google/callback',
-      'POST /api/test-ai',
-      'GET  /api/test-gemini'
-    ]
+    timestamp: new Date().toISOString(),
+    availableEndpoints: {
+      auth: [
+        'POST /api/auth/login',
+        'POST /api/auth/register', 
+        'GET  /api/auth/google',
+        'GET  /api/auth/google/callback',
+        'POST /api/auth/logout',
+        'GET  /api/auth/me'
+      ],
+      guest: [
+        'POST /api/guest/chat',
+        'GET  /api/guest/conversation/:sessionId'
+      ],
+      ai: [
+        'POST /api/ai/chat',
+        'GET  /api/ai/conversations',
+        'GET  /api/ai/history/:chatId',
+        'POST /api/ai/test-ai',
+        'GET  /api/ai/test-gemini'
+      ],
+      system: [
+        'GET  /',
+        'GET  /health',
+        'GET  /status',
+        'GET  /test',
+        'GET  /session-debug'
+      ]
+    }
   });
 });
 
-// Global error handler
+// Global error handler - Enhanced with better logging
 app.use((err, req, res, next) => {
-  console.error('🔴 [ERROR] Global error handler:', err);
-  
+  console.error('🔴 [GLOBAL ERROR]', {
+    message: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+    ip: req.ip,
+    timestamp: new Date().toISOString()
+  });
+
   // CORS error
   if (err.message.includes('CORS')) {
     return res.status(403).json({
       success: false,
       message: 'CORS Error: Origin not allowed',
-      allowedOrigins: allowedOrigins // Mengirim kembali daftar yang diizinkan
+      allowedOrigins: allowedOrigins,
+      yourOrigin: req.headers.origin
     });
   }
   
@@ -195,7 +303,8 @@ app.use((err, req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Database error occurred',
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+      code: err.code
     });
   }
   
@@ -203,41 +312,82 @@ app.use((err, req, res, next) => {
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({
       success: false,
-      message: 'Invalid token'
+      message: 'Invalid authentication token'
     });
   }
   
   if (err.name === 'TokenExpiredError') {
     return res.status(401).json({
       success: false,
-      message: 'Token expired'
+      message: 'Authentication token expired'
+    });
+  }
+
+  // Rate limiting error (if you implement rate limiting later)
+  if (err.name === 'RateLimitError') {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many requests, please try again later'
     });
   }
   
-  // Default error
-  res.status(err.status || 500).json({
+  // Default error response
+  const errorResponse = {
     success: false,
     message: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
+    timestamp: new Date().toISOString()
+  };
+
+  // Include stack trace in development
+  if (process.env.NODE_ENV === 'development') {
+    errorResponse.stack = err.stack;
+    errorResponse.details = err;
+  }
+
+  res.status(err.status || 500).json(errorResponse);
 });
 
 // ========================================================
-// GRACEFUL SHUTDOWN
+// GRACEFUL SHUTDOWN - ENHANCED
 // ========================================================
 
-process.on('SIGINT', async () => {
-  console.log('\n🔴 Received SIGINT. Shutting down gracefully...');
-  await prisma.$disconnect();
-  console.log('✅ Database disconnected.');
-  process.exit(0);
+const gracefulShutdown = async (signal) => {
+  console.log(`\n🔴 Received ${signal}. Shutting down gracefully...`);
+  
+  try {
+    // Close database connection
+    await prisma.$disconnect();
+    console.log('✅ Database disconnected.');
+    
+    // Close server
+    if (server) {
+      server.close(() => {
+        console.log('✅ HTTP server closed.');
+        process.exit(0);
+      });
+    } else {
+      process.exit(0);
+    }
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
+};
+
+// Handle different shutdown signals
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // For nodemon
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('🔴 UNCAUGHT EXCEPTION:', error);
+  process.exit(1);
 });
 
-process.on('SIGTERM', async () => {
-  console.log('\n🔴 Received SIGTERM. Shutting down gracefully...');
-  await prisma.$disconnect();
-  console.log('✅ Database disconnected.');
-  process.exit(0);
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔴 UNHANDLED REJECTION at:', promise, 'reason:', reason);
+  process.exit(1);
 });
 
 // ========================================================
@@ -246,24 +396,24 @@ process.on('SIGTERM', async () => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log('='.repeat(60));
+const server = app.listen(PORT, () => {
+  console.log('='.repeat(70));
   console.log('🚀 SAPA TAZKIA BACKEND SERVER STARTED SUCCESSFULLY');
-  console.log('='.repeat(60));
+  console.log('='.repeat(70));
   console.log(`📍 Port: ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔐 Auth: ${process.env.GOOGLE_CLIENT_ID ? 'Google OAuth Ready' : 'Local Auth Only'}`);
-  console.log(`🤖 AI: ${process.env.GEMINI_API_KEY ? 'Gemini AI Ready' : 'AI Disabled'}`);
-  console.log(`🗄️ Database: ${process.env.DATABASE_URL ? 'Connected' : 'No DB Config'}`);
+  console.log(`🔐 Auth: ${process.env.GOOGLE_CLIENT_ID ? '✅ Google OAuth Ready' : '❌ Local Auth Only'}`);
+  console.log(`🤖 AI: ${process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSy.....' ? '✅ Gemini AI Ready' : '❌ AI Disabled'}`);
+  console.log(`🗄️ Database: ${process.env.DATABASE_URL ? '✅ Connected' : '❌ No DB Config'}`);
   console.log('');
   console.log('📋 AVAILABLE ENDPOINTS:');
   console.log('   GET  / .......................... API Root');
   console.log('   GET  /health ................... Health check');
+  console.log('   GET  /status ................... System status');
   console.log('   GET  /session-debug ............ Session debug');
   console.log('   GET  /test .................... Test route');
   console.log('');
   console.log('🔐 AUTH ENDPOINTS:');
-  console.log('   GET  /api/auth/test ........... Auth test');
   console.log('   POST /api/auth/login .......... User login');
   console.log('   POST /api/auth/register ....... User registration');
   console.log('   GET  /api/auth/google ......... Google OAuth');
@@ -271,12 +421,24 @@ app.listen(PORT, () => {
   console.log('   POST /api/auth/logout ......... User logout');
   console.log('   GET  /api/auth/me ............ Get user profile');
   console.log('');
-  console.log('🤖 AI ENDPOINTS:');
-  console.log('   POST /api/test-ai ............ AI Chat');
-  console.log('   GET  /api/test-gemini ........ Test Gemini Connection');
-  console.log('   POST /api/chat ............... Main Chat Endpoint');
+  console.log('👤 GUEST ENDPOINTS:');
+  console.log('   POST /api/guest/chat .......... Guest Chat');
+  console.log('   GET  /api/guest/conversation/:sessionId ... Guest History');
   console.log('');
-  console.log('='.repeat(60));
+  console.log('🤖 AI ENDPOINTS:');
+  console.log('   POST /api/ai/chat ............ Authenticated Chat');
+  console.log('   GET  /api/ai/conversations .... Get conversations');
+  console.log('   GET  /api/ai/history/:chatId .. Get chat history');
+  console.log('   POST /api/ai/test-ai ......... Test AI');
+  console.log('   GET  /api/ai/test-gemini ..... Test Gemini Connection');
+  console.log('');
+  console.log('🛡️  SECURITY FEATURES:');
+  console.log('   ✅ CORS Protection');
+  console.log('   ✅ Session Management');
+  console.log('   ✅ Input Validation');
+  console.log('   ✅ Error Handling');
+  console.log('   ✅ Graceful Shutdown');
+  console.log('='.repeat(70));
 });
 
 module.exports = app;

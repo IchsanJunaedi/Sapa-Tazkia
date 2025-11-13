@@ -20,29 +20,50 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Ambil fungsi login dari AuthContext
-  const { loginWithCredentials, isAuthenticated } = useAuth();
+  // ✅ FIXED: Ambil fungsi login yang benar dari AuthContext
+  const { login, isAuthenticated, loading: authLoading } = useAuth();
 
-  // Redirect jika sudah login
+  // ✅ FIXED: Redirect jika sudah login - dengan pengecekan yang lebih baik
   useEffect(() => {
-    console.log('🔍 [LOGIN PAGE] Auth status:', isAuthenticated);
-    if (isAuthenticated) {
+    console.log('🔍 [LOGIN PAGE] Auth status:', { 
+      isAuthenticated, 
+      authLoading,
+      path: location.pathname 
+    });
+    
+    if (isAuthenticated && !authLoading) {
       console.log('✅ [LOGIN PAGE] User already authenticated, redirecting to chat');
-      navigate('/chat', { replace: true });
+      
+      // ✅ FIXED: Gunakan replace: true dan state yang jelas
+      navigate('/chat', { 
+        replace: true,
+        state: { 
+          from: 'login',
+          isGuest: false 
+        }
+      });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, authLoading, navigate, location]);
 
-  // Check untuk error message dari location state
+  // ✅ FIXED: Check untuk error message dari location state
   useEffect(() => {
     if (location.state?.error) {
       setError(location.state.error);
+      console.log('⚠️ [LOGIN PAGE] Error from location state:', location.state.error);
+      
       // Clear location state setelah menampilkan error
       window.history.replaceState({}, document.title);
+    }
+    
+    // ✅ FIXED: Check untuk success message (misalnya dari register)
+    if (location.state?.success) {
+      console.log('✅ [LOGIN PAGE] Success message from location:', location.state.success);
+      // Bisa tambahkan toast atau pesan sukses di sini jika needed
     }
   }, [location.state]);
 
   /**
-   * Fungsi untuk menangani login via NIM/Password
+   * ✅ FIXED: Fungsi untuk menangani login via NIM/Password
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,29 +74,48 @@ const LoginPage = () => {
       return;
     }
 
+    // Validasi format NIM (opsional)
+    if (nim.trim().length < 5) {
+      setError('NIM harus minimal 5 karakter');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
 
     try {
       console.log('🔍 [LOGIN PAGE] Attempting login with NIM:', nim);
       
-      await loginWithCredentials(nim, password);
+      // ✅ FIXED: Gunakan fungsi login yang benar dari context
+      await login(nim, password);
       
-      console.log('✅ [LOGIN PAGE] Login successful, redirecting...');
+      console.log('✅ [LOGIN PAGE] Login successful, redirect should happen automatically');
       
-      // Redirect akan ditangani oleh useEffect di atas
-      // atau oleh AuthContext setelah login berhasil
+      // ✅ FIXED: Redirect sudah ditangani oleh useEffect di atas
+      // Tidak perlu navigate manual di sini
       
     } catch (err) {
       console.error('❌ [LOGIN PAGE] Login failed:', err);
-      setError(err.response?.data?.message || err.message || 'Login gagal. Periksa kembali NIM dan Password Anda.');
+      
+      // ✅ FIXED: Error handling yang lebih detail
+      let errorMessage = 'Login gagal. Periksa kembali NIM dan Password Anda.';
+      
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      } else if (err.code === 'NETWORK_ERROR') {
+        errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
   /**
-   * Fungsi untuk menangani login via Google
+   * ✅ FIXED: Fungsi untuk menangani login via Google
    */
   const handleGoogleLogin = () => {
     setError('');
@@ -83,21 +123,81 @@ const LoginPage = () => {
     
     console.log('🔍 [LOGIN PAGE] Redirecting to Google OAuth...');
     
-    // Redirect ke backend Google OAuth endpoint
-    // Backend akan handle redirect ke Google dan kemudian kembali ke /auth/callback
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-    window.location.href = `${apiUrl}/api/auth/google`;
+    try {
+      // Redirect ke backend Google OAuth endpoint
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const redirectUrl = `${apiUrl}/api/auth/google`;
+      
+      console.log('📍 [LOGIN PAGE] Redirect URL:', redirectUrl);
+      window.location.href = redirectUrl;
+      
+    } catch (err) {
+      console.error('❌ [LOGIN PAGE] Google login redirect failed:', err);
+      setError('Gagal mengarahkan ke Google Login. Silakan coba lagi.');
+      setIsLoading(false);
+    }
   };
+
+  /**
+   * ✅ FIXED: Fungsi untuk navigasi ke guest mode
+   */
+  const handleGuestMode = () => {
+    console.log('👤 [LOGIN PAGE] Redirecting to guest mode');
+    navigate('/chat', { 
+      state: { 
+        isGuest: true,
+        from: 'login-page' 
+      }
+    });
+  };
+
+  // ✅ FIXED: Tampilkan loading spinner selama auth check
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6 font-sans">
+        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
+          <div className="flex flex-col items-center justify-center">
+            <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-gray-600">Memeriksa status login...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6 font-sans">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-2">Login Mahasiswa</h1>
-        <p className="text-gray-600 text-center mb-8">Sapa Tazkia Chatbot</p>
+        <div className="text-center mb-2">
+          <h1 className="text-3xl font-bold text-gray-800">Login Mahasiswa</h1>
+          <p className="text-gray-600 mt-2">Sapa Tazkia Chatbot</p>
+        </div>
+
+        {/* ✅ FIXED: Guest mode option */}
+        <div className="mb-6">
+          <button
+            onClick={handleGuestMode}
+            className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-medium transition-colors shadow-md mb-2"
+          >
+            Coba Sebagai Tamu
+          </button>
+          <p className="text-xs text-gray-500 text-center">
+            Coba fitur chat tanpa login
+          </p>
+        </div>
+
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-gray-300"></span>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="bg-white px-2 text-gray-500">ATAU</span>
+          </div>
+        </div>
 
         {/* Menampilkan pesan error */}
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" role="alert">
             <span className="block sm:inline">{error}</span>
           </div>
         )}
@@ -105,11 +205,13 @@ const LoginPage = () => {
         {/* Form dengan handler dan state */}
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">NIM</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              NIM
+            </label>
             <input
               type="text"
               placeholder="Masukkan NIM Anda"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none transition-colors"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
               value={nim}
               onChange={(e) => setNim(e.target.value)}
               disabled={isLoading}
@@ -118,11 +220,13 @@ const LoginPage = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Password
+            </label>
             <input
               type="password"
               placeholder="Masukkan Password"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none transition-colors"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
@@ -132,10 +236,17 @@ const LoginPage = () => {
 
           <button
             type="submit"
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-            disabled={isLoading}
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed shadow-md"
+            disabled={isLoading || !nim.trim() || !password.trim()}
           >
-            {isLoading ? 'Memproses...' : 'Login'}
+            {isLoading ? (
+              <span className="flex items-center justify-center">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                Memproses...
+              </span>
+            ) : (
+              'Login'
+            )}
           </button>
         </form>
 
@@ -145,7 +256,7 @@ const LoginPage = () => {
             <span className="w-full border-t border-gray-300"></span>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="bg-white px-2 text-gray-500">ATAU</span>
+            <span className="bg-white px-2 text-gray-500">ATAU LOGIN DENGAN</span>
           </div>
         </div>
 
@@ -154,24 +265,30 @@ const LoginPage = () => {
           type="button"
           onClick={handleGoogleLogin}
           disabled={isLoading}
-          className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed shadow-sm"
         >
           <GoogleIcon />
           <span className="ml-3 font-medium">
-            {isLoading ? 'Mengarahkan...' : 'Lanjutkan dengan Google'}
+            {isLoading ? 'Mengarahkan...' : 'Google'}
           </span>
         </button>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-600 mt-6">
-          Belum punya akun?{' '}
-          <button 
-            onClick={() => navigate('/register')}
-            className="text-orange-500 hover:underline font-medium"
-          >
-            Daftar
-          </button>
-        </p>
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-600">
+            Belum punya akun?{' '}
+            <button 
+              onClick={() => navigate('/register')}
+              className="text-orange-500 hover:underline font-medium focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 rounded"
+              disabled={isLoading}
+            >
+              Daftar
+            </button>
+          </p>
+          <p className="text-xs text-gray-500 mt-2">
+            Lupa password? Hubungi administrator.
+          </p>
+        </div>
       </div>
     </div>
   );

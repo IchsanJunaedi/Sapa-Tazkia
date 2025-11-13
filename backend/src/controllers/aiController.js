@@ -35,38 +35,40 @@ const testAI = async (req, res) => {
   }
 };
 
-// ✅ FUNCTION TEST GEMINI CONNECTION
+// ✅ FUNCTION TEST GEMINI CONNECTION - PERBAIKI NAMA FUNCTION
 const testGeminiConnectionHandler = async (req, res) => {
   try {
-    console.log('🔍 Gemini Connection Test');
+    console.log('🔧 Testing Gemini connection...');
     
+    // ✅ GUNAKAN service yang sudah di-import di atas file
     const result = await testGeminiConnection();
-    
+
     if (result.success) {
       res.json({
         success: true,
-        message: "Gemini connection test successful",
+        message: 'Gemini connection test successful',
         response: result.message
       });
     } else {
       res.status(500).json({
         success: false,
-        message: "Gemini connection test failed",
+        message: 'Gemini connection test failed',
         error: result.error,
         details: result.details
       });
     }
+    
   } catch (error) {
-    console.error('❌ Gemini Test Error:', error);
+    console.error('❌ Gemini connection test error:', error);
     res.status(500).json({
       success: false,
-      message: "Gemini test error",
+      message: 'Gemini connection test failed',
       error: error.message
     });
   }
 };
 
-// ✅ FUNCTION SEND CHAT - SEKARANG PAKAI PRISMADAN SIMPAN KE DATABASE
+// ✅ FUNCTION SEND CHAT - SEKARANG PAKAI PRISMA DAN SIMPAN KE DATABASE
 const sendChat = async (req, res) => {
   try {
     const { message, conversationId } = req.body;
@@ -353,10 +355,10 @@ const deleteConversation = async (req, res) => {
   }
 };
 
-// ✅ EXPORTS FUNCTION
+// ✅ EXPORTS FUNCTION - PERBAIKI NAMA
 module.exports = {
   testAI,
-  testGeminiConnection: testGeminiConnectionHandler,
+  testGeminiConnection: testGeminiConnectionHandler, // ✅ PERBAIKI: Export dengan nama yang benar
   sendChat,
   getConversations,
   getChatHistory,
@@ -366,4 +368,5 @@ module.exports = {
 // Test di akhir file
 console.log('✅ AI Controller loaded successfully');
 console.log('- testAI is function:', typeof testAI === 'function');
+console.log('- testGeminiConnectionHandler is function:', typeof testGeminiConnectionHandler === 'function');
 console.log('- sendChat is function:', typeof sendChat === 'function');

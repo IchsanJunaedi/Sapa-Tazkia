@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-// --- PERBAIKAN: Menambah ekstensi .js agar file ditemukan ---
 import { useAuth } from '../context/AuthContext';
-import { Send, Plus, MessageSquare, PenSquare, User, Settings, X, Instagram, Globe, Youtube } from 'lucide-react';
+import { Plus, MessageSquare, PenSquare, User, Settings, X, Instagram, Globe, Youtube, ArrowUp } from 'lucide-react';
 
-// --- Komponen GradientText (Sudah Benar) ---
+// --- Komponen GradientText ---
 const GradientText = ({ children, className = '' }) => {
   return (
     <span
@@ -16,7 +15,7 @@ const GradientText = ({ children, className = '' }) => {
   );
 };
 
-// --- Komponen Button (Sudah Benar) ---
+// --- Komponen Button ---
 const Button = ({ children, onClick, className, variant = 'default', size = 'md', ...props }) => {
   const baseClasses = 'font-semibold transition-all duration-200 ease-in-out flex items-center justify-center rounded-lg';
   const variantClasses = {
@@ -46,10 +45,8 @@ const Button = ({ children, onClick, className, variant = 'default', size = 'md'
   );
 };
 
-// --- Komponen Sidebar (Sudah diperbaiki) ---
+// --- Komponen Sidebar ---
 const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout }) => {
-
-  // Komponen Ikon Toggle kustom
   const ToggleIcon = ({ open }) => (
     <img
       src="https://www.svgrepo.com/show/493722/sidebar-toggle-nav-side-aside.svg"
@@ -60,8 +57,6 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
 
   return (
     <div className={` ${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative`}>
-
-      {/* Header Sidebar (Settings & Toggle) */}
       {isSidebarOpen ? (
         <div className="flex justify-between items-center mb-8">
           <button className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3" title="Settings">
@@ -87,28 +82,23 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
         </div>
       )}
 
-      {/* --- PERUBAHAN: Tombol Login/User Dinamis --- */}
       <div className="flex justify-center mb-10">
         {user ? (
-          // Jika sudah login
           <button
             className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-green-500 text-white rounded-xl shadow-lg hover:bg-green-600 transition-all flex items-center group relative gap-3`}
-            // ✅ PERBAIKAN 1: Ganti `user.fullName` menjadi `user.name`
             title={`Logged in as ${user?.name || 'User'}. Click to logout.`}
-            onClick={onLogout} // Memicu logout
+            onClick={onLogout}
           >
             <User size={20} />
             <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-              {/* ✅ PERBAIKAN 2 (Error Asli): Ganti `user.fullName.split` menjadi `user?.name?.split` */}
               {user?.name?.split(' ')[0] || 'User'}
             </span>
           </button>
         ) : (
-          // Jika belum login
           <button
             className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all flex items-center group relative gap-3`}
             title="Login Mahasiswa"
-            onClick={onClickLogin} // Memicu modal
+            onClick={onClickLogin}
           >
             <User size={20} />
             <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
@@ -118,7 +108,6 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
         )}
       </div>
 
-      {/* Tombol New Chat (Sudah Benar) */}
       <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
         <button
           className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
@@ -131,7 +120,6 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
         </button>
       </div>
 
-      {/* Tombol Chats History (Sudah Benar) */}
       <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
         <button
           className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
@@ -144,7 +132,6 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
         </button>
       </div>
 
-      {/* Social Links di Footer (Sudah Benar) */}
       <div className={`mt-auto flex ${isSidebarOpen ? 'flex-col items-start gap-2' : 'flex-row items-center justify-center space-x-2'} pb-4`}>
         <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors flex items-center gap-3">
           <Instagram size={16} />
@@ -163,7 +150,7 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
   );
 };
 
-// --- Komponen GoogleIcon (Sudah Benar) ---
+// --- Komponen GoogleIcon ---
 const GoogleIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-6 h-6 mr-3">
     <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.343c-1.896,3.101-5.466,6.17-11.343,6.17 c-6.958,0-12.632-5.673-12.632-12.632c0-6.958,5.674-12.632,12.632-12.632c3.23,0,6.347,1.385,8.441,3.483l5.882-5.882 C34.004,5.946,29.351,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20 C44,22.659,43.834,21.32,43.611,20.083z" />
@@ -173,28 +160,20 @@ const GoogleIcon = () => (
   </svg>
 );
 
-
-// --- Komponen AuthModal (Sudah diperbaiki) ---
+// --- Komponen AuthModal ---
 const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFunction }) => {
   const [step, setStep] = useState(initialStep);
-
-  // --- ✅ PERBAIKAN 3: State dipisahkan untuk Login dan Register ---
-  const [loginNim, setLoginNim] = useState(''); // State untuk NIM di form Login
-  const [password, setPassword] = useState(''); // State untuk Password (dipakai Login & Register)
-
-  const [fullName, setFullName] = useState(''); // State untuk Register
-  const [nim, setNim] = useState(''); // State untuk NIM di form Register
-  const [email, setEmail] = useState(''); // State untuk Email di form Register
-
+  const [loginNim, setLoginNim] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [nim, setNim] = useState('');
+  const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Sinkronisasi step saat modal dibuka
   useEffect(() => {
     if (isOpen) {
       setStep(initialStep);
-      // Reset semua state
-      // ✅ PERBAIKAN 4: Reset state loginNim
       setLoginNim('');
       setEmail('');
       setPassword('');
@@ -207,28 +186,23 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
 
   if (!isOpen) return null;
 
-  // --- ✅ PERBAIKAN 5: handleLogin disesuaikan untuk NIM ---
-const handleLogin = async () => {
-  // Validasi menggunakan loginNim
-  if (!loginNim || !password) {
-    setError('NIM and password are required.');
-    return;
-  }
-  setIsLoading(true);
-  setError(null);
-  try {
-    // Kirim loginNim dan password ke AuthContext
-    await loginFunction(loginNim, password); // ← Ini harusnya loginWithCredentials
-    onClose();
-  } catch (err) {
-    setError(err.response?.data?.message || 'Login failed. Please try again.');
-    setIsLoading(false);
-  }
-};
+  const handleLogin = async () => {
+    if (!loginNim || !password) {
+      setError('NIM and password are required.');
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      await loginFunction(loginNim, password);
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      setIsLoading(false);
+    }
+  };
 
-  // --- Fungsi handleSignUp (Sudah Benar) ---
   const handleSignUp = async () => {
-    // Validasi menggunakan state register (fullName, nim, email, password)
     if (!fullName || !nim || !email || !password) {
       setError('All fields are required.');
       return;
@@ -236,10 +210,7 @@ const handleLogin = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Panggil fungsi register dari AuthContext
       await registerFunction({ fullName, nim, email, password });
-
-      // Pindah ke step verifikasi
       setStep(2);
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
@@ -248,22 +219,15 @@ const handleLogin = async () => {
     }
   };
 
-  // --- ✅ PERBAIKAN 6: Tambahkan handleGoogleLogin ---
   const handleGoogleLogin = () => {
     setIsLoading(true);
-    console.log("Mengarahkan ke Google Login...");
-
-    // Ambil API URL dari environment atau hardcode
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-    // Arahkan ke endpoint Google backend Anda
     window.location.href = `${API_URL}/api/auth/google`;
   };
 
-
   const renderContent = () => {
     switch (step) {
-      case 0: // Login
+      case 0:
         return (
           <>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Log Into Your Account</h2>
@@ -275,7 +239,6 @@ const handleLogin = async () => {
               </div>
             )}
 
-            {/* --- ✅ PERBAIKAN 7: Ubah Input Email menjadi NIM --- */}
             <input
               type="text"
               placeholder="Enter your NIM"
@@ -295,7 +258,6 @@ const handleLogin = async () => {
             <button
               onClick={handleLogin}
               className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${
-                // --- ✅ PERBAIKAN 8: Update validasi disabled ---
                 (loginNim && password && !isLoading) ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
                 }`}
               disabled={!loginNim || !password || isLoading}
@@ -310,7 +272,6 @@ const handleLogin = async () => {
             </div>
 
             <div className="space-y-3">
-              {/* --- ✅ PERBAIKAN 9: Tambahkan onClick ke tombol Google --- */}
               <button
                 onClick={handleGoogleLogin}
                 className="w-full py-3 flex items-center justify-center border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -319,8 +280,6 @@ const handleLogin = async () => {
                 <GoogleIcon />
                 Continue with google
               </button>
-
-              {/* --- ✅ PERBAIKAN 10: Hapus tombol "Email and password" yang membingungkan --- */}
             </div>
 
             <p className="text-sm text-center text-gray-600 mt-6">
@@ -335,7 +294,7 @@ const handleLogin = async () => {
           </>
         );
 
-      case 1: // Signup Step 1 (Form Registrasi)
+      case 1:
         return (
           <>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Create Your Account</h2>
@@ -347,7 +306,6 @@ const handleLogin = async () => {
               </div>
             )}
 
-            {/* Input-input ini sudah benar terhubung ke state register */}
             <input
               type="text"
               placeholder="Full Name"
@@ -382,7 +340,7 @@ const handleLogin = async () => {
             />
 
             <button
-              onClick={handleSignUp} // Panggil fungsi register
+              onClick={handleSignUp}
               className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${
                 (email && password && fullName && nim && !isLoading) ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
                 }`}
@@ -403,7 +361,7 @@ const handleLogin = async () => {
           </>
         );
 
-      case 2: // Signup Step 2: Verify Code (Sudah Benar)
+      case 2:
         return (
           <>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Enter Your Code</h2>
@@ -420,7 +378,6 @@ const handleLogin = async () => {
     }
   };
 
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm relative transform transition-all duration-300 scale-100">
@@ -435,17 +392,15 @@ const handleLogin = async () => {
   );
 };
 
-
-// --- Komponen Utama Landing Page (Sudah Benar) ---
+// --- Komponen Utama Landing Page (FIXED VERSION) ---
 const LandingPage = () => {
   const navigate = useNavigate();
-  // ✅ PERBAIKAN: Tambahkan loginWithCredentials
   const { user, loginWithCredentials, register, logout, loading } = useAuth();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [initialModalStep, setInitialModalStep] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -457,37 +412,69 @@ const LandingPage = () => {
     setInitialModalStep(step);
     setIsModalOpen(true);
   };
+  
   const closeModal = () => setIsModalOpen(false);
 
   const handleToggleSidebar = () => {
     setIsSidebarOpen(prev => !prev);
   };
 
-  const handleChatFocus = () => {
-    navigate('/chat');
+  // ✅ FIXED: Fungsi untuk handle pengiriman pesan dengan navigasi yang benar
+  const handleSendMessage = () => {
+    if (message.trim()) {
+      if (user) {
+        // Jika sudah login - gunakan state
+        navigate('/chat', { 
+          state: { 
+            initialMessage: message.trim(),
+            isGuest: false 
+          } 
+        });
+      } else {
+        // ✅ FIXED: Jika belum login - gunakan BOTH URL parameters DAN state
+        navigate('/chat', { 
+          state: { 
+            initialMessage: message.trim(),
+            isGuest: true 
+          }
+        });
+      }
+    }
+  };
+
+  // ✅ FIXED: Fungsi untuk handle key press (Enter)
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSendMessage();
+    }
+  };
+
+  // ✅ FIXED: Fungsi untuk langsung ke chat sebagai guest
+  const handleGuestChat = () => {
+    navigate('/chat', { 
+      state: { 
+        isGuest: true 
+      }
+    });
   };
 
   return (
     <div className="min-h-screen flex bg-[#fbf9f6] font-sans">
-
       <Sidebar
         onClickLogin={() => openModal(0)}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={handleToggleSidebar}
-        user={user} // Kirim data user
-        onLogout={logout} // Kirim fungsi logout
+        user={user}
+        onLogout={logout}
       />
 
       <div className="flex-1 flex flex-col">
-
         <nav className="flex items-center justify-between p-6">
           <h1 className="text-xl font-bold text-gray-800">Sapa Tazkia</h1>
-
           <div className="flex items-center space-x-3">
             {loading ? (
               <span className="text-gray-500">Loading...</span>
             ) : user ? (
-              // Jika sudah login
               <>
                 <Button
                   variant="primary"
@@ -507,30 +494,29 @@ const LandingPage = () => {
                 </Button>
               </>
             ) : (
-              // Jika belum login
               <>
                 <Button
                   variant="primary"
                   size="md"
                   className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200/50 rounded-lg"
-                  onClick={() => openModal(0)} // Buka modal di Step 0 (Login)
+                  onClick={() => openModal(0)}
                 >
                   SIGN IN
                 </Button>
                 <Button
                   variant="primary"
                   size="md"
-                  className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200/50 rounded-lg"
-                  onClick={() => openModal(1)} // Buka modal di Step 1 (Sign Up)
+                  className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-200/50 rounded-lg"
+                  onClick={handleGuestChat}
                 >
-                  SIGN UP
+                  TRY AS GUEST
                 </Button>
               </>
             )}
           </div>
         </nav>
 
-        {/* Hero Section */}
+        {/* Hero Section - FIXED */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-20">
           <h1 className="text-5xl md:text-6xl font-extrabold text-center mb-12 max-w-4xl">
             <GradientText>Where should we begin?</GradientText>
@@ -544,48 +530,52 @@ const LandingPage = () => {
               <input
                 type="text"
                 placeholder="Message Sapa Tazkia"
-                onFocus={handleChatFocus}
-                readOnly
-                className="flex-1 px-2 py-2 text-lg text-gray-700 placeholder-gray-500 focus:outline-none bg-white cursor-pointer"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="flex-1 px-2 py-2 text-lg text-gray-700 placeholder-gray-500 focus:outline-none bg-white"
               />
               <button
                 className="p-3 bg-blue-500 text-white hover:bg-blue-600 rounded-full transition-colors shadow-md ml-2"
                 aria-label="Send Message"
-                onClick={handleChatFocus}
+                onClick={handleSendMessage}
+                disabled={!message.trim()}
               >
-                <Send size={20} className="transform -rotate-45" />
+                <ArrowUp size={20} />
               </button>
+            </div>
+            
+            {/* Guest mode info */}
+            <div className="mt-4 text-center">
+              <p className="text-gray-500 text-sm">
+                {user ? 'Tekan Enter untuk mulai chat' : 'Tekan Enter untuk chat sebagai tamu'}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Footer Social Links (Tetap Sama) */}
-<div className="flex justify-center p-6 space-x-6">
-  <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors">
-    <Instagram size={14} />
-  </a>
-  <a href="https://stmik.tazkia.ac.id/" target="_blank" rel="noopener noreferrer" title="Website" className="text-gray-500 hover:text-blue-500 transition-colors">
-    <Globe size={14} />
-  </a>
-  <a href="https://www.youtube.com/@stmiktazkia" target="_blank" rel="noopener noreferrer" title="YouTube" className="text-gray-500 hover:text-red-500 transition-colors">
-    <Youtube size={14} />
-  </a>
-</div>
+        {/* Footer Social Links */}
+        <div className="flex justify-center p-6 space-x-6">
+          <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors">
+            <Instagram size={14} />
+          </a>
+          <a href="https://stmik.tazkia.ac.id/" target="_blank" rel="noopener noreferrer" title="Website" className="text-gray-500 hover:text-blue-500 transition-colors">
+            <Globe size={14} />
+          </a>
+          <a href="https://www.youtube.com/@stmiktazkia" target="_blank" rel="noopener noreferrer" title="YouTube" className="text-gray-500 hover:text-red-500 transition-colors">
+            <Youtube size={14} />
+          </a>
+        </div>
+      </div>
 
-</div>
-{/* ===================================================================
-  ✅ AKHIR DARI DIV PEMBUNGKUS
-=================================================================== */}
-
-<AuthModal
-  isOpen={isModalOpen}
-  onClose={closeModal}
-  initialStep={initialModalStep}
-  loginFunction={loginWithCredentials}
-  registerFunction={register}
-/>
-</div>
-
+      <AuthModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        initialStep={initialModalStep}
+        loginFunction={loginWithCredentials}
+        registerFunction={register}
+      />
+    </div>
   );
 };
 
