@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Plus, MessageSquare, PenSquare, User, Settings, X, Instagram, Globe, Youtube, ArrowUp } from 'lucide-react';
+import api from '../api/axiosConfig';
+import { Plus, MessageSquare, PenSquare, User, Settings, X, Instagram, Globe, Youtube, ArrowUp, Trash2 } from 'lucide-react';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 // --- Komponen GradientText ---
 const GradientText = ({ children, className = '' }) => {
@@ -46,7 +48,18 @@ const Button = ({ children, onClick, className, variant = 'default', size = 'md'
 };
 
 // --- Komponen Sidebar ---
-const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout }) => {
+const Sidebar = ({ 
+  onClickLogin, 
+  isSidebarOpen, 
+  onToggleSidebar, 
+  user, 
+  onLogout, 
+  chatHistory, 
+  onSelectChat, 
+  currentChatId, 
+  onDeleteChat, 
+  isDeleting 
+}) => {
   
   // ✅ FUNGSI: Untuk mendapatkan nama user dengan berbagai fallback
   const getUserName = () => {
@@ -66,6 +79,14 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
       className={`w-6 h-6 text-gray-700 transition-transform duration-300 ${open ? '' : 'transform rotate-180'}`}
     />
   );
+
+  const handleUserClick = () => {
+    if (user) {
+      onLogout();
+    } else {
+      onClickLogin();
+    }
+  };
 
   return (
     <div className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative`}>
@@ -99,36 +120,23 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
       )}
 
       <div className="flex justify-center mb-10">
-        {user ? (
-          <button
-            className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all flex items-center group relative gap-3`}
-            title={`Logged in as ${getUserName()}. Click to logout.`}
-            onClick={onLogout}
-          >
-            <User size={20} />
-            <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-              {getUserShortName()}
-            </span>
-          </button>
-        ) : (
-          <button
-            className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all flex items-center group relative gap-3`}
-            title="Login Mahasiswa"
-            onClick={onClickLogin}
-          >
-            <User size={20} />
-            <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-              Login Mahasiswa
-            </span>
-          </button>
-        )}
+        <button
+          className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c6]'} text-white rounded-xl shadow-lg transition-all flex items-center group relative gap-3`}
+          title={user ? `Logged in as ${getUserName()}. Click to logout.` : 'Login Mahasiswa'}
+          onClick={handleUserClick}
+        >
+          <User size={20} />
+          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
+            {user ? getUserShortName() : 'Login Mahasiswa'}
+          </span>
+        </button>
       </div>
 
       <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
         <button
           className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
           title="New Chat"
-          onClick={() => console.log('New Chat clicked')}
+          onClick={() => window.location.reload()} // Refresh untuk chat baru
         >
           <PenSquare size={20} />
           <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
@@ -137,17 +145,53 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
         </button>
       </div>
 
+      {/* ✅ TAMBAHAN: Tombol Riwayat Chat */}
       <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
-        <button
-          className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
+        <div
+          className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 rounded-xl flex items-center group relative gap-3`}
           title="Chats"
-          onClick={() => console.log('Chat History clicked')}
         >
           <MessageSquare size={20} />
           <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
             Riwayat Chat
           </span>
-        </button>
+        </div>
+      </div>
+
+      {/* ✅ TAMBAHAN: Area Riwayat Chat */}
+      <div className="flex-1 overflow-y-auto mt-0 space-y-2">
+        {isSidebarOpen && user && chatHistory.length > 0 && chatHistory.map(chat => (
+          <div key={chat.id} className="flex items-center group">
+            <button
+              onClick={() => onSelectChat(chat.id)}
+              className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
+                currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
+              }`}
+              title={chat.title}
+              disabled={isDeleting}
+            >
+              {chat.title}
+            </button>
+            <button
+              onClick={() => onDeleteChat(chat.id)}
+              className="p-1 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 ml-1 disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Hapus chat"
+              disabled={isDeleting}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+        {isSidebarOpen && user && chatHistory.length === 0 && (
+          <p className="p-2 text-xs text-gray-500 text-center">
+            Belum ada riwayat chat.
+          </p>
+        )}
+        {isSidebarOpen && !user && (
+          <p className="p-2 text-xs text-gray-500 text-center">
+            Login untuk melihat riwayat chat Anda.
+          </p>
+        )}
       </div>
 
       <div className={`mt-auto flex ${isSidebarOpen ? 'flex-col items-start gap-2' : 'flex-row items-center justify-center space-x-2'} pb-4`}>
@@ -410,7 +454,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
   );
 };
 
-// --- Komponen Utama Landing Page (FIXED VERSION) ---
+// --- Komponen Utama Landing Page (UPDATED VERSION) ---
 const LandingPage = () => {
   const navigate = useNavigate();
   const { user, loginWithCredentials, register, logout, loading } = useAuth();
@@ -420,10 +464,16 @@ const LandingPage = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [greeting, setGreeting] = useState('');
+  
+  // ✅ TAMBAHAN: State untuk riwayat chat
+  const [chatHistory, setChatHistory] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState(null);
 
   // ✅ FIXED: Refresh greeting function dengan semua dependencies
   const refreshGreeting = useCallback(() => {
-    // Pindahkan fungsi helper ke dalam useCallback
     const getUserName = () => user?.name || user?.fullName || user?.username || 'User';
     const getUserShortName = () => {
       const fullName = getUserName();
@@ -433,7 +483,7 @@ const LandingPage = () => {
     const userShortName = getUserShortName();
     
     const greetingsForUser = [
-      `Hi ${userShortName}, good to see you!`,
+      `Hi ${userShortName}, Good to see you!`,
       `Welcome back, ${userShortName}!`,
       `Hello ${userShortName}, ready to chat?`,
       `Hi ${userShortName}, how can I help you today?`,
@@ -451,15 +501,110 @@ const LandingPage = () => {
     const availableGreetings = user ? greetingsForUser : greetingsForGuest;
     const randomGreeting = availableGreetings[Math.floor(Math.random() * availableGreetings.length)];
     setGreeting(randomGreeting);
-  }, [user]); // ✅ Hanya user sebagai dependency
+  }, [user]);
+
+  // ✅ TAMBAHAN: Load chat history untuk user yang login
+  const loadChatHistory = useCallback(async () => {
+    if (!user || !user.id) {
+      console.log('🔍 [LANDING PAGE] No user ID, skipping chat history load');
+      setChatHistory([]);
+      return;
+    }
+
+    try {
+      console.log('🔍 [LANDING PAGE] Loading chat history for user:', user.id);
+      const response = await api.get('/api/ai/conversations');
+      console.log('✅ [LANDING PAGE] Chat history loaded:', response.data.conversations);
+      setChatHistory(response.data.conversations || []);
+    } catch (error) {
+      console.error('❌ [LANDING PAGE] Error loading chat history:', error);
+      
+      if (error.response?.status === 401) {
+        console.log('🛑 [LANDING PAGE] 401 Unauthorized - Token invalid');
+      } else if (error.response?.status === 404) {
+        console.log('🔍 [LANDING PAGE] 404 - No conversations found');
+        setChatHistory([]);
+      } else {
+        console.error('❌ [LANDING PAGE] Other error:', error.response?.data || error.message);
+        setChatHistory([]);
+      }
+    }
+  }, [user]);
+
+  // ✅ TAMBAHAN: Handle delete chat dengan modal confirmation
+  const handleDeleteClick = (chatId) => {
+    setChatToDelete(chatId);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!chatToDelete || !user) {
+      setShowDeleteModal(false);
+      setChatToDelete(null);
+      return;
+    }
+
+    setIsDeleting(true);
+    
+    // Optimistic update
+    const previousChatHistory = [...chatHistory];
+    setChatHistory(prev => prev.filter(chat => chat.id !== chatToDelete));
+    
+    if (currentChatId === chatToDelete) {
+      setCurrentChatId(null);
+    }
+
+    try {
+      console.log('🗑️ [LANDING PAGE] Deleting chat:', chatToDelete);
+      await api.delete(`/api/ai/conversations/${chatToDelete}`);
+      console.log('✅ [LANDING PAGE] Chat deleted successfully');
+
+    } catch (error) {
+      console.error('❌ [LANDING PAGE] Error deleting chat:', error);
+      
+      // Rollback jika gagal
+      setChatHistory(previousChatHistory);
+      
+      if (error.response?.status === 401) {
+        console.log('🛑 [LANDING PAGE] 401 Unauthorized');
+      } else if (error.response?.status === 404) {
+        console.log('🔍 [LANDING PAGE] 404 - Chat not found');
+      } else {
+        alert('Gagal menghapus chat. Data dikembalikan.');
+      }
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+      setChatToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteModal(false);
+    setChatToDelete(null);
+  };
+
+  // ✅ TAMBAHAN: Handle select chat - navigasi ke chat page dengan chat yang dipilih
+  const handleSelectChat = (chatId) => {
+    console.log('🔍 [LANDING PAGE] Selecting chat:', chatId);
+    navigate('/chat', { 
+      state: { 
+        selectedChatId: chatId 
+      } 
+    });
+  };
 
   // ✅ FIXED: Effect untuk menutup modal dan refresh greeting ketika user berubah
   useEffect(() => {
     if (user) {
       setIsModalOpen(false);
+      // Load chat history ketika user login
+      loadChatHistory();
+    } else {
+      setChatHistory([]);
     }
     refreshGreeting();
-  }, [user, refreshGreeting]);
+  }, [user, refreshGreeting, loadChatHistory]);
 
   // ✅ FIXED: Effect untuk set greeting awal saat component mount
   useEffect(() => {
@@ -516,17 +661,34 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen flex bg-[#fef6e4] font-sans">
+      {/* ✅ MODAL KONFIRMASI HAPUS */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        title="Hapus Chat"
+        message="Apakah Anda yakin ingin menghapus chat ini? Tindakan ini tidak dapat dibatalkan."
+        confirmText="Hapus"
+        cancelText="Batal"
+        isDeleting={isDeleting}
+      />
+
+      {/* ✅ UPDATED: Sidebar dengan props tambahan untuk riwayat chat */}
       <Sidebar
         onClickLogin={() => openModal(0)}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={handleToggleSidebar}
         user={user}
         onLogout={logout}
+        chatHistory={chatHistory}
+        onSelectChat={handleSelectChat}
+        currentChatId={currentChatId}
+        onDeleteChat={handleDeleteClick}
+        isDeleting={isDeleting}
       />
 
       <div className="flex-1 flex flex-col">
         <nav className="flex items-center justify-between p-6">
-          {/* ✅ UPDATED: Ganti teks dengan gambar logo sapatazkia.png */}
           <div className="flex items-center">
             <button 
               onClick={() => navigate('/LandingPage.jsx')}
@@ -548,7 +710,7 @@ const LandingPage = () => {
                 <Button
                   variant="primary"
                   size="md"
-                  className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-200/50 rounded-lg"
+                  className="bg-[#172c66] hover:bg-[#172c90] text-white shadow-lg rounded-lg"
                   onClick={() => navigate('/chat')}
                 >
                   Go to Chat
@@ -556,10 +718,10 @@ const LandingPage = () => {
                 <Button
                   variant="secondary"
                   size="md"
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg"
+                  className="bg-[#172c66] hover:bg-[#172c90] text-white shadow-lg rounded-lg"
                   onClick={logout}
                 >
-                  LOGOUT
+                  Logout
                 </Button>
               </>
             ) : (
