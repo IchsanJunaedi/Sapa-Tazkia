@@ -2,14 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
-import { Plus, MessageSquare, PenSquare, User, Settings, X, Instagram, Globe, Youtube, ArrowUp, Trash2 } from 'lucide-react';
+import { Plus, X, ArrowUp } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
+import Sidebar from '../components/layout/SideBar';
 
 // --- Komponen GradientText ---
 const GradientText = ({ children, className = '' }) => {
   return (
     <span
-      className={`bg-clip-text text-transparent bg-gradient-to-r from-gray-500 to-gray-600 ${className}`}
+      className={`bg-clip-text text-transparent bg-gradient-to-r from-gray-500 to-gray-600  ${className}`}
       style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
     >
       {children}
@@ -44,183 +45,6 @@ const Button = ({ children, onClick, className, variant = 'default', size = 'md'
     >
       {children}
     </button>
-  );
-};
-
-// --- Komponen Sidebar ---
-const Sidebar = ({ 
-  onClickLogin, 
-  isSidebarOpen, 
-  onToggleSidebar, 
-  user, 
-  onLogout, 
-  chatHistory, 
-  onSelectChat, 
-  currentChatId, 
-  onDeleteChat, 
-  isDeleting 
-}) => {
-  
-  // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
-  const getUserName = () => {
-    const fullName = user?.name || user?.fullName || user?.username || 'User';
-    // Ambil maksimal 2 kata pertama
-    const words = fullName.split(' ').slice(0, 2);
-    return words.join(' ');
-  };
-
-  // ✅ FUNGSI: Untuk mendapatkan NIM user
-  const getUserNIM = () => {
-    return user?.nim || user?.studentId || 'NIM tidak tersedia';
-  };
-
-  const ToggleIcon = ({ open }) => (
-    <img
-      src="https://www.svgrepo.com/show/493722/sidebar-toggle-nav-side-aside.svg"
-      alt="Toggle Sidebar"
-      className={`w-6 h-6 text-gray-700 transition-transform duration-300 ${open ? '' : 'transform rotate-180'}`}
-    />
-  );
-
-  // ✅ DIUBAH: Hapus handleUserClick yang menyebabkan logout
-  const handleUserClick = () => {
-    // Tidak melakukan apa-apa ketika diklik, atau bisa diarahkan ke profile page
-    console.log('User profile clicked');
-  };
-
-  return (
-    <div className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative`}>
-      {isSidebarOpen ? (
-        <div className="flex justify-between items-center mb-8">
-          <button 
-            className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3" 
-            title="Settings"
-            onClick={() => console.log('Settings clicked')}
-          >
-            <Settings size={24} />
-          </button>
-          <button
-            onClick={onToggleSidebar}
-            className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
-            title="Tutup Sidebar"
-          >
-            <ToggleIcon open={true} />
-          </button>
-        </div>
-      ) : (
-        <div className="flex justify-center mb-8">
-          <button
-            onClick={onToggleSidebar}
-            className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
-            title="Buka Sidebar"
-          >
-            <ToggleIcon open={false} />
-          </button>
-        </div>
-      )}
-
-      {/* ✅ DIUBAH: Tombol User Profile dengan Nama dan NIM */}
-      <div className="flex justify-center mb-10">
-        <button
-          className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-auto ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c6]'} text-white rounded-xl shadow-lg transition-all flex flex-col items-start group relative gap-1 p-3`}
-          title={user ? `Logged in as ${getUserName()}. NIM: ${getUserNIM()}` : 'Login as Mahasiswa'}
-          onClick={handleUserClick}
-        >
-          <div className="flex items-center gap-3 w-full">
-            <User size={20} />
-            {isSidebarOpen && (
-              <div className="flex flex-col items-start">
-                <span className="text-sm font-semibold whitespace-nowrap truncate max-w-[160px]">
-                  {user ? getUserName() : 'Login Mahasiswa'}
-                </span>
-                {user && (
-                  <span className="text-xs text-gray-300 whitespace-nowrap truncate max-w-[160px]">
-                    {getUserNIM()}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        </button>
-      </div>
-
-      <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
-        <button
-          className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
-          title="New Chat"
-          onClick={() => window.location.reload()} // Refresh untuk chat baru
-        >
-          <PenSquare size={20} />
-          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-            New Chat
-          </span>
-        </button>
-      </div>
-
-      {/* ✅ TAMBAHAN: Tombol Riwayat Chat */}
-      <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
-        <div
-          className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 rounded-xl flex items-center group relative gap-3`}
-          title="Chats"
-        >
-          <MessageSquare size={20} />
-          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-            Riwayat Chat
-          </span>
-        </div>
-      </div>
-
-      {/* ✅ TAMBAHAN: Area Riwayat Chat */}
-      <div className="flex-1 overflow-y-auto mt-0 space-y-2">
-        {isSidebarOpen && user && chatHistory.length > 0 && chatHistory.map(chat => (
-          <div key={chat.id} className="flex items-center group">
-            <button
-              onClick={() => onSelectChat(chat.id)}
-              className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
-                currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
-              }`}
-              title={chat.title}
-              disabled={isDeleting}
-            >
-              {chat.title}
-            </button>
-            <button
-              onClick={() => onDeleteChat(chat.id)}
-              className="p-1 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 ml-1 disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Hapus chat"
-              disabled={isDeleting}
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-        {isSidebarOpen && user && chatHistory.length === 0 && (
-          <p className="p-2 text-xs text-gray-500 text-center">
-            Belum ada riwayat chat.
-          </p>
-        )}
-        {isSidebarOpen && !user && (
-          <p className="p-2 text-xs text-gray-500 text-center">
-            Login untuk melihat riwayat chat Anda.
-          </p>
-        )}
-      </div>
-
-      <div className={`mt-auto flex ${isSidebarOpen ? 'flex-col items-start gap-2' : 'flex-row items-center justify-center space-x-2'} pb-4`}>
-        <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors flex items-center gap-3">
-          <Instagram size={16} />
-          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>Instagram</span>
-        </a>
-        <a href="https://stmik.tazkia.ac.id/" target="_blank" rel="noopener noreferrer" title="Website" className="text-gray-500 hover:text-blue-500 transition-colors flex items-center gap-3">
-          <Globe size={16} />
-          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>Website</span>
-        </a>
-        <a href="https://www.youtube.com/@stmiktazkia" target="_blank" rel="noopener noreferrer" title="YouTube" className="text-gray-500 hover:text-red-500 transition-colors flex items-center gap-3">
-          <Youtube size={16} />
-          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>YouTube</span>
-        </a>
-      </div>
-    </div>
   );
 };
 
@@ -673,36 +497,48 @@ const LandingPage = () => {
     });
   };
 
+  // ✅ FUNGSI: Handle new chat di Landing Page
+  const handleNewChat = () => {
+    window.location.reload(); // Refresh untuk chat baru
+  };
+
+  // ✅ FUNGSI: Handle settings click
+  const handleSettingsClick = () => {
+    console.log('Settings clicked');
+  };
+
   return (
-    <div className="min-h-screen flex bg-[#fef6e4] font-sans">
+    <div className="min-h-screen flex bg-amber-50 font-sans overflow-hidden">
       {/* ✅ MODAL KONFIRMASI HAPUS */}
       <ConfirmationModal
         isOpen={showDeleteModal}
         onClose={handleCancelDelete}
         onConfirm={handleConfirmDelete}
-        title="Hapus Chat"
-        message="Apakah Anda yakin ingin menghapus chat ini? Tindakan ini tidak dapat dibatalkan."
+        title="Hapus Chat?"
+        message="Apakah Anda yakin ingin menghapus chat ini?"
         confirmText="Hapus"
         cancelText="Batal"
         isDeleting={isDeleting}
       />
 
-      {/* ✅ UPDATED: Sidebar dengan props tambahan untuk riwayat chat */}
+      {/* ✅ UPDATED: Menggunakan komponen Sidebar reusable */}
       <Sidebar
-        onClickLogin={() => openModal(0)}
-        isSidebarOpen={isSidebarOpen}
-        onToggleSidebar={handleToggleSidebar}
         user={user}
+        onLogin={() => openModal(0)}
         onLogout={logout}
         chatHistory={chatHistory}
         onSelectChat={handleSelectChat}
         currentChatId={currentChatId}
         onDeleteChat={handleDeleteClick}
         isDeleting={isDeleting}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
+        onNewChat={handleNewChat}
+        onSettingsClick={handleSettingsClick}
       />
 
-      <div className="flex-1 flex flex-col">
-        <nav className="flex items-center justify-between p-6">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <nav className="flex items-center justify-between p-6 flex-shrink-0">
           <div className="flex items-center">
             <button 
               onClick={() => navigate('/LandingPage.jsx')}
@@ -720,24 +556,8 @@ const LandingPage = () => {
             {loading ? (
               <span className="text-gray-500">Loading...</span>
             ) : user ? (
-              <>
-                <Button
-                  variant="primary"
-                  size="md"
-                  className="bg-[#072064] hover:bg-[#203dca] text-white shadow-lg rounded-lg"
-                  onClick={() => navigate('/chat')}
-                >
-                  Go to Chat
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="md"
-                  className="bg-[#072064] hover:bg-[#203dca] text-white shadow-lg rounded-lg"
-                  onClick={logout}
-                >
-                  Logout
-                </Button>
-              </>
+              // ✅ DIHAPUS: Tombol Go to Chat dan Logout untuk user yang sudah login
+              null
             ) : (
               <>
                 <Button
@@ -762,7 +582,7 @@ const LandingPage = () => {
         </nav>
 
         {/* Hero Section - FIXED */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-20">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-20 overflow-y-auto">
           <div className="text-center mb-12">
             <h1 className="text-5xl md:text-6xl font-extrabold text-center mb-6 max-w-4xl">
               <GradientText>{greeting}</GradientText>
@@ -795,23 +615,10 @@ const LandingPage = () => {
             {/* Guest mode info */}
             <div className="mt-4 text-center">
               <p className="text-gray-500 text-sm">
-                {user ? 'Tekan Enter untuk mulai chat!' : 'Tekan Enter untuk chat sebagai tamu'}
+                {user ? 'AI can make mistakes. Cross-check academic information with official sources.' : 'AI can make mistakes. Cross-check academic information with official sources.'}
               </p>
             </div>
           </div>
-        </div>
-
-        {/* Footer Social Links */}
-        <div className="flex justify-center p-6 space-x-6">
-          <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors">
-            <Instagram size={14} />
-          </a>
-          <a href="https://stmik.tazkia.ac.id/" target="_blank" rel="noopener noreferrer" title="Website" className="text-gray-500 hover:text-blue-500 transition-colors">
-            <Globe size={14} />
-          </a>
-          <a href="https://www.youtube.com/@stmiktazkia" target="_blank" rel="noopener noreferrer" title="YouTube" className="text-gray-500 hover:text-red-500 transition-colors">
-            <Youtube size={14} />
-          </a>
         </div>
       </div>
 
