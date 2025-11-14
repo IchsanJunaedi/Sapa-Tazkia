@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Plus, MessageSquare, PenSquare, User, Settings, X, Instagram, Globe, Youtube, ArrowUp } from 'lucide-react';
@@ -47,6 +47,18 @@ const Button = ({ children, onClick, className, variant = 'default', size = 'md'
 
 // --- Komponen Sidebar ---
 const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout }) => {
+  
+  // ✅ FUNGSI: Untuk mendapatkan nama user dengan berbagai fallback
+  const getUserName = () => {
+    return user?.name || user?.fullName || user?.username || 'User';
+  };
+
+  // ✅ FUNGSI: Untuk mendapatkan nama pendek (first name saja)
+  const getUserShortName = () => {
+    const fullName = getUserName();
+    return fullName.split(' ')[0];
+  };
+
   const ToggleIcon = ({ open }) => (
     <img
       src="https://www.svgrepo.com/show/493722/sidebar-toggle-nav-side-aside.svg"
@@ -56,10 +68,14 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
   );
 
   return (
-    <div className={` ${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative`}>
+    <div className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative`}>
       {isSidebarOpen ? (
         <div className="flex justify-between items-center mb-8">
-          <button className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3" title="Settings">
+          <button 
+            className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3" 
+            title="Settings"
+            onClick={() => console.log('Settings clicked')}
+          >
             <Settings size={24} />
           </button>
           <button
@@ -85,18 +101,18 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
       <div className="flex justify-center mb-10">
         {user ? (
           <button
-            className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-green-500 text-white rounded-xl shadow-lg hover:bg-green-600 transition-all flex items-center group relative gap-3`}
-            title={`Logged in as ${user?.name || 'User'}. Click to logout.`}
+            className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-green-500 text-white rounded-xl shadow-lg hover:bg-green-600 transition-all flex items-center group relative gap-3`}
+            title={`Logged in as ${getUserName()}. Click to logout.`}
             onClick={onLogout}
           >
             <User size={20} />
             <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-              {user?.name?.split(' ')[0] || 'User'}
+              {getUserShortName()}
             </span>
           </button>
         ) : (
           <button
-            className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all flex items-center group relative gap-3`}
+            className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all flex items-center group relative gap-3`}
             title="Login Mahasiswa"
             onClick={onClickLogin}
           >
@@ -110,8 +126,9 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
 
       <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
         <button
-          className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
+          className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
           title="New Chat"
+          onClick={() => console.log('New Chat clicked')}
         >
           <PenSquare size={20} />
           <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
@@ -122,8 +139,9 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
 
       <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
         <button
-          className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
+          className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
           title="Chats"
+          onClick={() => console.log('Chat History clicked')}
         >
           <MessageSquare size={20} />
           <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
@@ -401,12 +419,52 @@ const LandingPage = () => {
   const [initialModalStep, setInitialModalStep] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [message, setMessage] = useState('');
+  const [greeting, setGreeting] = useState('');
 
+  // ✅ FIXED: Refresh greeting function dengan semua dependencies
+  const refreshGreeting = useCallback(() => {
+    // Pindahkan fungsi helper ke dalam useCallback
+    const getUserName = () => user?.name || user?.fullName || user?.username || 'User';
+    const getUserShortName = () => {
+      const fullName = getUserName();
+      return fullName.split(' ')[0];
+    };
+
+    const userShortName = getUserShortName();
+    
+    const greetingsForUser = [
+      `Hi ${userShortName}, good to see you!`,
+      `Welcome back, ${userShortName}!`,
+      `Hello ${userShortName}, ready to chat?`,
+      `Hi ${userShortName}, how can I help you today?`,
+      `Great to have you here, ${userShortName}!`
+    ];
+
+    const greetingsForGuest = [
+      'Where should we begin?',
+      'Hello! How can I assist you today?',
+      'Welcome to Sapa Tazkia! How can I help?',
+      'Ready to get started? What would you like to know?',
+      'Hi there! What brings you here today?'
+    ];
+
+    const availableGreetings = user ? greetingsForUser : greetingsForGuest;
+    const randomGreeting = availableGreetings[Math.floor(Math.random() * availableGreetings.length)];
+    setGreeting(randomGreeting);
+  }, [user]); // ✅ Hanya user sebagai dependency
+
+  // ✅ FIXED: Effect untuk menutup modal dan refresh greeting ketika user berubah
   useEffect(() => {
     if (user) {
       setIsModalOpen(false);
     }
-  }, [user]);
+    refreshGreeting();
+  }, [user, refreshGreeting]);
+
+  // ✅ FIXED: Effect untuk set greeting awal saat component mount
+  useEffect(() => {
+    refreshGreeting();
+  }, [refreshGreeting]);
 
   const openModal = (step) => {
     setInitialModalStep(step);
@@ -423,7 +481,6 @@ const LandingPage = () => {
   const handleSendMessage = () => {
     if (message.trim()) {
       if (user) {
-        // Jika sudah login - gunakan state
         navigate('/chat', { 
           state: { 
             initialMessage: message.trim(),
@@ -431,7 +488,6 @@ const LandingPage = () => {
           } 
         });
       } else {
-        // ✅ FIXED: Jika belum login - gunakan BOTH URL parameters DAN state
         navigate('/chat', { 
           state: { 
             initialMessage: message.trim(),
@@ -470,7 +526,10 @@ const LandingPage = () => {
 
       <div className="flex-1 flex flex-col">
         <nav className="flex items-center justify-between p-6">
-          <h1 className="text-xl font-bold text-gray-800">Sapa Tazkia</h1>
+          {/* ✅ SIMPLIFIED: Hanya tampilkan Sapa Tazkia tanpa greeting di navbar */}
+          <div className="flex items-center">
+            <h1 className="text-xl font-bold text-gray-800">Sapa Tazkia</h1>
+          </div>
           <div className="flex items-center space-x-3">
             {loading ? (
               <span className="text-gray-500">Loading...</span>
@@ -518,9 +577,12 @@ const LandingPage = () => {
 
         {/* Hero Section - FIXED */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-20">
-          <h1 className="text-5xl md:text-6xl font-extrabold text-center mb-12 max-w-4xl">
-            <GradientText>Where should we begin?</GradientText>
-          </h1>
+          <div className="text-center mb-12">
+            <h1 className="text-5xl md:text-6xl font-extrabold text-center mb-6 max-w-4xl">
+              <GradientText>{greeting}</GradientText>
+            </h1>
+            {/* ✅ HAPUS: Tombol refresh greeting dihapus */}
+          </div>
 
           <div className="w-full max-w-2xl">
             <div className="relative flex items-center p-2 bg-white border border-gray-300 rounded-full shadow-xl">
@@ -548,7 +610,7 @@ const LandingPage = () => {
             {/* Guest mode info */}
             <div className="mt-4 text-center">
               <p className="text-gray-500 text-sm">
-                {user ? 'Tekan Enter untuk mulai chat' : 'Tekan Enter untuk chat sebagai tamu'}
+                {user ? 'Tekan Enter untuk mulai chat!' : 'Tekan Enter untuk chat sebagai tamu'}
               </p>
             </div>
           </div>

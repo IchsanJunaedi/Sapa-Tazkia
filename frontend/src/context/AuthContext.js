@@ -24,15 +24,23 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Fungsi untuk menyimpan token dan mengupdate header axios
+  // ✅ PERBAIKAN: Fungsi untuk menyimpan token dan mengupdate header axios
   const setAuthToken = (newToken) => {
-    if (newToken) {
+    console.log('🔍 [AUTH CONTEXT] setAuthToken called:', {
+      hasNewToken: !!newToken,
+      tokenType: typeof newToken,
+      tokenLength: newToken?.length
+    });
+
+    if (newToken && typeof newToken === 'string' && newToken.length > 10) {
       localStorage.setItem('token', newToken);
       setToken(newToken);
       setIsAuthenticated(true);
       // Set header Authorization untuk semua request axios
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+      console.log('✅ [AUTH CONTEXT] Token set successfully');
     } else {
+      console.log('🔄 [AUTH CONTEXT] Clearing auth data');
       localStorage.removeItem('token');
       setToken(null);
       setIsAuthenticated(false);
@@ -40,7 +48,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ PERBAIKAN: Check logged in user - TANPA panggil /api/auth/me
+  // ✅ PERBAIKAN: Check logged in user - dengan validasi lengkap
   useEffect(() => {
     const checkLoggedInUser = async () => {
       const storedToken = localStorage.getItem('token');
@@ -48,22 +56,44 @@ export const AuthProvider = ({ children }) => {
       
       console.log('🔍 [AUTH CONTEXT] Checking stored auth data:', {
         hasToken: !!storedToken,
+        tokenLength: storedToken?.length,
         hasUser: !!storedUser
       });
       
       if (storedToken && storedUser) {
         try {
-          // Gunakan data dari localStorage saja
+          // Validasi token
+          if (typeof storedToken !== 'string' || storedToken.length < 20) {
+            console.warn('⚠️ [AUTH CONTEXT] Invalid token format, clearing auth');
+            throw new Error('Invalid token format');
+          }
+
+          // Parse user data
           const userData = JSON.parse(storedUser);
           
+          // ✅ PERBAIKAN: Validasi struktur user data
+          if (!userData || typeof userData !== 'object') {
+            throw new Error('Invalid user data structure');
+          }
+
+          // ✅ PERBAIKAN: Pastikan ada field nama yang bisa digunakan
+          if (!userData.name && !userData.fullName && !userData.username) {
+            console.warn('⚠️ [AUTH CONTEXT] User data missing name fields:', userData);
+            // Tetap lanjutkan, tapi beri warning
+          }
+
           setUser(userData);
           setToken(storedToken);
           setIsAuthenticated(true);
           api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
           
-          console.log('✅ [AUTH CONTEXT] User restored from storage:', userData);
+          console.log('✅ [AUTH CONTEXT] User restored from storage:', {
+            name: userData.name || userData.fullName || userData.username || 'No Name',
+            email: userData.email,
+            id: userData.id
+          });
         } catch (error) {
-          console.error('❌ [AUTH CONTEXT] Error parsing stored user:', error);
+          console.error('❌ [AUTH CONTEXT] Error restoring user:', error);
           // Clear data yang corrupt
           setAuthToken(null);
           setUser(null);
@@ -97,15 +127,13 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // ✅ PERBAIKAN: Fungsi Login dengan validasi lengkap
+  // ✅ PERBAIKAN: Fungsi Login dengan validasi lengkap dan debug
   const login = async (token, userData) => {
     try {
       console.log('🔍 [AUTH CONTEXT] Login function called with:', { 
-        token: token,
         tokenLength: token?.length,
         tokenType: typeof token,
-        userData: userData,
-        userDataType: typeof userData
+        userData: userData
       });
 
       // ✅ VALIDASI LENGKAP: Pastikan parameter valid
@@ -114,21 +142,27 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (typeof token !== 'string') {
-        throw new Error(`Token must be string, got ${typeof token}: ${token}`);
+        throw new Error(`Token must be string, got ${typeof token}`);
       }
 
       if (token.length < 20) {
         console.warn('⚠️ [AUTH CONTEXT] Token might be invalid (too short):', token);
-        // Tetap lanjutkan untuk development, tapi beri warning
       }
 
       if (!userData || typeof userData !== 'object') {
-        throw new Error(`User data must be object, got ${typeof userData}: ${userData}`);
+        throw new Error(`User data must be object, got ${typeof userData}`);
       }
 
-      if (!userData.id || !userData.email) {
-        throw new Error('User data must contain id and email');
-      }
+      // ✅ PERBAIKAN: Log struktur user data untuk debugging
+      console.log('🔍 [AUTH CONTEXT] User data structure:', {
+        id: userData.id,
+        name: userData.name,
+        fullName: userData.fullName,
+        username: userData.username,
+        email: userData.email,
+        nim: userData.nim,
+        allKeys: Object.keys(userData)
+      });
 
       // Simpan token dan user data
       setAuthToken(token);
@@ -138,9 +172,9 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(userData));
       
       console.log('✅ [AUTH CONTEXT] Login successful!', {
-        user: userData,
-        tokenLength: token.length,
-        tokenPreview: token.substring(0, 20) + '...'
+        userName: userData.name || userData.fullName || userData.username || 'No Name',
+        userEmail: userData.email,
+        tokenLength: token.length
       });
       
       return { success: true, user: userData };
@@ -157,28 +191,14 @@ export const AuthProvider = ({ children }) => {
   const loginWithCredentials = async (nim, password) => {
     setLoading(true);
     try {
-      console.log('🔍 [AUTH CONTEXT] loginWithCredentials called with:', { nim });
-      
-      // ✅ DEBUG: Sebelum API call
-      console.log('🔍 [AUTH CONTEXT] Making API call to /api/auth/login');
+      console.log('🔍 [AUTH CONTEXT] loginWithCredentials called with NIM:', nim);
       
       const response = await api.post('/api/auth/login', { nim, password });
       
       // ✅ DEBUG: Full response structure
-      console.log('🔍 [AUTH CONTEXT] FULL API Response:', {
+      console.log('🔍 [AUTH CONTEXT] Login API Response:', {
         status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
         data: response.data
-      });
-      
-      console.log('🔍 [AUTH CONTEXT] Response data structure:', {
-        success: response.data.success,
-        message: response.data.message,
-        tokenExists: !!response.data.token,
-        userExists: !!response.data.user,
-        tokenType: typeof response.data.token,
-        userType: typeof response.data.user
       });
       
       // ✅ PERBAIKAN: Validasi response structure
@@ -186,15 +206,20 @@ export const AuthProvider = ({ children }) => {
         throw new Error(response.data.message || 'Login failed: No success flag');
       }
       
-      // ✅ PERBAIKAN: Extract data dengan validasi
       const { token, user } = response.data;
       
-      console.log('🔍 [AUTH CONTEXT] Extracted data:', {
-        token: token,
+      console.log('🔍 [AUTH CONTEXT] Extracted login data:', {
+        tokenExists: !!token,
+        userExists: !!user,
         tokenLength: token?.length,
-        tokenPreview: token ? token.substring(0, 30) + '...' : 'NO TOKEN',
-        user: user,
-        userKeys: user ? Object.keys(user) : 'NO USER'
+        userStructure: user ? {
+          name: user.name,
+          fullName: user.fullName, 
+          username: user.username,
+          email: user.email,
+          nim: user.nim,
+          allKeys: Object.keys(user)
+        } : 'NO USER'
       });
       
       // ✅ PERBAIKAN: Validasi token dan user
@@ -202,16 +227,8 @@ export const AuthProvider = ({ children }) => {
         throw new Error('No token received from server');
       }
       
-      if (typeof token !== 'string') {
-        throw new Error(`Token is not string: ${typeof token}`);
-      }
-      
       if (!user) {
         throw new Error('No user data received from server');
-      }
-      
-      if (typeof user !== 'object') {
-        throw new Error(`User data is not object: ${typeof user}`);
       }
       
       // ✅ Panggil login function dengan data yang sudah divalidasi
@@ -224,17 +241,29 @@ export const AuthProvider = ({ children }) => {
       setAuthToken(null);
       setUser(null);
       localStorage.removeItem('user');
-      throw error;
+      
+      // ✅ PERBAIKAN: Throw error yang lebih informatif
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Login failed');
+      } else if (error.request) {
+        throw new Error('Network error: Cannot connect to server');
+      } else {
+        throw error;
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Fungsi Register dengan debug
+  // ✅ PERBAIKAN: Fungsi Register dengan debug lengkap
   const register = async (userData) => {
     setLoading(true);
     try {
-      console.log('🔍 [AUTH CONTEXT] Register called:', userData);
+      console.log('🔍 [AUTH CONTEXT] Register called:', {
+        fullName: userData.fullName,
+        nim: userData.nim,
+        email: userData.email
+      });
       
       const response = await api.post('/api/auth/register', userData);
       console.log('🔍 [AUTH CONTEXT] Register response:', response.data);
@@ -250,11 +279,26 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Invalid response: missing token or user data');
       }
       
+      console.log('🔍 [AUTH CONTEXT] Register user data structure:', {
+        name: user.name,
+        fullName: user.fullName,
+        username: user.username,
+        email: user.email
+      });
+      
       const result = await login(token, user);
       return result;
     } catch (error) {
       console.error('❌ [AUTH CONTEXT] Registration failed:', error);
-      throw error;
+      
+      // ✅ PERBAIKAN: Throw error yang lebih informatif
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Registration failed');
+      } else if (error.request) {
+        throw new Error('Network error: Cannot connect to server');
+      } else {
+        throw error;
+      }
     } finally {
       setLoading(false);
     }
@@ -262,9 +306,17 @@ export const AuthProvider = ({ children }) => {
 
   // ✅ PERBAIKAN: Fungsi untuk update user data
   const updateUser = (updatedUserData) => {
+    console.log('🔍 [AUTH CONTEXT] updateUser called with:', updatedUserData);
+    
     setUser(prevUser => {
       const newUser = { ...prevUser, ...updatedUserData };
       localStorage.setItem('user', JSON.stringify(newUser));
+      
+      console.log('✅ [AUTH CONTEXT] User updated:', {
+        oldName: prevUser?.name || prevUser?.fullName,
+        newName: newUser.name || newUser.fullName
+      });
+      
       return newUser;
     });
   };
@@ -278,6 +330,7 @@ export const AuthProvider = ({ children }) => {
     
     console.log('🔍 [AUTH CONTEXT] Auth check:', { 
       hasToken: !!storedToken, 
+      tokenLength: storedToken?.length,
       hasUser: !!storedUser,
       isAuthenticated 
     });
@@ -285,34 +338,46 @@ export const AuthProvider = ({ children }) => {
     return isAuthenticated;
   };
 
-  // Fungsi Logout
+  // ✅ PERBAIKAN: Fungsi Logout dengan cleanup lengkap
   const logout = () => {
-    console.log('🔍 [AUTH CONTEXT] Logout called');
+    console.log('🔍 [AUTH CONTEXT] Logout called', {
+      currentUser: user?.name || user?.fullName || 'Unknown'
+    });
     
     // Clear semua data
     setAuthToken(null);
     setUser(null);
     localStorage.removeItem('user');
     
+    // ✅ PERBAIKAN: Clear semua related auth data
+    localStorage.removeItem('token');
+    delete api.defaults.headers.common['Authorization'];
+    
     console.log('✅ [AUTH CONTEXT] Logout successful');
     
-    // Redirect ke landing page
-    window.location.href = '/';
+    // ✅ PERBAIKAN: Gunakan window.location.replace untuk hindari history
+    window.location.replace('/');
   };
 
-  // Value yang disediakan ke context
+  // ✅ PERBAIKAN: Value yang disediakan ke context
   const value = {
     user,
     token,
     loading,
     isAuthenticated,
-    login,           // Untuk external call (harus dengan parameter yang benar)
-    loginWithCredentials, // Untuk login dengan NIM/password
+    login,
+    loginWithCredentials,
     register,
     logout,
     setAuthToken,
     updateUser,
-    checkAuthStatus
+    checkAuthStatus,
+    // ✅ PERBAIKAN: Tambahkan helper function untuk mendapatkan nama user
+    getUserName: () => user?.name || user?.fullName || user?.username || 'User',
+    getUserShortName: () => {
+      const fullName = user?.name || user?.fullName || user?.username || 'User';
+      return fullName.split(' ')[0];
+    }
   };
 
   return (
