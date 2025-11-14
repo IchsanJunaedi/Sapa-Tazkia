@@ -8,6 +8,17 @@ import ConfirmationModal from '../components/ConfirmationModal';
 
 // --- Komponen Sidebar ---
 const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChatId, navigate, isSidebarOpen, onToggleSidebar, onLogout, onDeleteChat, isDeleting }) => {
+    
+    // ✅ FUNGSI: Untuk mendapatkan nama user dengan berbagai fallback
+    const getUserName = () => {
+        return user?.name || user?.fullName || user?.username || 'User';
+    };
+
+    // ✅ FUNGSI: Untuk mendapatkan nama pendek (first name saja)
+    const getUserShortName = () => {
+        const fullName = getUserName();
+        return fullName.split(' ')[0];
+    };
 
     const ToggleIcon = ({ open }) => (
         <img
@@ -26,7 +37,7 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
     };
 
     return (
-        <div className={` ${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative`}>
+        <div className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative`}>
 
             {/* Header Sidebar (Settings & Toggle) */}
             {isSidebarOpen ? (
@@ -57,13 +68,13 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
             {/* Tombol User Profile (Dinamis) */}
             <div className="flex justify-center mb-10">
                 <button
-                    className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${user ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'} text-white rounded-xl shadow-lg transition-all flex items-center group relative gap-3`}
-                    title={user ? `Logged in as ${user.fullName}. Click to logout.` : 'Login as Mahasiswa'}
+                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${user ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'} text-white rounded-xl shadow-lg transition-all flex items-center group relative gap-3`}
+                    title={user ? `Logged in as ${getUserName()}. Click to logout.` : 'Login as Mahasiswa'}
                     onClick={handleUserClick}
                 >
                     <User size={20} />
                     <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-                        {user ? (user.fullName || 'User') : 'Login Mahasiswa'}
+                        {user ? getUserShortName() : 'Login Mahasiswa'}
                     </span>
                 </button>
             </div>
@@ -71,7 +82,7 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
             {/* Tombol New Chat */}
             <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
                 <button
-                    className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
+                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
                     title="New Chat"
                     onClick={onNewChat}
                 >
@@ -85,7 +96,7 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
             {/* Tombol Riwayat Chat (Label) */}
             <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
                 <div
-                    className={` ${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 rounded-xl flex items-center group relative gap-3`}
+                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 rounded-xl flex items-center group relative gap-3`}
                     title="Chats"
                 >
                     <MessageSquare size={20} />
@@ -281,7 +292,7 @@ const ChatPage = () => {
     const [isGuest, setIsGuest] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     
-    // ✅ STATE BARU untuk Modal Confirmation
+    // ✅ STATE untuk Modal Confirmation
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [chatToDelete, setChatToDelete] = useState(null);
     
@@ -322,7 +333,7 @@ const ChatPage = () => {
         }
     }, [user, logout, navigate, isGuest]);
 
-    // ✅ FUNGSI BARU: Handle Delete dengan Modal Confirmation
+    // ✅ FUNGSI: Handle Delete dengan Modal Confirmation
     const handleDeleteClick = (chatId) => {
         setChatToDelete(chatId);
         setShowDeleteModal(true);
@@ -515,7 +526,18 @@ const ChatPage = () => {
         setIsSidebarOpen(prev => !prev);
     };
 
-    // ✅ FIX: USE EFFECTS dengan proper guards
+    // ✅ FUNGSI: Untuk mendapatkan nama user dengan berbagai fallback
+    const getUserName = () => {
+        return user?.name || user?.fullName || user?.username || 'User';
+    };
+
+    // ✅ FUNGSI: Untuk mendapatkan nama pendek (first name saja)
+    const getUserShortName = () => {
+        const fullName = getUserName();
+        return fullName.split(' ')[0];
+    };
+
+    // ✅ USE EFFECTS dengan proper guards
 
     // 1. FIRST: Set guest mode from location state - HANYA SEKALI
     useEffect(() => {
@@ -559,40 +581,45 @@ const ChatPage = () => {
     }, [location.state, handleAIMessage, isGuest]);
 
     // 3. THIRD: Auth check - dengan guest mode protection
-    useEffect(() => {
-        console.log('🔍 [CHAT PAGE] Auth Status Check:', {
-            loading,
-            isAuthenticated,
-            user: user ? { id: user.id, name: user.fullName } : 'No user',
-            tokenLength: token?.length,
-            isGuest: isGuest,
-            locationState: location.state,
-            locationSearch: location.search
-        });
+useEffect(() => {
+    // ✅ Pindahkan fungsi helper ke dalam useEffect
+    const getUserName = () => {
+        return user?.name || user?.fullName || user?.username || 'User';
+    };
 
-        // ✅ CEK SEMUA SUMBER untuk guest mode
-        const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
-        const guestFromState = location.state?.isGuest;
-        
-        if (guestFromUrl || guestFromState) {
-            console.log('👤 [CHAT PAGE] Guest mode detected - skipping auth checks');
-            setIsGuest(true);
-            return;
-        }
+    console.log('🔍 [CHAT PAGE] Auth Status Check:', {
+        loading,
+        isAuthenticated,
+        user: user ? { id: user.id, name: getUserName() } : 'No user',
+        tokenLength: token?.length,
+        isGuest: isGuest,
+        locationState: location.state,
+        locationSearch: location.search
+    });
 
-        // ✅ JIKA GUEST MODE SUDAH AKTIF, SKIP
-        if (isGuest) {
-            console.log('👤 [CHAT PAGE] Guest mode active - skipping auth checks');
-            return;
-        }
+    // ✅ CEK SEMUA SUMBER untuk guest mode
+    const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
+    const guestFromState = location.state?.isGuest;
+    
+    if (guestFromUrl || guestFromState) {
+        console.log('👤 [CHAT PAGE] Guest mode detected - skipping auth checks');
+        setIsGuest(true);
+        return;
+    }
 
-        // ✅ HANYA JALANKAN AUTH CHECKS JIKA BUKAN GUEST
-        if (!loading && !isAuthenticated) {
-            console.log('❌ [CHAT PAGE] User not authenticated and not guest, redirecting to home');
-            navigate('/', { replace: true });
-            return;
-        }
-    }, [loading, isAuthenticated, user, token, navigate, logout, isGuest, location.state, location.search]);
+    // ✅ JIKA GUEST MODE SUDAH AKTIF, SKIP
+    if (isGuest) {
+        console.log('👤 [CHAT PAGE] Guest mode active - skipping auth checks');
+        return;
+    }
+
+    // ✅ HANYA JALANKAN AUTH CHECKS JIKA BUKAN GUEST
+    if (!loading && !isAuthenticated) {
+        console.log('❌ [CHAT PAGE] User not authenticated and not guest, redirecting to home');
+        navigate('/', { replace: true });
+        return;
+    }
+}, [loading, isAuthenticated, user, token, navigate, logout, isGuest, location.state, location.search]);
 
     // 4. FOURTH: Handle URL parameters - DENGAN GUARD
     useEffect(() => {
@@ -700,23 +727,31 @@ const ChatPage = () => {
                 isSidebarOpen={isSidebarOpen}
                 onToggleSidebar={handleToggleSidebar}
                 onLogout={logout}
-                onDeleteChat={handleDeleteClick} // ✅ GANTI dengan handleDeleteClick
+                onDeleteChat={handleDeleteClick}
                 isDeleting={isDeleting}
             />
 
             <div className="flex-1 flex flex-col overflow-hidden">
                 <nav className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200">
-                    <h1
-                        className="text-xl font-bold text-gray-800 cursor-pointer hover:text-blue-600 transition-colors"
-                        onClick={() => navigate('/')}
-                    >
-                        Sapa Tazkia
-                    </h1>
+                    {/* ✅ UPDATED: Ganti teks dengan gambar logo */}
+                    <div className="flex items-center">
+                        <button 
+                            onClick={() => navigate('/')}
+                            className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
+                        >
+                            <img 
+                                src="/logosapatazkia.png" 
+                                alt="Sapa Tazkia Logo" 
+                                className="h-8 w-auto hover:scale-105 transition-transform duration-200"
+                            />
+                        </button>
+                    </div>
+                    
                     <div className="flex items-center space-x-4">
                         {isGuest ? (
                             <span className="text-purple-500 font-medium">Mode Tamu</span>
                         ) : user ? (
-                            <span className="text-gray-600">Halo, {user.fullName || 'User'}</span>
+                            <span className="text-gray-600">Halo, {getUserShortName()}</span>
                         ) : null}
                         <button
                             onClick={() => navigate('/')}
@@ -735,7 +770,7 @@ const ChatPage = () => {
                         <ChatWindow
                             messages={messages}
                             isLoading={isLoading}
-                            userName={user ? user.fullName : null}
+                            userName={user ? getUserName() : null}
                             isGuest={isGuest}
                         />
                     </div>

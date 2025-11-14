@@ -526,10 +526,20 @@ const LandingPage = () => {
 
       <div className="flex-1 flex flex-col">
         <nav className="flex items-center justify-between p-6">
-          {/* ✅ SIMPLIFIED: Hanya tampilkan Sapa Tazkia tanpa greeting di navbar */}
+          {/* ✅ UPDATED: Ganti teks dengan gambar logo sapatazkia.png */}
           <div className="flex items-center">
-            <h1 className="text-xl font-bold text-gray-800">Sapa Tazkia</h1>
+            <button 
+              onClick={() => navigate('/LandingPage.jsx')}
+              className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
+            >
+              <img 
+                src="/logosapatazkia.png" 
+                alt="Sapa Tazkia Logo" 
+                className="h-8 w-auto hover:scale-105 transition-transform duration-200"
+              />
+            </button>
           </div>
+          
           <div className="flex items-center space-x-3">
             {loading ? (
               <span className="text-gray-500">Loading...</span>
@@ -581,7 +591,6 @@ const LandingPage = () => {
             <h1 className="text-5xl md:text-6xl font-extrabold text-center mb-6 max-w-4xl">
               <GradientText>{greeting}</GradientText>
             </h1>
-            {/* ✅ HAPUS: Tombol refresh greeting dihapus */}
           </div>
 
           <div className="w-full max-w-2xl">
