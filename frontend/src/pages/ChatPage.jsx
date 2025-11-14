@@ -68,7 +68,7 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
             {/* Tombol User Profile (Dinamis) */}
             <div className="flex justify-center mb-10">
                 <button
-                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${user ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'} text-white rounded-xl shadow-lg transition-all flex items-center group relative gap-3`}
+                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${user ? 'bg-blue-500 hover:blue-600' : 'bg-blue-500 hover:bg-blue-600'} text-white rounded-xl shadow-lg transition-all flex items-center group relative gap-3`}
                     title={user ? `Logged in as ${getUserName()}. Click to logout.` : 'Login as Mahasiswa'}
                     onClick={handleUserClick}
                 >
@@ -171,7 +171,7 @@ const ChatWindow = ({ messages, isLoading, userName, isGuest = false }) => {
     );
 
     const UserAvatar = ({ initial, isGuest }) => (
-        <div className={`w-8 h-8 ${isGuest ? 'bg-purple-500' : 'bg-blue-500'} text-white rounded-full flex items-center justify-center text-sm font-semibold`}>
+        <div className={`w-8 h-8 ${isGuest ? 'bg-blue-500' : 'bg-blue-500'} text-white rounded-full flex items-center justify-center text-sm font-semibold`}>
             {isGuest ? 'G' : (initial ? initial.charAt(0).toUpperCase() : 'U')}
         </div>
     );
@@ -208,7 +208,7 @@ const ChatWindow = ({ messages, isLoading, userName, isGuest = false }) => {
                             {avatar}
                             <div className={`p-3 md:p-4 rounded-xl max-w-full shadow-md text-sm ${
                                 isUser
-                                    ? `${msg.isGuest ? 'bg-purple-500' : 'bg-blue-500'} text-white rounded-tr-sm`
+                                    ? `${msg.isGuest ? 'bg-blue-500' : 'bg-blue-500'} text-white rounded-tr-sm`
                                     : 'bg-white text-gray-800 border border-gray-200 rounded-tl-sm'
                                 }`}>
                                 <p>{msg.content}</p>
@@ -252,7 +252,7 @@ const ChatInput = ({ onSend, disabled }) => {
     };
 
     return (
-        <div className="p-4 md:p-6 border-t border-gray-200 flex justify-center bg-[#fbf9f6]">
+        <div className="p-4 md:p-6 border-t border-gray-200 flex justify-center bg-[#fef6e4]">
             <form onSubmit={handleSubmit} className="w-full max-w-3xl flex items-center p-2 bg-white border border-gray-300 rounded-full shadow-xl">
                 <button type="button" className="p-2 mr-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-colors" title="Attach" disabled={disabled}>
                     <Plus size={20} />
@@ -704,7 +704,7 @@ useEffect(() => {
     }
 
     return (
-        <div className="flex h-screen bg-[#fbf9f6] font-sans">
+        <div className="flex h-screen bg-[#fef6e4] font-sans">
             {/* ✅ MODAL KONFIRMASI HAPUS */}
             <ConfirmationModal
                 isOpen={showDeleteModal}
@@ -749,13 +749,13 @@ useEffect(() => {
                     
                     <div className="flex items-center space-x-4">
                         {isGuest ? (
-                            <span className="text-purple-500 font-medium">Mode Tamu</span>
+                            <span className="text-blue-500 font-medium">Mode Tamu</span>
                         ) : user ? (
-                            <span className="text-gray-600">Halo, {getUserShortName()}</span>
+                            <span className="text-gray-800">Halo, {getUserShortName()}</span>
                         ) : null}
                         <button
                             onClick={() => navigate('/')}
-                            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                            className="px-4 py-2 bg-[#fef6e4] text-gray-800 rounded-lg hover:bg-[#fef6e4] transition-colors"
                         >
                             Kembali
                         </button>
@@ -779,7 +779,7 @@ useEffect(() => {
                 <div>
                     <ChatInput onSend={handleSendMessage} disabled={isLoading || isDeleting} />
 
-                    <div className="flex justify-center items-center space-x-2 px-6 pb-7 bg-[#fbf9f6]">
+                    <div className="flex justify-center items-center space-x-2 px-6 pb-7 bg-[#fef6e4]">
                         <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors">
                             <Instagram size={16} />
                         </a>
