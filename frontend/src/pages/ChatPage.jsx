@@ -3,178 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
 import { sendMessageToAI } from '../api/aiService';
-import { Plus, MessageSquare, PenSquare, User, Settings, Instagram, Globe, Youtube, ArrowUp, Trash2 } from 'lucide-react';
+import { Plus, ArrowUp, MoreHorizontal, Trash2 } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
-
-// --- Komponen Sidebar ---
-const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChatId, navigate, isSidebarOpen, onToggleSidebar, onLogout, onDeleteChat, isDeleting }) => {
-    
-    // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
-    const getUserName = () => {
-        const fullName = user?.name || user?.fullName || user?.username || 'User';
-        // Ambil maksimal 2 kata pertama
-        const words = fullName.split(' ').slice(0, 2);
-        return words.join(' ');
-    };
-
-    // ✅ FUNGSI: Untuk mendapatkan NIM user
-    const getUserNIM = () => {
-        return user?.nim || user?.studentId || 'NIM tidak tersedia';
-    };
-
-    const ToggleIcon = ({ open }) => (
-        <img
-            src="https://www.svgrepo.com/show/493722/sidebar-toggle-nav-side-aside.svg"
-            alt="Toggle Sidebar"
-            className={`w-6 h-6 text-gray-700 transition-transform duration-300 ${open ? '' : 'transform rotate-180'}`}
-        />
-    );
-
-    // ✅ DIUBAH: Hapus handleUserClick yang menyebabkan logout
-    const handleUserClick = () => {
-        // Tidak melakukan apa-apa ketika diklik, atau bisa diarahkan ke profile page
-        console.log('User profile clicked');
-    };
-
-    return (
-        <div className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative`}>
-
-            {/* Header Sidebar (Settings & Toggle) */}
-            {isSidebarOpen ? (
-                <div className="flex justify-between items-center mb-8">
-                    <button className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3" title="Settings">
-                        <Settings size={24} />
-                    </button>
-                    <button
-                        onClick={onToggleSidebar}
-                        className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
-                        title="Tutup Sidebar"
-                    >
-                        <ToggleIcon open={true} />
-                    </button>
-                </div>
-            ) : (
-                <div className="flex justify-center mb-8">
-                    <button
-                        onClick={onToggleSidebar}
-                        className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
-                        title="Buka Sidebar"
-                    >
-                        <ToggleIcon open={false} />
-                    </button>
-                </div>
-            )}
-
-            {/* ✅ DIUBAH: Tombol User Profile dengan Nama dan NIM */}
-            <div className="flex justify-center mb-10">
-                <button
-                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-auto ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c6]'} text-white rounded-xl shadow-lg transition-all flex flex-col items-start group relative gap-1 p-3`}
-                    title={user ? `Logged in as ${getUserName()}. NIM: ${getUserNIM()}` : 'Login as Mahasiswa'}
-                    onClick={handleUserClick}
-                >
-                    <div className="flex items-center gap-3 w-full">
-                        <User size={20} />
-                        {isSidebarOpen && (
-                            <div className="flex flex-col items-start">
-                                <span className="text-sm font-semibold whitespace-nowrap truncate max-w-[160px]">
-                                    {user ? getUserName() : 'Login Mahasiswa'}
-                                </span>
-                                {user && (
-                                    <span className="text-xs text-gray-300 whitespace-nowrap truncate max-w-[160px]">
-                                        {getUserNIM()}
-                                    </span>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </button>
-            </div>
-
-            {/* Tombol New Chat */}
-            <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
-                <button
-                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
-                    title="New Chat"
-                    onClick={onNewChat}
-                >
-                    <PenSquare size={20} />
-                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-                        New Chat
-                    </span>
-                </button>
-            </div>
-
-            {/* Tombol Riwayat Chat (Label) */}
-            <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
-                <div
-                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 rounded-xl flex items-center group relative gap-3`}
-                    title="Chats"
-                >
-                    <MessageSquare size={20} />
-                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-                        Riwayat Chat
-                    </span>
-                </div>
-            </div>
-
-            {/* Area Riwayat Chat */}
-            <div className="flex-1 overflow-y-auto mt-0 space-y-2">
-                {isSidebarOpen && user && chatHistory.length > 0 && chatHistory.map(chat => (
-                    <div key={chat.id} className="flex items-center group">
-                        <button
-                            onClick={() => onSelectChat(chat.id)}
-                            className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
-                                currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
-                            }`}
-                            title={chat.title}
-                            disabled={isDeleting}
-                        >
-                            {chat.title}
-                        </button>
-                        <button
-                            onClick={() => onDeleteChat(chat.id)}
-                            className="p-1 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 ml-1 disabled:opacity-30 disabled:cursor-not-allowed"
-                            title="Hapus chat"
-                            disabled={isDeleting}
-                        >
-                            <Trash2 size={14} />
-                        </button>
-                    </div>
-                ))}
-                {isSidebarOpen && user && chatHistory.length === 0 && (
-                    <p className="p-2 text-xs text-gray-500 text-center">
-                        Belum ada riwayat chat.
-                    </p>
-                )}
-                {isSidebarOpen && !user && (
-                    <p className="p-2 text-xs text-gray-500 text-center">
-                        Login untuk melihat riwayat chat Anda.
-                    </p>
-                )}
-            </div>
-
-            {/* Social Links */}
-            <div className={`mt-auto flex ${isSidebarOpen ? 'flex-col items-start gap-2' : 'flex-row items-center justify-center space-x-2'} pb-4`}>
-                <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors flex items-center gap-3">
-                    <Instagram size={16} />
-                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>Instagram</span>
-                </a>
-                <a href="https://stmik.tazkia.ac.id/" target="_blank" rel="noopener noreferrer" title="Website" className="text-gray-500 hover:text-blue-500 transition-colors flex items-center gap-3">
-                    <Globe size={16} />
-                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>Website</span>
-                </a>
-                <a href="https://www.youtube.com/@stmiktazkia" target="_blank" rel="noopener noreferrer" title="YouTube" className="text-gray-500 hover:text-red-500 transition-colors flex items-center gap-3">
-                    <Youtube size={16} />
-                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap text-sm`}>YouTube</span>
-                </a>
-            </div>
-        </div>
-    );
-};
+import Sidebar from '../components/layout/SideBar';
 
 // --- Komponen ChatWindow ---
 const ChatWindow = ({ messages, isLoading, userName, isGuest = false }) => {
-
     const BotAvatar = () => (
         <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600"><path d="M12 2a2 2 0 0 0-2 2v.5L8.5 6h7l-1.5-1.5V4a2 2 0 0 0-2-2z" /><path d="M12 22a2 2 0 0 0 2-2v-.5l1.5-1.5h-7l1.5 1.5V20a2 2 0 0 0 2 2z" /><path d="M21 12a2 2 0 0 0-2-2h-3v4h3a2 2 0 0 0 2-2z" /><path d="M3 12a2 2 0 0 1 2-2h3v4H5a2 2 0 0 1-2-2z" /></svg>
@@ -190,7 +24,7 @@ const ChatWindow = ({ messages, isLoading, userName, isGuest = false }) => {
     if (messages.length === 0 && !isLoading) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500">
-                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center m-4">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><path d="M4 14s1.5-1 4-1 4 1 4 1v3H4z" /><path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /><path d="M10 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /></svg>
                 </div>
                 <h2 className="text-lg font-semibold text-gray-700">
@@ -253,14 +87,35 @@ const ChatWindow = ({ messages, isLoading, userName, isGuest = false }) => {
 // --- Komponen ChatInput ---
 const ChatInput = ({ onSend, disabled }) => {
     const [input, setInput] = useState('');
+    const textareaRef = useRef(null);
     
     const handleSubmit = (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         if (input.trim() && !disabled) {
             onSend(input.trim());
             setInput('');
+            // Reset height setelah kirim
+            if (textareaRef.current) {
+                textareaRef.current.style.height = 'auto';
+            }
         }
     };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSubmit();
+        }
+        // Shift + Enter akan membiarkan new line secara natural
+    };
+
+    // Auto-resize textarea agar tinggi menyesuaikan konten
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, [input]);
 
     return (
         <div className="p-4 md:p-6 border-t border-gray-200 flex justify-center bg-[#fef6e4]">
@@ -268,14 +123,27 @@ const ChatInput = ({ onSend, disabled }) => {
                 <button type="button" className="p-2 mr-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-colors" title="Attach" disabled={disabled}>
                     <Plus size={20} />
                 </button>
-                <input
-                    type="text"
+                
+                {/* Ganti input dengan textarea */}
+                <textarea
+                    ref={textareaRef}
                     placeholder="Message Sapa Tazkia"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    className="flex-1 px-2 py-2 text-base text-gray-700 placeholder-gray-500 focus:outline-none bg-white"
+                    onKeyDown={handleKeyDown}
                     disabled={disabled}
+                    rows={1}
+                    className="flex-1 px-2 py-2 text-base text-gray-700 placeholder-gray-500 focus:outline-none bg-white resize-none min-h-[40px] max-h-[120px]"
+                    style={{ 
+                        // Maintain styling seperti input
+                        border: 'none',
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                        fontSize: 'inherit',
+                        lineHeight: 'inherit'
+                    }}
                 />
+                
                 <button
                     type="submit"
                     className={`p-3 text-white rounded-full transition-colors shadow-md ml-2 ${input.trim() && !disabled ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-400 cursor-not-allowed'}`}
@@ -307,13 +175,55 @@ const ChatPage = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [chatToDelete, setChatToDelete] = useState(null);
     
+    // ✅ STATE untuk Menu Titik Tiga
+    const [showMenu, setShowMenu] = useState(false);
+    
     const chatContainerRef = useRef(null);
+    const menuButtonRef = useRef(null);
 
     // ✅ FIX: Tambahkan ref untuk mencegah multiple executions
     const hasProcessedInitialMessage = useRef(false);
     const hasProcessedUrlMessage = useRef(false);
 
     // ✅ FUNCTION DEFINITIONS
+
+    // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
+    const getUserName = useCallback(() => {
+        const fullName = user?.name || user?.fullName || user?.username || 'User';
+        // Ambil maksimal 2 kata pertama
+        const words = fullName.split(' ').slice(0, 2);
+        return words.join(' ');
+    }, [user]);
+
+    // ✅ FUNGSI: Toggle Menu Titik Tiga
+    const handleMenuToggle = (e) => {
+        e.stopPropagation();
+        setShowMenu(prev => !prev);
+    };
+
+    // ✅ FUNGSI: Close Menu ketika klik di luar
+    const handleCloseMenu = useCallback(() => {
+        setShowMenu(false);
+    }, []);
+
+    // ✅ FUNGSI: Handle Delete dari Menu
+    const handleDeleteFromMenu = () => {
+        if (currentChatId && !isGuest) {
+            setChatToDelete(currentChatId);
+            setShowDeleteModal(true);
+            setShowMenu(false);
+        }
+    };
+
+    // Attach event listener untuk close menu ketika klik di luar
+    useEffect(() => {
+        if (showMenu) {
+            document.addEventListener('click', handleCloseMenu);
+            return () => {
+                document.removeEventListener('click', handleCloseMenu);
+            };
+        }
+    }, [showMenu, handleCloseMenu]);
 
     const loadChatHistory = useCallback(async () => {
         if (isGuest || !user || !user.id) {
@@ -537,17 +447,14 @@ const ChatPage = () => {
         setIsSidebarOpen(prev => !prev);
     };
 
-    // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
-    const getUserName = () => {
-        const fullName = user?.name || user?.fullName || user?.username || 'User';
-        // Ambil maksimal 2 kata pertama
-        const words = fullName.split(' ').slice(0, 2);
-        return words.join(' ');
+    // ✅ FUNGSI: Handle login redirect
+    const handleLogin = () => {
+        navigate('/'); // Redirect ke landing page untuk login
     };
 
-    // ✅ FUNGSI: Untuk mendapatkan NIM user
-    const getUserNIM = () => {
-        return user?.nim || user?.studentId || 'NIM tidak tersedia';
+    // ✅ FUNGSI: Handle settings click
+    const handleSettingsClick = () => {
+        console.log('Settings clicked');
     };
 
     // ✅ USE EFFECTS dengan proper guards
@@ -627,7 +534,7 @@ const ChatPage = () => {
             navigate('/', { replace: true });
             return;
         }
-    }, [loading, isAuthenticated, user, token, navigate, logout, isGuest, location.state, location.search]);
+    }, [loading, isAuthenticated, user, token, navigate, logout, isGuest, location.state, location.search, getUserName]);
 
     // 4. FOURTH: Handle URL parameters - DENGAN GUARD
     useEffect(() => {
@@ -712,36 +619,38 @@ const ChatPage = () => {
     }
 
     return (
-        <div className="flex h-screen bg-[#fef6e4] font-sans">
+        <div className="flex h-screen bg-amber-50 font-sans overflow-hidden">
             {/* ✅ MODAL KONFIRMASI HAPUS */}
             <ConfirmationModal
                 isOpen={showDeleteModal}
                 onClose={handleCancelDelete}
                 onConfirm={handleConfirmDelete}
-                title="Hapus Chat"
-                message="Apakah Anda yakin ingin menghapus chat ini? Tindakan ini tidak dapat dibatalkan."
+                title="Hapus Chat?"
+                message="Apakah Anda yakin ingin menghapus chat ini?"
                 confirmText="Hapus"
                 cancelText="Batal"
                 isDeleting={isDeleting}
             />
 
-            <CustomSideBar
+            {/* ✅ UPDATED: Menggunakan komponen Sidebar reusable */}
+            <Sidebar
                 user={user}
+                onLogin={handleLogin}
+                onLogout={logout}
                 chatHistory={chatHistory}
-                onNewChat={handleNewChat}
                 onSelectChat={handleSelectChat}
                 currentChatId={currentChatId}
-                navigate={navigate}
-                isSidebarOpen={isSidebarOpen}
-                onToggleSidebar={handleToggleSidebar}
-                onLogout={logout}
                 onDeleteChat={handleDeleteClick}
                 isDeleting={isDeleting}
+                isSidebarOpen={isSidebarOpen}
+                onToggleSidebar={handleToggleSidebar}
+                onNewChat={handleNewChat}
+                onSettingsClick={handleSettingsClick}
             />
 
             <div className="flex-1 flex flex-col overflow-hidden">
-                <nav className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200">
-                    {/* ✅ UPDATED: Ganti teks dengan gambar logo */}
+                <nav className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 flex-shrink-0">
+                    {/* Logo */}
                     <div className="flex items-center">
                         <button 
                             onClick={() => navigate('/')}
@@ -758,21 +667,40 @@ const ChatPage = () => {
                     <div className="flex items-center space-x-4">
                         {isGuest ? (
                             <span className="text-blue-500 font-medium">Mode Tamu</span>
-                        ) : user ? (
-                            <span className="text-gray-800">Halo, {getUserName()}</span>
                         ) : null}
-                        <button
-                            onClick={() => navigate('/')}
-                            className="px-4 py-2 bg-[#fef6e4] text-gray-800 rounded-lg hover:bg-[#fef6e4] transition-colors"
-                        >
-                            Kembali
-                        </button>
+                        
+                        {/* ✅ TAMBAHKAN: Tombol Menu Titik Tiga Horizontal */}
+                        {!isGuest && currentChatId && (
+                            <div className="relative">
+                                <button
+                                    ref={menuButtonRef}
+                                    onClick={handleMenuToggle}
+                                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-80 hover:opacity-100"
+                                    title="More options"
+                                >
+                                    <MoreHorizontal size={18} />
+                                </button>
+                                
+                                {/* Dropdown Menu */}
+                                {showMenu && (
+                                    <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
+                                        <button
+                                            onClick={handleDeleteFromMenu}
+                                            className="w-full flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                        >
+                                            <Trash2 size={14} className="mr-2" />
+                                            Hapus Chat
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </nav>
 
                 <div
                     ref={chatContainerRef}
-                    className="flex-1 overflow-y-auto relative"
+                    className="flex-1 overflow-y-auto relative scrollbar-hide"
                 >
                     <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col">
                         <ChatWindow
@@ -784,20 +712,8 @@ const ChatPage = () => {
                     </div>
                 </div>
 
-                <div>
+                <div className="flex-shrink-0">
                     <ChatInput onSend={handleSendMessage} disabled={isLoading || isDeleting} />
-
-                    <div className="flex justify-center items-center space-x-2 px-6 pb-7 bg-[#fef6e4]">
-                        <a href="https://www.instagram.com/stmiktazkia_official/" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-gray-500 hover:text-pink-500 transition-colors">
-                            <Instagram size={16} />
-                        </a>
-                        <a href="https://stmik.tazkia.ac.id/" target="_blank" rel="noopener noreferrer" title="Website" className="text-gray-500 hover:text-blue-500 transition-colors">
-                            <Globe size={16} />
-                        </a>
-                        <a href="https://www.youtube.com/@stmiktazkia" target="_blank" rel="noopener noreferrer" title="YouTube" className="text-gray-500 hover:text-red-500 transition-colors">
-                            <Youtube size={16} />
-                        </a>
-                    </div>
                 </div>
             </div>
         </div>
