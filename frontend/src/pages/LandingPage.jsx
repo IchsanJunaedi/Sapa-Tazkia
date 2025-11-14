@@ -61,15 +61,17 @@ const Sidebar = ({
   isDeleting 
 }) => {
   
-  // ✅ FUNGSI: Untuk mendapatkan nama user dengan berbagai fallback
+  // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
   const getUserName = () => {
-    return user?.name || user?.fullName || user?.username || 'User';
+    const fullName = user?.name || user?.fullName || user?.username || 'User';
+    // Ambil maksimal 2 kata pertama
+    const words = fullName.split(' ').slice(0, 2);
+    return words.join(' ');
   };
 
-  // ✅ FUNGSI: Untuk mendapatkan nama pendek (first name saja)
-  const getUserShortName = () => {
-    const fullName = getUserName();
-    return fullName.split(' ')[0];
+  // ✅ FUNGSI: Untuk mendapatkan NIM user
+  const getUserNIM = () => {
+    return user?.nim || user?.studentId || 'NIM tidak tersedia';
   };
 
   const ToggleIcon = ({ open }) => (
@@ -80,12 +82,10 @@ const Sidebar = ({
     />
   );
 
+  // ✅ DIUBAH: Hapus handleUserClick yang menyebabkan logout
   const handleUserClick = () => {
-    if (user) {
-      onLogout();
-    } else {
-      onClickLogin();
-    }
+    // Tidak melakukan apa-apa ketika diklik, atau bisa diarahkan ke profile page
+    console.log('User profile clicked');
   };
 
   return (
@@ -119,16 +119,28 @@ const Sidebar = ({
         </div>
       )}
 
+      {/* ✅ DIUBAH: Tombol User Profile dengan Nama dan NIM */}
       <div className="flex justify-center mb-10">
         <button
-          className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c6]'} text-white rounded-xl shadow-lg transition-all flex items-center group relative gap-3`}
-          title={user ? `Logged in as ${getUserName()}. Click to logout.` : 'Login Mahasiswa'}
+          className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-auto ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c6]'} text-white rounded-xl shadow-lg transition-all flex flex-col items-start group relative gap-1 p-3`}
+          title={user ? `Logged in as ${getUserName()}. NIM: ${getUserNIM()}` : 'Login as Mahasiswa'}
           onClick={handleUserClick}
         >
-          <User size={20} />
-          <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-            {user ? getUserShortName() : 'Login Mahasiswa'}
-          </span>
+          <div className="flex items-center gap-3 w-full">
+            <User size={20} />
+            {isSidebarOpen && (
+              <div className="flex flex-col items-start">
+                <span className="text-sm font-semibold whitespace-nowrap truncate max-w-[160px]">
+                  {user ? getUserName() : 'Login Mahasiswa'}
+                </span>
+                {user && (
+                  <span className="text-xs text-gray-300 whitespace-nowrap truncate max-w-[160px]">
+                    {getUserNIM()}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </button>
       </div>
 
@@ -472,15 +484,17 @@ const LandingPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [chatToDelete, setChatToDelete] = useState(null);
 
+  // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
+  const getUserName = useCallback(() => {
+    const fullName = user?.name || user?.fullName || user?.username || 'User';
+    // Ambil maksimal 2 kata pertama
+    const words = fullName.split(' ').slice(0, 2);
+    return words.join(' ');
+  }, [user]);
+
   // ✅ FIXED: Refresh greeting function dengan semua dependencies
   const refreshGreeting = useCallback(() => {
-    const getUserName = () => user?.name || user?.fullName || user?.username || 'User';
-    const getUserShortName = () => {
-      const fullName = getUserName();
-      return fullName.split(' ')[0];
-    };
-
-    const userShortName = getUserShortName();
+    const userShortName = getUserName();
     
     const greetingsForUser = [
       `Hi ${userShortName}, Good to see you!`,
@@ -501,7 +515,7 @@ const LandingPage = () => {
     const availableGreetings = user ? greetingsForUser : greetingsForGuest;
     const randomGreeting = availableGreetings[Math.floor(Math.random() * availableGreetings.length)];
     setGreeting(randomGreeting);
-  }, [user]);
+  }, [user, getUserName]);
 
   // ✅ TAMBAHAN: Load chat history untuk user yang login
   const loadChatHistory = useCallback(async () => {
@@ -710,7 +724,7 @@ const LandingPage = () => {
                 <Button
                   variant="primary"
                   size="md"
-                  className="bg-[#172c66] hover:bg-[#172c90] text-white shadow-lg rounded-lg"
+                  className="bg-[#072064] hover:bg-[#203dca] text-white shadow-lg rounded-lg"
                   onClick={() => navigate('/chat')}
                 >
                   Go to Chat
@@ -718,7 +732,7 @@ const LandingPage = () => {
                 <Button
                   variant="secondary"
                   size="md"
-                  className="bg-[#172c66] hover:bg-[#172c90] text-white shadow-lg rounded-lg"
+                  className="bg-[#072064] hover:bg-[#203dca] text-white shadow-lg rounded-lg"
                   onClick={logout}
                 >
                   Logout
