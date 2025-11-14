@@ -7,7 +7,7 @@ import { Plus, MessageSquare, PenSquare, User, Settings, X, Instagram, Globe, Yo
 const GradientText = ({ children, className = '' }) => {
   return (
     <span
-      className={`bg-clip-text text-transparent bg-gradient-to-r from-orange-500 to-purple-600 ${className}`}
+      className={`bg-clip-text text-transparent bg-gradient-to-r from-gray-500 to-gray-600 ${className}`}
       style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
     >
       {children}
@@ -101,7 +101,7 @@ const Sidebar = ({ onClickLogin, isSidebarOpen, onToggleSidebar, user, onLogout 
       <div className="flex justify-center mb-10">
         {user ? (
           <button
-            className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-green-500 text-white rounded-xl shadow-lg hover:bg-green-600 transition-all flex items-center group relative gap-3`}
+            className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all flex items-center group relative gap-3`}
             title={`Logged in as ${getUserName()}. Click to logout.`}
             onClick={onLogout}
           >
@@ -515,7 +515,7 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-[#fbf9f6] font-sans">
+    <div className="min-h-screen flex bg-[#fef6e4] font-sans">
       <Sidebar
         onClickLogin={() => openModal(0)}
         isSidebarOpen={isSidebarOpen}
@@ -548,7 +548,7 @@ const LandingPage = () => {
                 <Button
                   variant="primary"
                   size="md"
-                  className="bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-200/50 rounded-lg"
+                  className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-200/50 rounded-lg"
                   onClick={() => navigate('/chat')}
                 >
                   Go to Chat
@@ -575,7 +575,7 @@ const LandingPage = () => {
                 <Button
                   variant="primary"
                   size="md"
-                  className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-200/50 rounded-lg"
+                  className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200/50 rounded-lg"
                   onClick={handleGuestChat}
                 >
                   TRY AS GUEST
