@@ -1,12 +1,22 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  // Pastikan Tailwind membaca semua file di folder src
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
   ],
   theme: {
     extend: {
-      // Tambahkan kustomisasi theme di sini jika perlu
+      // ✅ TAMBAHKAN FONT FAMILY DI SINI
+      fontFamily: {
+        sans: [
+          'Inter',
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
+          'Roboto',
+          'sans-serif'
+        ],
+      },
     },
   },
   plugins: [],
