@@ -9,15 +9,17 @@ import ConfirmationModal from '../components/ConfirmationModal';
 // --- Komponen Sidebar ---
 const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChatId, navigate, isSidebarOpen, onToggleSidebar, onLogout, onDeleteChat, isDeleting }) => {
     
-    // ✅ FUNGSI: Untuk mendapatkan nama user dengan berbagai fallback
+    // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
     const getUserName = () => {
-        return user?.name || user?.fullName || user?.username || 'User';
+        const fullName = user?.name || user?.fullName || user?.username || 'User';
+        // Ambil maksimal 2 kata pertama
+        const words = fullName.split(' ').slice(0, 2);
+        return words.join(' ');
     };
 
-    // ✅ FUNGSI: Untuk mendapatkan nama pendek (first name saja)
-    const getUserShortName = () => {
-        const fullName = getUserName();
-        return fullName.split(' ')[0];
+    // ✅ FUNGSI: Untuk mendapatkan NIM user
+    const getUserNIM = () => {
+        return user?.nim || user?.studentId || 'NIM tidak tersedia';
     };
 
     const ToggleIcon = ({ open }) => (
@@ -28,12 +30,10 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
         />
     );
 
+    // ✅ DIUBAH: Hapus handleUserClick yang menyebabkan logout
     const handleUserClick = () => {
-        if (user) {
-            onLogout();
-        } else {
-            navigate('/');
-        }
+        // Tidak melakukan apa-apa ketika diklik, atau bisa diarahkan ke profile page
+        console.log('User profile clicked');
     };
 
     return (
@@ -65,17 +65,28 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
                 </div>
             )}
 
-            {/* Tombol User Profile (Dinamis) */}
+            {/* ✅ DIUBAH: Tombol User Profile dengan Nama dan NIM */}
             <div className="flex justify-center mb-10">
                 <button
-                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c6]'} text-white rounded-xl shadow-lg transition-all flex items-center group relative gap-3`}
-                    title={user ? `Logged in as ${getUserName()}. Click to logout.` : 'Login as Mahasiswa'}
+                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-auto ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c6]'} text-white rounded-xl shadow-lg transition-all flex flex-col items-start group relative gap-1 p-3`}
+                    title={user ? `Logged in as ${getUserName()}. NIM: ${getUserNIM()}` : 'Login as Mahasiswa'}
                     onClick={handleUserClick}
                 >
-                    <User size={20} />
-                    <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-                        {user ? getUserShortName() : 'Login Mahasiswa'}
-                    </span>
+                    <div className="flex items-center gap-3 w-full">
+                        <User size={20} />
+                        {isSidebarOpen && (
+                            <div className="flex flex-col items-start">
+                                <span className="text-sm font-semibold whitespace-nowrap truncate max-w-[160px]">
+                                    {user ? getUserName() : 'Login Mahasiswa'}
+                                </span>
+                                {user && (
+                                    <span className="text-xs text-gray-300 whitespace-nowrap truncate max-w-[160px]">
+                                        {getUserNIM()}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </button>
             </div>
 
@@ -526,15 +537,17 @@ const ChatPage = () => {
         setIsSidebarOpen(prev => !prev);
     };
 
-    // ✅ FUNGSI: Untuk mendapatkan nama user dengan berbagai fallback
+    // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
     const getUserName = () => {
-        return user?.name || user?.fullName || user?.username || 'User';
+        const fullName = user?.name || user?.fullName || user?.username || 'User';
+        // Ambil maksimal 2 kata pertama
+        const words = fullName.split(' ').slice(0, 2);
+        return words.join(' ');
     };
 
-    // ✅ FUNGSI: Untuk mendapatkan nama pendek (first name saja)
-    const getUserShortName = () => {
-        const fullName = getUserName();
-        return fullName.split(' ')[0];
+    // ✅ FUNGSI: Untuk mendapatkan NIM user
+    const getUserNIM = () => {
+        return user?.nim || user?.studentId || 'NIM tidak tersedia';
     };
 
     // ✅ USE EFFECTS dengan proper guards
@@ -581,45 +594,40 @@ const ChatPage = () => {
     }, [location.state, handleAIMessage, isGuest]);
 
     // 3. THIRD: Auth check - dengan guest mode protection
-useEffect(() => {
-    // ✅ Pindahkan fungsi helper ke dalam useEffect
-    const getUserName = () => {
-        return user?.name || user?.fullName || user?.username || 'User';
-    };
+    useEffect(() => {
+        console.log('🔍 [CHAT PAGE] Auth Status Check:', {
+            loading,
+            isAuthenticated,
+            user: user ? { id: user.id, name: getUserName() } : 'No user',
+            tokenLength: token?.length,
+            isGuest: isGuest,
+            locationState: location.state,
+            locationSearch: location.search
+        });
 
-    console.log('🔍 [CHAT PAGE] Auth Status Check:', {
-        loading,
-        isAuthenticated,
-        user: user ? { id: user.id, name: getUserName() } : 'No user',
-        tokenLength: token?.length,
-        isGuest: isGuest,
-        locationState: location.state,
-        locationSearch: location.search
-    });
+        // ✅ CEK SEMUA SUMBER untuk guest mode
+        const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
+        const guestFromState = location.state?.isGuest;
+        
+        if (guestFromUrl || guestFromState) {
+            console.log('👤 [CHAT PAGE] Guest mode detected - skipping auth checks');
+            setIsGuest(true);
+            return;
+        }
 
-    // ✅ CEK SEMUA SUMBER untuk guest mode
-    const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
-    const guestFromState = location.state?.isGuest;
-    
-    if (guestFromUrl || guestFromState) {
-        console.log('👤 [CHAT PAGE] Guest mode detected - skipping auth checks');
-        setIsGuest(true);
-        return;
-    }
+        // ✅ JIKA GUEST MODE SUDAH AKTIF, SKIP
+        if (isGuest) {
+            console.log('👤 [CHAT PAGE] Guest mode active - skipping auth checks');
+            return;
+        }
 
-    // ✅ JIKA GUEST MODE SUDAH AKTIF, SKIP
-    if (isGuest) {
-        console.log('👤 [CHAT PAGE] Guest mode active - skipping auth checks');
-        return;
-    }
-
-    // ✅ HANYA JALANKAN AUTH CHECKS JIKA BUKAN GUEST
-    if (!loading && !isAuthenticated) {
-        console.log('❌ [CHAT PAGE] User not authenticated and not guest, redirecting to home');
-        navigate('/', { replace: true });
-        return;
-    }
-}, [loading, isAuthenticated, user, token, navigate, logout, isGuest, location.state, location.search]);
+        // ✅ HANYA JALANKAN AUTH CHECKS JIKA BUKAN GUEST
+        if (!loading && !isAuthenticated) {
+            console.log('❌ [CHAT PAGE] User not authenticated and not guest, redirecting to home');
+            navigate('/', { replace: true });
+            return;
+        }
+    }, [loading, isAuthenticated, user, token, navigate, logout, isGuest, location.state, location.search]);
 
     // 4. FOURTH: Handle URL parameters - DENGAN GUARD
     useEffect(() => {
@@ -751,7 +759,7 @@ useEffect(() => {
                         {isGuest ? (
                             <span className="text-blue-500 font-medium">Mode Tamu</span>
                         ) : user ? (
-                            <span className="text-gray-800">Halo, {getUserShortName()}</span>
+                            <span className="text-gray-800">Halo, {getUserName()}</span>
                         ) : null}
                         <button
                             onClick={() => navigate('/')}
