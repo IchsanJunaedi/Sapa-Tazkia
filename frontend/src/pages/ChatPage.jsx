@@ -68,7 +68,7 @@ const CustomSideBar = ({ user, chatHistory, onNewChat, onSelectChat, currentChat
             {/* Tombol User Profile (Dinamis) */}
             <div className="flex justify-center mb-10">
                 <button
-                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${user ? 'bg-blue-500 hover:blue-600' : 'bg-blue-500 hover:bg-blue-600'} text-white rounded-xl shadow-lg transition-all flex items-center group relative gap-3`}
+                    className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c6]'} text-white rounded-xl shadow-lg transition-all flex items-center group relative gap-3`}
                     title={user ? `Logged in as ${getUserName()}. Click to logout.` : 'Login as Mahasiswa'}
                     onClick={handleUserClick}
                 >
