@@ -32,13 +32,13 @@ Chatbot ini membantu pengguna mengakses informasi akademik seperti **IPK, nilai,
 
 ## 🧩 Arsitektur Sistem
 
- Frontend (React) 
- └── Chat UI, Login, PDF 
+ - Frontend (React) 
+   -Chat UI, Login, PDF 
 │
-HTTPS / REST API
+- HTTPS / REST API
 │
- Backend (Express) 
- └── Auth, RAG, PDF, AI 
+- Backend (Express) 
+   -Auth, RAG, PDF, AI 
 │
 │ MySQL / Prisma │ ← Data akademik & pengguna
 │ Qdrant (VectorDB) │ ← Embedding dokumen kampus
