@@ -39,9 +39,9 @@ Chatbot ini membantu pengguna mengakses informasi akademik seperti **IPK, nilai,
 │
 - Backend (Express) 
    -Auth, RAG, PDF, AI 
-│
-│ MySQL / Prisma │ ← Data akademik & pengguna
-│ Qdrant (VectorDB) │ ← Embedding dokumen kampus
+
+- MySQL / Prisma │ ← Data akademik & pengguna
+- Qdrant (VectorDB) │ ← Embedding dokumen kampus
 
 
 
