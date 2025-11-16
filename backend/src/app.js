@@ -43,7 +43,7 @@ app.use(cors({
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // ✅ TAMBAHKAN PATCH DI SINI
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type', 
     'Authorization', 
@@ -68,7 +68,7 @@ app.options('*', cors({
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // ✅ TAMBAHKAN PATCH DI SINI JUGA
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type', 
     'Authorization', 
@@ -149,10 +149,16 @@ app.get('/', (req, res) => {
   res.json({
     success: true,
     message: '🚀 Sapa Tazkia Backend API',
-    version: '3.1.0',
+    version: '3.2.0', // ✅ UPDATE VERSION
     status: 'running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
+    features: {
+      authentication: true,
+      emailVerification: true, // ✅ FEATURE BARU
+      googleOAuth: !!process.env.GOOGLE_CLIENT_ID,
+      aiChat: !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSy.....')
+    },
     endpoints: {
       auth: '/api/auth',
       ai: '/api/ai',
@@ -184,6 +190,13 @@ app.get('/health', async (req, res) => {
     } else {
       healthCheck.services.gemini = 'Not Configured';
     }
+
+    // Test email service configuration
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+      healthCheck.services.email = 'Configured';
+    } else {
+      healthCheck.services.email = 'Not Configured';
+    }
     
     res.json(healthCheck);
   } catch (error) {
@@ -205,8 +218,10 @@ app.get('/status', (req, res) => {
     memory: process.memoryUsage(),
     features: {
       authentication: !!process.env.GOOGLE_CLIENT_ID,
+      emailVerification: true, // ✅ FEATURE BARU
       ai: !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSy.....'),
-      database: !!process.env.DATABASE_URL
+      database: !!process.env.DATABASE_URL,
+      emailService: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD)
     }
   });
 });
@@ -269,11 +284,18 @@ app.use('*', (req, res) => {
       auth: [
         'POST /api/auth/login',
         'POST /api/auth/register', 
+        'POST /api/auth/register-email', // ✅ ENDPOINT BARU
+        'POST /api/auth/verify-email', // ✅ ENDPOINT BARU
+        'POST /api/auth/resend-verification', // ✅ ENDPOINT BARU
+        'GET  /api/auth/check-verification/:email', // ✅ ENDPOINT BARU
         'GET  /api/auth/google',
         'GET  /api/auth/google/callback',
         'POST /api/auth/logout',
         'GET  /api/auth/me',
-        'PATCH /api/auth/update-profile' // ✅ TAMBAHKAN INI
+        'PATCH /api/auth/update-profile',
+        'POST /api/auth/verify-student',
+        'PATCH /api/auth/update-verification',
+        'GET  /api/auth/check-nim/:nim'
       ],
       guest: [
         'POST /api/guest/chat',
@@ -416,9 +438,10 @@ const server = app.listen(PORT, () => {
   console.log(`📍 Port: ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔐 Auth: ${process.env.GOOGLE_CLIENT_ID ? '✅ Google OAuth Ready' : '❌ Local Auth Only'}`);
+  console.log(`📧 Email Verification: ${process.env.EMAIL_USER ? '✅ Email Service Ready' : '❌ Email Disabled'}`); // ✅ BARU
   console.log(`🤖 AI: ${process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSy.....' ? '✅ Gemini AI Ready' : '❌ AI Disabled'}`);
   console.log(`🗄️ Database: ${process.env.DATABASE_URL ? '✅ Connected' : '❌ No DB Config'}`);
-  console.log(`🔄 CORS: ✅ PATCH Method Enabled`); // ✅ TAMBAHKAN INI
+  console.log(`🔄 CORS: ✅ PATCH Method Enabled`);
   console.log('');
   console.log('📋 AVAILABLE ENDPOINTS:');
   console.log('   GET  / .......................... API Root');
@@ -430,11 +453,18 @@ const server = app.listen(PORT, () => {
   console.log('🔐 AUTH ENDPOINTS:');
   console.log('   POST /api/auth/login .......... User login');
   console.log('   POST /api/auth/register ....... User registration');
+  console.log('   POST /api/auth/register-email .. Email registration'); 
+  console.log('   POST /api/auth/verify-email .... Email verification'); 
+  console.log('   POST /api/auth/resend-verification . Resend code'); 
+  console.log('   GET  /api/auth/check-verification/:email . Check status'); 
   console.log('   GET  /api/auth/google ......... Google OAuth');
   console.log('   GET  /api/auth/google/callback . Google Callback');
   console.log('   POST /api/auth/logout ......... User logout');
   console.log('   GET  /api/auth/me ............ Get user profile');
-  console.log('   PATCH /api/auth/update-profile . Update profile'); // ✅ TAMBAHKAN INI
+  console.log('   PATCH /api/auth/update-profile . Update profile');
+  console.log('   POST /api/auth/verify-student .. Verify student data');
+  console.log('   PATCH /api/auth/update-verification . Update verification');
+  console.log('   GET  /api/auth/check-nim/:nim . Check NIM availability');
   console.log('');
   console.log('👤 GUEST ENDPOINTS:');
   console.log('   POST /api/guest/chat .......... Guest Chat');
@@ -450,6 +480,7 @@ const server = app.listen(PORT, () => {
   console.log('🛡️  SECURITY FEATURES:');
   console.log('   ✅ CORS Protection');
   console.log('   ✅ Session Management');
+  console.log('   ✅ Email Verification System'); 
   console.log('   ✅ Input Validation');
   console.log('   ✅ Error Handling');
   console.log('   ✅ Graceful Shutdown');
