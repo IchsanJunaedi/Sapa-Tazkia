@@ -16,7 +16,7 @@ const app = express();
 const prisma = new PrismaClient();
 
 // ========================================================
-// MIDDLEWARE SETUP
+// MIDDLEWARE SETUP - DIPERBAIKI UNTUK SUPPORT PATCH
 // ========================================================
 
 // CORS configuration - Updated for better security
@@ -27,7 +27,7 @@ const allowedOrigins = [
   'http://192.168.100.11:3000'
 ];
 
-// Enhanced CORS configuration
+// ✅ PERBAIKAN: Enhanced CORS configuration dengan PATCH method
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, postman, server-to-server)
@@ -43,7 +43,7 @@ app.use(cors({
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // ✅ TAMBAHKAN PATCH DI SINI
   allowedHeaders: [
     'Content-Type', 
     'Authorization', 
@@ -57,8 +57,28 @@ app.use(cors({
   maxAge: 86400 // 24 hours
 }));
 
-// Handle preflight requests
-app.options('*', cors());
+// ✅ PERBAIKAN: Handle preflight requests dengan PATCH support
+app.options('*', cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('CORS not allowed'), false);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // ✅ TAMBAHKAN PATCH DI SINI JUGA
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ]
+}));
 
 // Body parser middleware with better limits
 app.use(express.json({ 
@@ -252,7 +272,8 @@ app.use('*', (req, res) => {
         'GET  /api/auth/google',
         'GET  /api/auth/google/callback',
         'POST /api/auth/logout',
-        'GET  /api/auth/me'
+        'GET  /api/auth/me',
+        'PATCH /api/auth/update-profile' // ✅ TAMBAHKAN INI
       ],
       guest: [
         'POST /api/guest/chat',
@@ -323,14 +344,6 @@ app.use((err, req, res, next) => {
     });
   }
 
-  // Rate limiting error (if you implement rate limiting later)
-  if (err.name === 'RateLimitError') {
-    return res.status(429).json({
-      success: false,
-      message: 'Too many requests, please try again later'
-    });
-  }
-  
   // Default error response
   const errorResponse = {
     success: false,
@@ -405,6 +418,7 @@ const server = app.listen(PORT, () => {
   console.log(`🔐 Auth: ${process.env.GOOGLE_CLIENT_ID ? '✅ Google OAuth Ready' : '❌ Local Auth Only'}`);
   console.log(`🤖 AI: ${process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSy.....' ? '✅ Gemini AI Ready' : '❌ AI Disabled'}`);
   console.log(`🗄️ Database: ${process.env.DATABASE_URL ? '✅ Connected' : '❌ No DB Config'}`);
+  console.log(`🔄 CORS: ✅ PATCH Method Enabled`); // ✅ TAMBAHKAN INI
   console.log('');
   console.log('📋 AVAILABLE ENDPOINTS:');
   console.log('   GET  / .......................... API Root');
@@ -420,6 +434,7 @@ const server = app.listen(PORT, () => {
   console.log('   GET  /api/auth/google/callback . Google Callback');
   console.log('   POST /api/auth/logout ......... User logout');
   console.log('   GET  /api/auth/me ............ Get user profile');
+  console.log('   PATCH /api/auth/update-profile . Update profile'); // ✅ TAMBAHKAN INI
   console.log('');
   console.log('👤 GUEST ENDPOINTS:');
   console.log('   POST /api/guest/chat .......... Guest Chat');
