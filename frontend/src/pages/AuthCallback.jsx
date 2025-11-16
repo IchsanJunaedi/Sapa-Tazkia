@@ -1,22 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const AuthCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login, isAuthenticated, needsProfileCompletion } = useAuth();
-  const [hasProcessed, setHasProcessed] = useState(false);
+  const { login, isAuthenticated, loading } = useAuth();
   const [error, setError] = useState(null);
+  const [status, setStatus] = useState('Processing authentication...');
+  
+  // ✅ SOLUSI RADIKAL: Gunakan useRef untuk track processed state
+  const hasProcessedRef = useRef(false);
+  const processingRef = useRef(false);
 
   useEffect(() => {
-    // ✅ PERBAIKAN: Cegah multiple execution dengan flag
-    if (hasProcessed) {
-      console.log('🔍 [AUTH CALLBACK] Already processed, skipping');
+    // ✅ PERBAIKAN 1: Skip jika masih loading atau sedang processing
+    if (loading || processingRef.current) {
+      console.log('🔍 [AUTH CALLBACK] Auth context loading or already processing, skipping...');
       return;
     }
 
-    // ✅ PERBAIKAN: Jika sudah authenticated, handle redirect ke LANDING PAGE
+    // ✅ PERBAIKAN 2: Skip jika sudah diproses (gunakan ref untuk menghindari re-render)
+    if (hasProcessedRef.current) {
+      console.log('🔍 [AUTH CALLBACK] Already processed (ref), skipping');
+      return;
+    }
+
+    // ✅ PERBAIKAN 3: Jika sudah authenticated, langsung redirect
     if (isAuthenticated) {
       console.log('🔍 [AUTH CALLBACK] Already authenticated, redirecting to LANDING PAGE');
       navigate('/', { replace: true });
@@ -24,14 +34,19 @@ const AuthCallback = () => {
     }
 
     const handleAuthCallback = async () => {
+      // ✅ Tandai sedang processing untuk cegah multiple execution
+      processingRef.current = true;
+      
       try {
+        setStatus('Validating authentication data...');
+        
         // Ambil semua parameter dari URL
         const token = searchParams.get('token');
         const userParam = searchParams.get('user');
         const success = searchParams.get('success');
 
         console.log('🔍 [AUTH CALLBACK] URL Parameters:', {
-          token: token ? '✓ Available' : '✗ Missing',
+          token: token ? `✓ Available (${token.length} chars)` : '✗ Missing',
           userParam: userParam ? '✓ Available' : '✗ Missing', 
           success,
           fullURL: window.location.href
@@ -41,6 +56,7 @@ const AuthCallback = () => {
         if (success !== 'true') {
           console.error('❌ [AUTH CALLBACK] OAuth failed - success parameter is not true');
           setError('Authentication failed. Please try again.');
+          setStatus('Authentication failed');
           setTimeout(() => {
             navigate('/', { 
               state: { error: 'Authentication failed. Please try again.' },
@@ -53,6 +69,7 @@ const AuthCallback = () => {
         if (!token || !userParam) {
           console.error('❌ [AUTH CALLBACK] Missing token or user data');
           setError('Missing authentication data.');
+          setStatus('Missing authentication data');
           setTimeout(() => {
             navigate('/', { 
               state: { error: 'Missing authentication data.' },
@@ -63,59 +80,72 @@ const AuthCallback = () => {
         }
 
         try {
+          setStatus('Parsing user data...');
+          
           // Parse user data
           const userData = JSON.parse(decodeURIComponent(userParam));
           
-          console.log('✅ [AUTH CALLBACK] Parsed user data:', userData);
+          console.log('✅ [AUTH CALLBACK] Parsed user data:', {
+            id: userData.id,
+            fullName: userData.fullName,
+            email: userData.email,
+            isProfileComplete: userData.isProfileComplete,
+            nim: userData.nim
+          });
 
-          // ✅ PERBAIKAN: Set flag sebelum memproses login
-          setHasProcessed(true);
+          setStatus('Logging in...');
+          
+          // ✅ PERBAIKAN 4: Tandai sebagai processed SEBELUM login
+          hasProcessedRef.current = true;
 
           // Simpan data ke AuthContext
           const result = await login(token, userData);
           
-          console.log('✅ [AUTH CALLBACK] Login successful, checking if first time login...');
-          console.log('🔍 [AUTH CALLBACK] Login result:', result);
-          
-          // ✅ PERBAIKAN KRITIS: Check jika user PERLU mengisi profile (first time)
-          const needsCompletion = result.needsProfileCompletion || needsProfileCompletion();
-          
-          console.log('🔍 [AUTH CALLBACK] Profile completion check:', { needsCompletion });
+          console.log('✅ [AUTH CALLBACK] Login successful!');
+          console.log('🔍 [AUTH CALLBACK] Login result:', {
+            success: result.success,
+            needsProfileCompletion: result.needsProfileCompletion
+          });
 
-          // ✅ PERBAIKAN: Clear URL parameters untuk hindari re-trigger
+          // ✅ PERBAIKAN 5: Clear URL parameters SEBELUM redirect
           const cleanUrl = window.location.origin + window.location.pathname;
           window.history.replaceState({}, document.title, cleanUrl);
           
-          // ✅ PERBAIKAN KRITIS: Redirect logic yang BENAR
+          setStatus('Redirecting...');
+          
+          // ✅ PERBAIKAN 6: Gunakan HANYA data dari loginResult
+          const needsCompletion = result.needsProfileCompletion;
+          
+          console.log('🔍 [AUTH CALLBACK] Final decision:', { 
+            needsCompletion,
+            userProfileComplete: userData.isProfileComplete
+          });
+
+          // ✅ PERBAIKAN 7: Redirect langsung tanpa setTimeout
           if (needsCompletion) {
-            // ✅ FIRST TIME: User belum pernah isi profile, arahkan ke AboutYouPage
             console.log('🔍 [AUTH CALLBACK] FIRST TIME USER - Redirecting to AboutYouPage');
-            setTimeout(() => {
-              navigate('/about-you', { 
-                replace: true,
-                state: { 
-                  from: 'first-login',
-                  userEmail: userData.email 
-                }
-              });
-            }, 500);
+            navigate('/about-you', { 
+              replace: true,
+              state: { 
+                from: 'first-login',
+                userData: userData
+              }
+            });
           } else {
-            // ✅ RETURNING USER: Sudah pernah isi profile, arahkan ke LANDING PAGE
             console.log('🔍 [AUTH CALLBACK] RETURNING USER - Redirecting to LANDING PAGE');
-            setTimeout(() => {
-              navigate('/', { 
-                replace: true,
-                state: { 
-                  from: 'google-auth',
-                  welcomeBack: true 
-                }
-              });
-            }, 500);
+            navigate('/', { 
+              replace: true,
+              state: { 
+                from: 'auth-callback',
+                welcomeBack: true
+              }
+            });
           }
           
         } catch (parseError) {
           console.error('❌ [AUTH CALLBACK] Error parsing user data:', parseError);
           setError('Invalid user data format.');
+          setStatus('Data parsing failed');
           setTimeout(() => {
             navigate('/', { 
               state: { error: 'Invalid user data format.' },
@@ -127,19 +157,23 @@ const AuthCallback = () => {
       } catch (error) {
         console.error('❌ [AUTH CALLBACK] Unexpected error:', error);
         setError('An unexpected error occurred.');
+        setStatus('Unexpected error');
         setTimeout(() => {
           navigate('/', { 
             state: { error: 'An unexpected error occurred.' },
             replace: true 
           });
         }, 2000);
+      } finally {
+        // ✅ Reset processing flag
+        processingRef.current = false;
       }
     };
 
     handleAuthCallback();
-  }, [searchParams, navigate, login, hasProcessed, isAuthenticated, needsProfileCompletion]);
+  }, [searchParams, navigate, login, isAuthenticated, loading]);
 
-  // Tampilkan UI yang lebih informatif
+  // Tampilkan UI yang lebih informatif dengan status real-time
   return (
     <div style={{
       display: 'flex',
@@ -149,7 +183,9 @@ const AuthCallback = () => {
       flexDirection: 'column',
       gap: '16px',
       backgroundColor: '#f8fafc',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      padding: '20px',
+      textAlign: 'center'
     }}>
       {error ? (
         <>
@@ -201,8 +237,22 @@ const AuthCallback = () => {
           <div style={{ fontSize: '20px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
             Processing Authentication
           </div>
-          <div style={{ fontSize: '16px', color: '#6b7280' }}>
-            Please wait while we log you in...
+          <div style={{ fontSize: '16px', color: '#6b7280', marginBottom: '8px' }}>
+            {status}
+          </div>
+          <div style={{ 
+            fontSize: '14px', 
+            color: '#9ca3af',
+            backgroundColor: '#f1f5f9',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            maxWidth: '400px'
+          }}>
+            {hasProcessedRef.current ? '✓ Login processed' : '⏳ Processing login...'}
+            <br />
+            {loading ? '⏳ Loading auth context...' : '✓ Auth context ready'}
+            <br />
+            {processingRef.current ? '⏳ Processing...' : '✓ Ready to process'}
           </div>
         </>
       )}
