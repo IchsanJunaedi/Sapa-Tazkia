@@ -1014,10 +1014,8 @@ module.exports = {
   checkNIMAvailability,
   updateUserVerification,
   updateUserProfile,
-  // ✅ FUNGSI BARU
   findOrCreateUserByEmail,
   registerWithEmail,
-  // ✅ FUNGSI VERIFIKASI BARU
   generateVerificationCode,
   sendVerificationEmail,
   verifyEmailCode,
