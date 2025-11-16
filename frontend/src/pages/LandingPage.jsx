@@ -52,11 +52,126 @@ const Button = ({ children, onClick, className, variant = 'default', size = 'md'
 const GoogleIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-6 h-6 mr-3">
     <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.343c-1.896,3.101-5.466,6.17-11.343,6.17 c-6.958,0-12.632-5.673-12.632-12.632c0-6.958,5.674-12.632,12.632-12.632c3.23,0,6.347,1.385,8.441,3.483l5.882-5.882 C34.004,5.946,29.351,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20 C44,22.659,43.834,21.32,43.611,20.083z" />
-    <path fill="#FF3D00" d="M6.309,16.713L11.822,20.3L11.822,20.3C13.298,16.59,17.207,14,21.723,14c3.41,0,6.619,1.218,8.875,3.447l0.024,0.023 l5.845-5.844C34.004,5.946,29.351,4,24,4C16.326,4,9.66,8.275,6.309,14.713z" />
+    <path fill="#FF3D00" d="M6.309,16.713L11.822,20.3L11.822,20.3C13.298,16.59,17.207,14,21.723,14 c3.41,0,6.619,1.218,8.875,3.447l0.024,0.023 l5.845-5.844C34.004,5.946,29.351,4,24,4C16.326,4,9.66,8.275,6.309,14.713z" />
     <path fill="#4CAF50" d="M24,44c5.205,0,10.222-1.92,13.911-5.385l-6.736-6.495C30.297,33.024,27.265,34.08,24,34.08 c-5.877,0-9.448-3.07-11.344-6.171L6.309,33.287C9.66,39.725,16.326,44,24,44z" />
     <path fill="#1976D2" d="M43.611,20.083L43.611,20.083L42,20h-0.29c-0.122-0.638-0.344-1.254-0.627-1.851 C41.347,17.385,38.23,16,35,16c-3.265,0-6.297,1.056-8.214,3.003L35.343,28h7.957 C42.834,26.68,44,25.045,44,24C44,22.659,43.834,21.32,43.611,20.083z" />
   </svg>
 );
+
+// --- Komponen VerificationForm ---
+const VerificationForm = ({ email, onVerify, onResend, onBack, isLoading, error }) => {
+  const [code, setCode] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (code.trim().length >= 4) {
+      onVerify(code.trim());
+    }
+  };
+
+  const handleResend = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    setResendLoading(true);
+    setResendSuccess(false);
+    
+    try {
+      await onResend();
+      setResendSuccess(true);
+      setTimeout(() => setResendSuccess(false), 3000);
+    } catch (err) {
+      console.error('Resend failed:', err);
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && code.trim().length >= 4 && !isLoading) {
+      handleSubmit(e);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <h2 className="text-2xl font-bold text-gray-800 mb-2">Verifikasi Email</h2>
+      <p className="text-sm text-gray-600 mb-6">
+        Kami telah mengirim kode verifikasi ke: <strong>{email}</strong>
+      </p>
+
+      {resendSuccess && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
+          <span className="block sm:inline">✅ Kode verifikasi telah dikirim ulang!</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
+          <span className="block sm:inline">{error}</span>
+          <button 
+            type="button"
+            onClick={() => error && typeof error === 'object' && error.onClose ? error.onClose() : null}
+            className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Masukkan kode verifikasi"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          onKeyPress={handleKeyPress}
+          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+          disabled={isLoading}
+          maxLength={6}
+        />
+        <p className="text-xs text-gray-500 mt-2">
+          Masukkan kode 6 digit yang dikirim ke email Anda
+        </p>
+      </div>
+
+      <button
+        type="submit"
+        className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-3 ${
+          code.trim().length >= 4 && !isLoading ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
+        }`}
+        disabled={code.trim().length < 4 || isLoading}
+      >
+        {isLoading ? 'Memverifikasi...' : 'Verifikasi'}
+      </button>
+
+      <div className="flex space-x-3">
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={resendLoading}
+          className="flex-1 py-2 text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+        >
+          {resendLoading ? 'Mengirim...' : 'Kirim Ulang Kode'}
+        </button>
+        
+        <button
+          type="button"
+          onClick={onBack}
+          disabled={isLoading}
+          className="flex-1 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:text-gray-400"
+        >
+          Kembali
+        </button>
+      </div>
+    </form>
+  );
+};
 
 // --- Komponen AuthModal ---
 const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
@@ -66,18 +181,41 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
   const [error, setError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const { loginWithCredentials, registerWithEmail } = useAuth();
+  const { 
+    loginWithCredentials, 
+    registerWithEmail, 
+    verifyEmailCode, 
+    resendVerificationCode,
+    pendingVerification,
+    pendingEmail,
+    clearPendingVerification
+  } = useAuth();
 
   // Reset state ketika modal dibuka
   useEffect(() => {
     if (isOpen) {
-      setStep(initialStep);
-      setEmail('');
+      // Jika ada pending verification, langsung ke step verifikasi
+      if (pendingVerification && pendingEmail) {
+        setStep(1);
+        setEmail(pendingEmail);
+      } else {
+        setStep(initialStep);
+        setEmail('');
+      }
       setError(null);
       setIsLoading(false);
       setShowSuccess(false);
     }
-  }, [isOpen, initialStep]);
+  }, [isOpen, initialStep, pendingVerification, pendingEmail]);
+
+  // Handle ketika modal ditutup
+  const handleClose = () => {
+    // Clear pending verification state jika modal ditutup
+    if (pendingVerification) {
+      clearPendingVerification();
+    }
+    onClose();
+  };
 
   const handleContinue = async (e) => {
     if (e) {
@@ -116,18 +254,30 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
         }
 
         // Call register function for email
-        await registerWithEmail(email);
+        const result = await registerWithEmail(email);
         
-        // Show success message and redirect to AboutYouPage
-        setShowSuccess(true);
-        setTimeout(() => {
-          onClose();
-        }, 1500);
+        console.log('🔍 [AUTH MODAL] Register result:', result);
+        
+        // Jika memerlukan verifikasi, pindah ke step verifikasi
+        if (result.requiresVerification) {
+          setStep(1);
+          setShowSuccess(false);
+        } else {
+          // Jika tidak memerlukan verifikasi (langsung berhasil)
+          setShowSuccess(true);
+          setTimeout(() => {
+            handleClose();
+          }, 1500);
+        }
         
       } else {
         // NIM input - proceed with login
         console.log('🔍 [AUTH MODAL] NIM detected, proceeding with login:', email);
         await loginWithCredentials(email, email); // Using NIM as password for now
+        setShowSuccess(true);
+        setTimeout(() => {
+          handleClose();
+        }, 1500);
       }
     } catch (err) {
       console.error('❌ [AUTH MODAL] Auth failed:', err);
@@ -135,6 +285,54 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleVerification = async (code) => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      console.log('🔍 [AUTH MODAL] Verifying code for email:', email);
+      const result = await verifyEmailCode(email, code);
+      
+      console.log('🔍 [AUTH MODAL] Verification result:', result);
+      
+      if (result.success) {
+        setShowSuccess(true);
+        setTimeout(() => {
+          handleClose();
+        }, 1500);
+      } else {
+        throw new Error(result.error || 'Verifikasi gagal');
+      }
+    } catch (err) {
+      console.error('❌ [AUTH MODAL] Verification failed:', err);
+      setError(err.message || 'Kode verifikasi salah atau telah kedaluwarsa');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    try {
+      console.log('🔍 [AUTH MODAL] Resending code to:', email);
+      const result = await resendVerificationCode(email);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Gagal mengirim ulang kode');
+      }
+      
+      return result;
+    } catch (err) {
+      console.error('❌ [AUTH MODAL] Resend failed:', err);
+      throw err;
+    }
+  };
+
+  const handleBackToEmail = () => {
+    setStep(0);
+    setError('');
+    clearPendingVerification();
   };
 
   const handleGoogleLogin = (e) => {
@@ -150,7 +348,9 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && email && !isLoading) {
-      handleContinue(e);
+      if (step === 0) {
+        handleContinue(e);
+      }
     }
   };
 
@@ -166,7 +366,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
 
             {showSuccess && (
               <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
-                <span className="block sm:inline">✅ Registrasi berhasil! Mengarahkan ke halaman profil...</span>
+                <span className="block sm:inline">✅ Autentikasi berhasil! Mengarahkan...</span>
               </div>
             )}
 
@@ -218,13 +418,16 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
             <div className="mb-4">
               <input
                 type="text"
-                placeholder="Email Address"
+                placeholder="Masukkan Email atau NIM"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyPress={handleKeyPress}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
                 disabled={isLoading}
               />
+              <p className="text-xs text-gray-500 mt-2">
+                Untuk email: gunakan email Tazkia (@student.tazkia.ac.id, @student.stmik.tazkia.ac.id, atau @tazkia.ac.id)
+              </p>
             </div>
 
             <button
@@ -234,18 +437,30 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
               }`}
               disabled={!email || isLoading}
             >
-              {isLoading ? 'Memproses...' : (email.includes('@') ? 'Continue' : 'Continue')}
+              {isLoading ? 'Memproses...' : 'Lanjutkan'}
             </button>
 
             <button 
               type="button"
-              onClick={onClose} 
+              onClick={handleClose} 
               className="w-full text-sm text-gray-500 hover:text-gray-900 mt-2" 
               disabled={isLoading}
             >
               Tutup
             </button>
           </form>
+        );
+
+      case 1:
+        return (
+          <VerificationForm
+            email={email}
+            onVerify={handleVerification}
+            onResend={handleResendCode}
+            onBack={handleBackToEmail}
+            isLoading={isLoading}
+            error={error}
+          />
         );
 
       default:
@@ -260,8 +475,9 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm relative transform transition-all duration-300 scale-100">
         <button 
           type="button"
-          onClick={onClose} 
+          onClick={handleClose} 
           className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-900 rounded-full hover:bg-gray-100"
+          disabled={isLoading}
         >
           <X size={24} />
         </button>
@@ -276,14 +492,16 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
 // --- Komponen Utama Landing Page ---
 const LandingPage = () => {
   const navigate = useNavigate();
-  const location = useLocation(); // ✅ DITAMBAHKAN
+  const location = useLocation();
   const { 
     user, 
     logout, 
     loading: authLoading,
     isAuthenticated,
     handleGoogleAuthCallback,
-    needsProfileCompletion
+    needsProfileCompletion,
+    pendingVerification,
+    pendingEmail
   } = useAuth();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -299,7 +517,16 @@ const LandingPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [chatToDelete, setChatToDelete] = useState(null);
 
-  // ✅ TAMBAHAN: Load chat history untuk user yang login - DIPINDAHKAN KE ATAS
+  // ✅ TAMBAHAN: Auto open modal jika ada pending verification
+  useEffect(() => {
+    if (pendingVerification && pendingEmail && !isModalOpen) {
+      console.log('🔍 [LANDING PAGE] Auto-opening modal for pending verification');
+      setInitialModalStep(1);
+      setIsModalOpen(true);
+    }
+  }, [pendingVerification, pendingEmail, isModalOpen]);
+
+  // ✅ TAMBAHAN: Load chat history untuk user yang login
   const loadChatHistory = useCallback(async () => {
     if (!user || !user.id) {
       console.log('🔍 [LANDING PAGE] No user ID, skipping chat history load');
@@ -363,64 +590,47 @@ const LandingPage = () => {
     handleAuthCallback();
   }, [handleGoogleAuthCallback]);
 
-  // ✅ PERBAIKAN: Handle redirect berdasarkan user status - FIXED
+  // ✅ PERBAIKAN: Handle redirect berdasarkan user status
   useEffect(() => {
-  console.log('🔍 [LANDING PAGE] Auth effect - User:', user, 'Authenticated:', isAuthenticated, 'Loading:', authLoading);
+    console.log('🔍 [LANDING PAGE] Auth effect - User:', user, 'Authenticated:', isAuthenticated, 'Loading:', authLoading);
 
-  // Only proceed if we have user data and not loading
-  if (!authLoading && isAuthenticated && user) {
-    console.log('🔍 [LANDING PAGE] Checking profile status:', {
-      isProfileComplete: user.isProfileComplete,
-      fullName: user.fullName,
-      needsProfileCompletion: needsProfileCompletion()
-    });
+    // Only proceed if we have user data and not loading
+    if (!authLoading && isAuthenticated && user) {
+      console.log('🔍 [LANDING PAGE] Checking profile status:', {
+        isProfileComplete: user.isProfileComplete,
+        fullName: user.fullName,
+        needsProfileCompletion: needsProfileCompletion()
+      });
 
-    // ✅ PERBAIKAN: Coba sync profile completion status terlebih dahulu
-    const checkProfileStatus = async () => {
-      try {
-        // Jika user memiliki nama valid tapi isProfileComplete false, coba sync
-        const hasValidName = user.fullName && user.fullName !== 'User' && user.fullName.length >= 2;
-        if (hasValidName && !user.isProfileComplete) {
-          console.log('🔍 [LANDING PAGE] User has valid name but profile not complete, syncing...');
-          // Tidak perlu await di sini, biarkan proses berjalan di background
+      // Check jika user perlu complete profile
+      const shouldCompleteProfile = needsProfileCompletion();
+
+      if (shouldCompleteProfile) {
+        console.log('🔍 [LANDING PAGE] User needs profile completion, checking current page...');
+        
+        const currentPath = window.location.pathname;
+        const isComingFromAboutYou = location.state?.from === 'profile-completion';
+        const isOnAboutYouPage = currentPath === '/about-you' || currentPath.includes('/about-you');
+        const isSubmitting = location.state?.isSubmitting;
+        
+        // Hanya redirect jika BENAR-BENAR belum di AboutYouPage dan tidak berasal dari submission
+        if (!isOnAboutYouPage && !isComingFromAboutYou && !isSubmitting) {
+          console.log('🔍 [LANDING PAGE] Redirecting to AboutYouPage');
+          navigate('/about-you', { 
+            state: { 
+              from: 'landing-page',
+              userEmail: user.email 
+            } 
+          });
+        } else {
+          console.log('🔍 [LANDING PAGE] Already on/about to go to AboutYouPage, skipping redirect');
         }
-      } catch (error) {
-        console.warn('⚠️ [LANDING PAGE] Sync check failed:', error);
-      }
-    };
-
-    checkProfileStatus();
-
-    // Check jika user perlu complete profile - GUNAKAN FUNGSI DARI AUTHCONTEXT
-    const shouldCompleteProfile = needsProfileCompletion();
-
-    if (shouldCompleteProfile) {
-      console.log('🔍 [LANDING PAGE] User needs profile completion, checking current page...');
-      
-      // ✅ PERBAIKAN: Cegah redirect loop dengan kondisi yang lebih ketat
-      const currentPath = window.location.pathname;
-      const isComingFromAboutYou = location.state?.from === 'profile-completion';
-      const isOnAboutYouPage = currentPath === '/about-you' || currentPath.includes('/about-you');
-      const isSubmitting = location.state?.isSubmitting;
-      
-      // Hanya redirect jika BENAR-BENAR belum di AboutYouPage dan tidak berasal dari submission
-      if (!isOnAboutYouPage && !isComingFromAboutYou && !isSubmitting) {
-        console.log('🔍 [LANDING PAGE] Redirecting to AboutYouPage');
-        navigate('/about-you', { 
-          state: { 
-            from: 'landing-page',
-            userEmail: user.email 
-          } 
-        });
       } else {
-        console.log('🔍 [LANDING PAGE] Already on/about to go to AboutYouPage, skipping redirect');
+        console.log('🔍 [LANDING PAGE] User profile complete, loading chat history');
+        loadChatHistory();
       }
-    } else {
-      console.log('🔍 [LANDING PAGE] User profile complete, loading chat history');
-      loadChatHistory();
     }
-  }
-}, [isAuthenticated, user, authLoading, needsProfileCompletion, navigate, loadChatHistory, location.state?.from, location.state?.isSubmitting]);
+  }, [isAuthenticated, user, authLoading, needsProfileCompletion, navigate, loadChatHistory, location.state?.from, location.state?.isSubmitting]);
 
   // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
   const getUserName = useCallback(() => {
@@ -698,7 +908,7 @@ const LandingPage = () => {
         </div>
       </div>
 
-      {/* ✅ Auth Modal dengan form baru */}
+      {/* ✅ Auth Modal dengan form verifikasi */}
       <AuthModal
         isOpen={isModalOpen}
         onClose={closeModal}
