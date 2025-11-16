@@ -21,7 +21,7 @@ const googleCallback = (req, res, next) => {
   })(req, res, next);
 };
 
-// PERBAIKAN: Google Callback Success - KIRIM USER DATA LENGKAP
+// PERBAIKAN: Google Callback Success - DITAMBAH VALIDASI DOMAIN
 const googleCallbackSuccess = async (req, res) => {
   try {
     console.log('[DEBUG] Google callback success handler called');
@@ -33,7 +33,24 @@ const googleCallbackSuccess = async (req, res) => {
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=no_user_session`);
     }
 
-    console.log(`[DEBUG] Google OAuth successful for user: ${req.user.email}`);
+    const userEmail = req.user.email;
+    console.log(`[DEBUG] Google OAuth successful for user: ${userEmail}`);
+
+    // ✅ ✅ ✅ TAMBAHKAN VALIDASI DOMAIN DI SINI ✅ ✅ ✅
+    const validDomains = [
+      'student.tazkia.ac.id',
+      'student.stmik.tazkia.ac.id', 
+      'tazkia.ac.id'
+    ];
+    
+    const userDomain = userEmail.split('@')[1];
+    const isValidDomain = validDomains.includes(userDomain);
+    
+    if (!isValidDomain) {
+      console.log(`🚫 [AUTH CONTROLLER] Google login rejected - Invalid domain: ${userEmail}`);
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=invalid_domain&message=Hanya email Tazkia yang diizinkan&email=${encodeURIComponent(userEmail)}`);
+    }
+    // ✅ ✅ ✅ END OF VALIDASI ✅ ✅ ✅
 
     // Generate token untuk API calls
     const token = authService.generateToken(req.user.id);
@@ -764,7 +781,6 @@ module.exports = {
   login,
   register,
   registerWithEmail,
-  // ✅ ENDPOINT VERIFIKASI BARU
   verifyEmailCode,
   resendVerificationCode,
   checkEmailVerification,
