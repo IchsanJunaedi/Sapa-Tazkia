@@ -1,6 +1,6 @@
 const authService = require('../services/authService');
 const academicService = require('../services/academicService');
-
+const emailService = require('../services/emailService');
 
 const googleAuth = (req, res, next) => {
   console.log('[DEBUG] Initiating Google OAuth');
@@ -54,7 +54,8 @@ const googleCallbackSuccess = async (req, res) => {
       status: req.user.status,
       authMethod: req.user.authMethod,
       userType: req.user.userType,
-      isProfileComplete: req.user.isProfileComplete
+      isProfileComplete: req.user.isProfileComplete,
+      isEmailVerified: req.user.isEmailVerified
     };
 
     console.log(`[DEBUG] User data to send:`, userData);
@@ -74,7 +75,209 @@ const googleCallbackSuccess = async (req, res) => {
   }
 };
 
-// ✅ BARU: REGISTER FUNCTION
+// ✅ BARU: VERIFY EMAIL CODE ENDPOINT
+const verifyEmailCode = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    console.log('🔍 [AUTH CONTROLLER] Verify email code request:', { email, code });
+
+    // Validasi input
+    if (!email || !code) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email dan kode verifikasi harus diisi'
+      });
+    }
+
+    // Validasi format kode (6 digit)
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Kode verifikasi harus 6 digit angka'
+      });
+    }
+
+    // Panggil service verifikasi
+    const result = await authService.verifyEmailCode(email, code);
+
+    if (result.success) {
+      console.log('✅ [AUTH CONTROLLER] Email verification successful:', email);
+      
+      // Kirim email welcome setelah verifikasi berhasil
+      try {
+        await emailService.sendWelcomeEmail(
+          email, 
+          result.user.fullName || 'User', 
+          result.user.userType
+        );
+        console.log('✅ [AUTH CONTROLLER] Welcome email sent to:', email);
+      } catch (emailError) {
+        console.log('⚠️ [AUTH CONTROLLER] Failed to send welcome email:', emailError.message);
+        // Continue even if welcome email fails
+      }
+
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        token: result.token,
+        user: {
+          id: result.user.id,
+          nim: result.user.nim,
+          email: result.user.email,
+          fullName: result.user.fullName,
+          status: result.user.status,
+          authMethod: result.user.authMethod,
+          userType: result.user.userType,
+          isProfileComplete: result.user.isProfileComplete,
+          isEmailVerified: result.user.isEmailVerified
+        },
+        requiresProfileCompletion: !result.user.isProfileComplete
+      });
+    } else {
+      console.log('❌ [AUTH CONTROLLER] Email verification failed:', result.message);
+      res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ [AUTH CONTROLLER] Verify email code error:', error);
+    
+    // Handle specific errors
+    if (error.message.includes('tidak valid') || error.message.includes('kadaluarsa')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    if (error.message.includes('Terlalu banyak percobaan')) {
+      return res.status(429).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server saat verifikasi email'
+    });
+  }
+};
+
+// ✅ BARU: RESEND VERIFICATION CODE ENDPOINT
+const resendVerificationCode = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    console.log('🔍 [AUTH CONTROLLER] Resend verification code request:', email);
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email harus diisi'
+      });
+    }
+
+    // Panggil service untuk kirim ulang kode
+    const result = await authService.resendVerificationCode(email);
+
+    if (result.success) {
+      console.log('✅ [AUTH CONTROLLER] Verification code resent to:', email);
+      res.status(200).json({
+        success: true,
+        message: result.message
+      });
+    } else {
+      console.log('❌ [AUTH CONTROLLER] Resend verification code failed:', result.message);
+      res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ [AUTH CONTROLLER] Resend verification code error:', error);
+    
+    if (error.message === 'Email sudah terverifikasi') {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    if (error.message === 'User tidak ditemukan') {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server saat mengirim ulang kode verifikasi'
+    });
+  }
+};
+
+// ✅ BARU: CHECK EMAIL VERIFICATION STATUS
+const checkEmailVerification = async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    console.log('🔍 [AUTH CONTROLLER] Check email verification status:', email);
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email harus diisi'
+      });
+    }
+
+    // Cek user di database
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        isEmailVerified: true,
+        status: true,
+        verificationCodeExpires: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User tidak ditemukan'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        email: user.email,
+        isEmailVerified: user.isEmailVerified,
+        status: user.status,
+        hasActiveVerification: user.verificationCodeExpires && new Date() < user.verificationCodeExpires
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [AUTH CONTROLLER] Check email verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server saat mengecek status verifikasi'
+    });
+  }
+};
+
+// ✅ BARU: REGISTER FUNCTION - DIPERBAIKI DENGAN VERIFIKASI
 const register = async (req, res) => {
   try {
     const { fullName, nim, email, password } = req.body;
@@ -94,7 +297,20 @@ const register = async (req, res) => {
 
     if (result.success) {
       console.log('✅ [AUTH CONTROLLER] Registration successful:', email);
-      res.status(201).json(result);
+      
+      // Kirim response yang sesuai dengan flow verifikasi
+      if (result.requiresVerification) {
+        res.status(201).json({
+          success: true,
+          message: result.message,
+          requiresVerification: true,
+          data: {
+            email: result.data.email
+          }
+        });
+      } else {
+        res.status(201).json(result);
+      }
     } else {
       console.log('❌ [AUTH CONTROLLER] Registration failed:', result.message);
       res.status(400).json(result);
@@ -109,40 +325,24 @@ const register = async (req, res) => {
   }
 };
 
-// PERBAIKAN: Login dengan validasi yang lebih ketat
+// PERBAIKAN: Login dengan validasi yang lebih ketat - DIPERBAIKI DENGAN VERIFIKASI
 const login = async (req, res) => {
   try {
-    const { nim, password } = req.body;
+    const { identifier, password } = req.body;
     const ipAddress = req.ip;
     const userAgent = req.get('User-Agent');
 
-    console.log(`[DEBUG] Login attempt for NIM: ${nim}`);
+    console.log(`[DEBUG] Login attempt for identifier: ${identifier}`);
 
     // Validasi input
-    if (!nim || !password) {
+    if (!identifier || !password) {
       return res.status(400).json({
         success: false,
-        message: 'NIM dan password harus diisi'
+        message: 'Email/NIM dan password harus diisi'
       });
     }
 
-    // Validasi format NIM (minimal 3 digit)
-    if (nim.length < 3) {
-      return res.status(400).json({
-        success: false,
-        message: 'Format NIM tidak valid'
-      });
-    }
-
-    // Validasi format password (minimal 6 karakter)
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password harus minimal 6 karakter'
-      });
-    }
-
-    const result = await authService.login(nim, password, ipAddress, userAgent);
+    const result = await authService.login(identifier, password, ipAddress, userAgent);
 
     if (result.success) {
       // Login ke Passport session untuk konsistensi
@@ -154,7 +354,7 @@ const login = async (req, res) => {
 
       console.log(`[DEBUG] Login successful for user: ${result.user.email}`);
 
-      // PERBAIKAN: Kirim user data yang lengkap
+      // PERBAIKAN: Kirim user data yang lengkap termasuk status verifikasi
       res.status(200).json({
         success: true,
         message: result.message,
@@ -167,11 +367,23 @@ const login = async (req, res) => {
           status: result.user.status,
           authMethod: result.user.authMethod,
           userType: result.user.userType,
-          isProfileComplete: result.user.isProfileComplete
+          isProfileComplete: result.user.isProfileComplete,
+          isEmailVerified: result.user.isEmailVerified
         }
       });
     } else {
-      console.log(`[DEBUG] Login failed for NIM: ${nim} - ${result.message}`);
+      console.log(`[DEBUG] Login failed for identifier: ${identifier} - ${result.message}`);
+      
+      // Handle case where email verification is required
+      if (result.requiresVerification) {
+        return res.status(403).json({
+          success: false,
+          message: result.message,
+          requiresVerification: true,
+          email: result.email
+        });
+      }
+      
       res.status(401).json({
         success: false,
         message: result.message
@@ -186,7 +398,7 @@ const login = async (req, res) => {
   }
 };
 
-// ✅ BARU: REGISTER WITH EMAIL ONLY
+// ✅ BARU: REGISTER WITH EMAIL ONLY - DIPERBAIKI
 const registerWithEmail = async (req, res) => {
   try {
     const { email } = req.body;
@@ -200,15 +412,34 @@ const registerWithEmail = async (req, res) => {
       });
     }
 
+    // Validasi format email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Format email tidak valid'
+      });
+    }
+
     // Panggil service registerWithEmail
     const result = await authService.registerWithEmail(email);
 
     if (result.success) {
       console.log('✅ [AUTH CONTROLLER] Email registration successful:', email);
-      return res.status(201).json(result);
+      return res.status(201).json({
+        success: true,
+        message: result.message,
+        requiresVerification: true,
+        data: {
+          email: result.data.email
+        }
+      });
     } else {
       console.log('❌ [AUTH CONTROLLER] Email registration failed:', result.message);
-      return res.status(400).json(result);
+      return res.status(400).json({
+        success: false,
+        message: result.message
+      });
     }
 
   } catch (error) {
@@ -375,7 +606,7 @@ const checkNIM = async (req, res) => {
   }
 };
 
-// PERBAIKAN: Update verify endpoint
+// PERBAIKAN: Update verify endpoint - DIPERBAIKI DENGAN VERIFIKASI
 const verify = async (req, res) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -392,7 +623,7 @@ const verify = async (req, res) => {
     const result = await authService.verifySession(token);
     
     if (result.valid) {
-      // PERBAIKAN: Kirim user data yang lengkap
+      // PERBAIKAN: Kirim user data yang lengkap termasuk status verifikasi
       res.json({
         success: true,
         valid: true,
@@ -404,7 +635,8 @@ const verify = async (req, res) => {
           status: result.user.status,
           authMethod: result.user.authMethod,
           userType: result.user.userType,
-          isProfileComplete: result.user.isProfileComplete
+          isProfileComplete: result.user.isProfileComplete,
+          isEmailVerified: result.user.isEmailVerified
         }
       });
     } else {
@@ -430,7 +662,12 @@ const healthCheck = (req, res) => {
     success: true,
     message: 'Auth service is healthy',
     timestamp: new Date().toISOString(),
-    service: 'Authentication Service'
+    service: 'Authentication Service',
+    features: {
+      emailVerification: true,
+      googleOAuth: true,
+      sessionManagement: true
+    }
   });
 };
 
@@ -525,8 +762,12 @@ module.exports = {
   googleCallback,
   googleCallbackSuccess,
   login,
-  register,           // ✅ DITAMBAHKAN
-  registerWithEmail,  // ✅ DITAMBAHKAN
+  register,
+  registerWithEmail,
+  // ✅ ENDPOINT VERIFIKASI BARU
+  verifyEmailCode,
+  resendVerificationCode,
+  checkEmailVerification,
   verifyStudent,
   updateVerification,  
   updateProfile,
