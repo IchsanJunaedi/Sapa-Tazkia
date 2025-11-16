@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
 import ChatPage from './pages/ChatPage';
+import AboutYouPage from './pages/AboutYouPage'; // ✅ IMPORT BARU
 import AuthCallback from './pages/AuthCallback';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
@@ -16,6 +17,14 @@ function App() {
           <Route path="/auth/callback" element={<AuthCallback />} />
           
           {/* Protected Routes - hanya bisa diakses jika sudah login */}
+          <Route 
+            path="/about-you" 
+            element={
+              <ProtectedRoute>
+                <AboutYouPage />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/chat" 
             element={

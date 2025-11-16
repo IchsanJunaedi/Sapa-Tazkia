@@ -11,7 +11,186 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const prisma = new PrismaClient();
 
 // ========================================================
-// KONFIGURASI PASSPORT (GOOGLE STRATEGY) - DIPERBAIKI NIM EXTRACTION
+// ✅ BARU: FUNGSI FIND OR CREATE USER BY EMAIL
+// ========================================================
+
+const findOrCreateUserByEmail = async (email, googleData = null) => {
+  try {
+    console.log('🔍 [AUTH SERVICE] Find or create user by email:', email);
+
+    // Check if user exists
+    let user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (user) {
+      console.log('✅ [AUTH SERVICE] User found:', user.nim);
+      return { user, isNewUser: false };
+    }
+
+    // EXTRACT NIM FROM EMAIL IF STUDENT EMAIL
+    let nim = null;
+    let userType = 'regular';
+    let fullName = '';
+    
+    if (email.includes('@student.tazkia.ac.id') || email.includes('@student.stmik.tazkia.ac.id')) {
+      // Extract NIM from student email: 102834567812.gab@student.tazkia.ac.id
+      const nimMatch = email.match(/^(\d+)\./);
+      if (nimMatch && nimMatch[1]) {
+        nim = nimMatch[1];
+        userType = 'student';
+        fullName = ''; // Will be filled in AboutYouPage
+        console.log('🎓 [AUTH SERVICE] Student detected, NIM:', nim);
+      }
+    }
+
+    // If not student email or NIM not extracted, generate random NIM
+    if (!nim) {
+      nim = 'E' + Math.floor(10000000 + Math.random() * 90000000).toString();
+      fullName = googleData?.name || '';
+      console.log('👤 [AUTH SERVICE] Regular user, generated NIM:', nim);
+    }
+
+    // Use Google data if available
+    if (googleData?.name && !fullName) {
+      fullName = googleData.name;
+    }
+
+    // Create user data
+    const userData = {
+      nim: nim,
+      email: email,
+      fullName: fullName,
+      authMethod: googleData ? 'google' : 'email',
+      userType: userType,
+      isProfileComplete: !!fullName, // If name is provided, consider profile complete
+      status: 'active'
+    };
+
+    user = await prisma.user.create({
+      data: userData
+    });
+
+    console.log('✅ [AUTH SERVICE] New user created:', { 
+      email: user.email, 
+      nim: user.nim, 
+      type: userType,
+      isNewUser: true 
+    });
+
+    return { user, isNewUser: true };
+
+  } catch (error) {
+    console.error('❌ [AUTH SERVICE] Find or create user error:', error);
+    throw error;
+  }
+};
+
+
+// ========================================================
+// ✅ BARU: FUNGSI REGISTER WITH EMAIL ONLY
+// ========================================================
+
+const registerWithEmail = async (email) => {
+  try {
+    console.log('🔍 [AUTH SERVICE] Register with email:', email);
+
+    if (!email) {
+      throw new Error('Email is required');
+    }
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (existingUser) {
+      throw new Error('Email already registered');
+    }
+
+    // EXTRACT NIM FROM EMAIL IF STUDENT EMAIL
+    let nim = null;
+    let userType = 'regular';
+    
+    if (email.includes('@student.tazkia.ac.id') || email.includes('@student.stmik.tazkia.ac.id')) {
+      // Extract NIM from student email: 102834567812.gab@student.tazkia.ac.id
+      const nimMatch = email.match(/^(\d+)\./);
+      if (nimMatch && nimMatch[1]) {
+        nim = nimMatch[1];
+        userType = 'student';
+        console.log('🎓 [AUTH SERVICE] Student detected, NIM:', nim);
+      }
+    }
+
+    // If not student email, generate random NIM
+    if (!nim) {
+      nim = 'E' + Math.floor(10000000 + Math.random() * 90000000).toString();
+      console.log('👤 [AUTH SERVICE] Regular user, generated NIM:', nim);
+    }
+
+    // Create new user
+    const newUser = await prisma.user.create({
+      data: {
+        nim: nim,
+        email: email,
+        fullName: '', // Will be filled in AboutYouPage
+        authMethod: 'email',
+        userType: userType,
+        isProfileComplete: false,
+        status: 'active'
+      }
+    });
+
+    console.log('✅ [AUTH SERVICE] User created with email:', { 
+      email: newUser.email, 
+      nim: newUser.nim, 
+      type: userType 
+    });
+
+    // Generate token
+    const token = jwt.sign(
+      { 
+        userId: newUser.id,
+        nim: newUser.nim,
+        email: newUser.email,
+        isProfileComplete: newUser.isProfileComplete,
+        userType: userType
+      },
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '7d' }
+    );
+
+    // Create session
+    await createSession(newUser.id, token, 'email-registration', 'email-registration');
+
+    return {
+      success: true,
+      message: userType === 'student' 
+        ? 'Registrasi berhasil. Silakan lengkapi profil Anda.' 
+        : 'Registration successful. Please complete your profile.',
+      data: {
+        user: {
+          id: newUser.id,
+          nim: newUser.nim,
+          email: newUser.email,
+          fullName: newUser.fullName,
+          isProfileComplete: newUser.isProfileComplete,
+          userType: userType,
+          authMethod: newUser.authMethod
+        },
+        token: token,
+        requiresProfileCompletion: true
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ [AUTH SERVICE] Register with email error:', error);
+    throw error;
+  }
+};
+
+// ========================================================
+// KONFIGURASI PASSPORT (GOOGLE STRATEGY) - DIPERBAIKI DENGAN FUNGSI BARU
 // ========================================================
 
 // HANYA JALANKAN JIKA ADA GOOGLE CLIENT ID
@@ -40,117 +219,19 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
           const userEmail = profile.emails[0].value;
           
-          // --- LOGIKA EKSTRAKSI NIM - DIPERBAIKI ---
-          let studentNim = null;
-          const academicDomain = '@student.stmik.tazkia.ac.id';
-          
-          if (userEmail.endsWith(academicDomain)) {
-              // PERBAIKAN: Ambil bagian sebelum @ sebagai NIM
-              studentNim = userEmail.split('@')[0];
-              
-              // PERBAIKAN: Hapus karakter non-digit jika ada (seperti titik)
-              studentNim = studentNim.replace(/\D/g, '');
-              
-              // Validasi panjang NIM (minimal 10 digit)
-              if (studentNim.length >= 10) {
-                  console.log(`[DEBUG] NIM ditemukan: ${studentNim} dari email: ${userEmail}`);
-              } else {
-                  console.log(`[WARNING] NIM terlalu pendek: ${studentNim} dari email: ${userEmail}`);
-                  // Tetap gunakan, tapi log warning
-              }
-          } else {
-              console.log(`[DEBUG] Email non-akademik: ${userEmail}`);
-              return done(new Error('Hanya email akademik (@student.stmik.tazkia.ac.id) yang diizinkan'), false);
-          }
-
-          // Validasi NIM berhasil diekstrak
-          if (!studentNim || studentNim.length < 10) {
-            console.error('[ERROR] Gagal mengekstrak NIM yang valid dari email:', userEmail);
-            return done(new Error('Gagal mengekstrak NIM dari email. Pastikan format email benar.'), false);
-          }
-
-          console.log(`[DEBUG] Final NIM: ${studentNim}`);
-
-          // 1. Cek apakah user sudah ada berdasarkan Google ID
-          let user = await prisma.user.findUnique({
-            where: { googleId: profile.id },
+          // ✅ PERBAIKAN: Gunakan fungsi findOrCreateUserByEmail yang baru
+          const { user, isNewUser } = await findOrCreateUserByEmail(userEmail, {
+            name: profile.displayName,
+            picture: profile.photos?.[0]?.value
           });
 
-          console.log(`[DEBUG] User by Google ID:`, user ? 'Found' : 'Not found');
-
-          if (user) {
-            console.log(`[DEBUG] User found by Google ID, logging in`);
-            
-            // PERBAIKAN: Update NIM jika masih null atau berbeda
-            if (!user.nim || user.nim !== studentNim) {
-              console.log(`[DEBUG] Updating NIM for existing user: ${user.nim} -> ${studentNim}`);
-              user = await prisma.user.update({
-                where: { id: user.id },
-                data: { nim: studentNim }
-              });
-            }
-            
-            return done(null, user);
-          }
-
-          // 2. Cek user berdasarkan email
-          user = await prisma.user.findUnique({
-            where: { email: userEmail },
-          });
-
-          console.log(`[DEBUG] User by email:`, user ? 'Found' : 'Not found');
-
-          if (user) {
-            console.log(`[DEBUG] User found by email, updating Google ID dan NIM`);
-            
-            // PERBAIKAN: Update user dengan Google ID dan NIM yang benar
-            const updatedUser = await prisma.user.update({
-              where: { email: userEmail },
-              data: { 
-                googleId: profile.id,
-                nim: studentNim // SELALU update dengan NIM yang diekstrak
-              }, 
-            });
-            
-            console.log(`[DEBUG] User updated with Google ID and NIM`);
-            return done(null, updatedUser);
-          }
-
-          // 3. Cek apakah NIM sudah digunakan oleh user lain
-          const existingUserWithNim = await prisma.user.findUnique({
-            where: { nim: studentNim },
-          });
-
-          if (existingUserWithNim) {
-            console.error(`[ERROR] NIM ${studentNim} sudah digunakan oleh user lain`);
-            return done(new Error('NIM sudah digunakan oleh akun lain. Silakan hubungi administrator.'), false);
-          }
-
-          // 4. Buat user baru
-          console.log(`[DEBUG] Creating new user with:`, {
+          console.log(`[DEBUG] Google OAuth result:`, {
             email: userEmail,
-            nim: studentNim,
-            name: profile.displayName
+            isNewUser: isNewUser,
+            nim: user.nim
           });
 
-          const newUser = await prisma.user.create({
-            data: {
-              googleId: profile.id,
-              email: userEmail,
-              fullName: profile.displayName,
-              nim: studentNim,
-              passwordHash: null, 
-              status: 'active'
-            },
-          });
-
-          console.log(`[DEBUG] New user created successfully:`, {
-            id: newUser.id,
-            email: newUser.email,
-            nim: newUser.nim
-          });
-
-          return done(null, newUser);
+          return done(null, user);
           
         } catch (error) {
           console.error(`[ERROR] Google Strategy error:`, error);
@@ -170,18 +251,25 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     try {
       console.log(`[DEBUG] Deserializing user:`, id);
       
-      // PERBAIKAN: Handle both string and number IDs
-      const userId = typeof id === 'string' ? parseInt(id, 10) : id;
-      
       const user = await prisma.user.findUnique({ 
-        where: { id: userId },
+        where: { id: id },
         select: {
           id: true,
           email: true,
           fullName: true,
           nim: true,
           googleId: true,
-          status: true
+          status: true,
+          authMethod: true,
+          userType: true,
+          isProfileComplete: true,
+          passwordHash: true,
+          phone: true,
+          programStudiId: true,
+          angkatan: true,
+          createdAt: true,
+          updatedAt: true,
+          lastLogin: true
         }
       });
       
@@ -293,7 +381,14 @@ const verifySession = async (token) => {
             email: true,
             fullName: true,
             nim: true,
-            status: true
+            status: true,
+            authMethod: true,
+            userType: true,
+            isProfileComplete: true,
+            passwordHash: true,
+            phone: true,
+            programStudiId: true,
+            angkatan: true
           }
         } 
       }
@@ -316,6 +411,84 @@ const verifySession = async (token) => {
   } catch (error) {
     console.error('[ERROR] Verify session error:', error);
     return { valid: false, message: 'Terjadi kesalahan saat verifikasi session' };
+  }
+};
+
+// ========================================================
+// ✅ BARU: FUNGSI VERIFICATION MANAGEMENT - DIPERBAIKI
+// ========================================================
+
+/**
+ * Update user verification status
+ */
+const updateUserVerification = async (userId, verificationData) => {
+  try {
+    console.log('🔍 [AUTH SERVICE] Updating user verification:', { userId, verificationData });
+
+    const updateData = {
+      nim: verificationData.nim,
+      fullName: verificationData.fullName
+    };
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        nim: true,
+        status: true,
+        authMethod: true,
+        userType: true,
+        isProfileComplete: true
+      }
+    });
+
+    console.log('✅ [AUTH SERVICE] User verification updated:', updatedUser);
+    return updatedUser;
+
+  } catch (error) {
+    console.error('❌ [AUTH SERVICE] Update user verification error:', error);
+    throw new Error('Gagal memperbarui status verifikasi user');
+  }
+};
+
+/**
+ * Update user profile
+ */
+const updateUserProfile = async (userId, profileData) => {
+  try {
+    console.log('🔍 [AUTH SERVICE] Updating user profile:', { userId, profileData });
+
+    const updateData = {
+      email: profileData.email,
+      nim: profileData.nim,
+      fullName: profileData.fullName,
+      isProfileComplete: true // Mark as complete after profile update
+    };
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        nim: true,
+        status: true,
+        authMethod: true,
+        userType: true,
+        isProfileComplete: true
+      }
+    });
+
+    console.log('✅ [AUTH SERVICE] User profile updated:', updatedUser);
+    return updatedUser;
+
+  } catch (error) {
+    console.error('❌ [AUTH SERVICE] Update user profile error:', error);
+    throw new Error('Gagal memperbarui profile user');
   }
 };
 
@@ -374,11 +547,6 @@ const register = async (userData) => {
       return { success: false, message: 'Password harus minimal 6 karakter' };
     }
 
-    // Validasi format email kampus
-    if (!email.endsWith('@student.stmik.tazkia.ac.id')) {
-      return { success: false, message: 'Hanya email akademik (@student.stmik.tazkia.ac.id) yang diizinkan' };
-    }
-
     // Cek apakah email sudah ada
     const emailExists = await prisma.user.findUnique({ 
       where: { email: email.trim() } 
@@ -408,6 +576,9 @@ const register = async (userData) => {
         nim: nim.trim(),
         email: email.trim(),
         passwordHash: hashedPassword,
+        authMethod: 'nim',
+        userType: 'student',
+        isProfileComplete: true, // Complete profile for NIM registration
         status: 'active'
       },
     });
@@ -432,7 +603,10 @@ const register = async (userData) => {
         fullName: user.fullName,
         email: user.email,
         nim: user.nim,
-        status: user.status
+        status: user.status,
+        authMethod: user.authMethod,
+        userType: user.userType,
+        isProfileComplete: user.isProfileComplete
       },
       token,
     };
@@ -446,76 +620,90 @@ const register = async (userData) => {
 };
 
 // PERBAIKAN: Login function dengan validasi yang lebih ketat
-const login = async (nim, password, ipAddress, userAgent) => {
+const login = async (identifier, password, ipAddress, userAgent) => {
   try {
-    console.log(`[DEBUG] Login attempt for NIM: ${nim}`);
+    console.log(`[DEBUG] Login attempt for identifier: ${identifier}`);
 
     // Validasi input
-    if (!nim || !password) {
+    if (!identifier || !password) {
       return {
         success: false,
-        message: 'NIM dan password harus diisi',
+        message: 'Email/NIM dan password harus diisi',
       };
     }
 
-    // Validasi format NIM
-    if (nim.trim().length < 3) {
-      return {
-        success: false,
-        message: 'Format NIM tidak valid',
-      };
-    }
+    // Tentukan apakah identifier adalah email atau NIM
+    const isEmail = identifier.includes('@');
+    let user;
 
-    // Validasi format password
-    if (password.length < 6) {
-      return {
-        success: false,
-        message: 'Password harus minimal 6 karakter',
-      };
-    }
+    if (isEmail) {
+      // ✅ PERBAIKAN: Login dengan email
+      console.log(`[DEBUG] Attempting email login for: ${identifier}`);
+      
+      user = await prisma.user.findUnique({
+        where: { 
+          email: identifier.trim()
+        },
+      });
 
-    // Cari user by NIM (case sensitive, exact match)
-    const user = await prisma.user.findUnique({
-      where: { 
-        nim: nim.trim() // PERBAIKAN: Gunakan trim() untuk consistency
-      },
-    });
+      if (!user) {
+        console.log(`[DEBUG] User not found for email: ${identifier}`);
+        return {
+          success: false,
+          message: 'Email atau password salah',
+        };
+      }
+    } else {
+      // Login dengan NIM (existing logic)
+      user = await prisma.user.findUnique({
+        where: { 
+          nim: identifier.trim()
+        },
+      });
 
-    if (!user) {
-      console.log(`[DEBUG] User not found for NIM: ${nim}`);
-      return {
-        success: false,
-        message: 'NIM atau password salah', // Jangan kasih tahu yang mana yang salah
-      };
+      if (!user) {
+        console.log(`[DEBUG] User not found for NIM: ${identifier}`);
+        return {
+          success: false,
+          message: 'NIM atau password salah',
+        };
+      }
     }
 
     // Cek status user
     if (user.status !== 'active') {
-      console.log(`[DEBUG] User ${nim} is not active`);
+      console.log(`[DEBUG] User ${identifier} is not active`);
       return {
         success: false,
         message: 'Akun tidak aktif. Silakan hubungi administrator.',
       };
     }
 
-    // Cek jika user adalah user Google (tidak ada password)
+    // ✅ PERBAIKAN: Handle user tanpa password (email-only users)
     if (!user.passwordHash) {
-      console.log(`[DEBUG] User ${nim} is Google-only user`);
-      return {
-        success: false,
-        message: 'Akun ini hanya dapat login melalui Google. Silakan gunakan Login dengan Google.',
-      };
-    }
-
-    // Verifikasi password
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-    
-    if (!isPasswordValid) {
-      console.log(`[DEBUG] Invalid password for user: ${user.email}`);
-      return {
-        success: false,
-        message: 'NIM atau password salah', // Jangan kasih tahu yang mana yang salah
-      };
+      // Untuk user tanpa password, gunakan NIM sebagai password sementara
+      const extractedNim = user.nim || identifier.split('@')[0].split('.')[0];
+      if (password === extractedNim) {
+        // Password match dengan NIM, lanjutkan login
+        console.log(`[DEBUG] Email-only user authenticated with NIM`);
+      } else {
+        console.log(`[DEBUG] Invalid password for email-only user: ${user.email}`);
+        return {
+          success: false,
+          message: 'Email atau password salah',
+        };
+      }
+    } else {
+      // User dengan password, verifikasi normal
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+      
+      if (!isPasswordValid) {
+        console.log(`[DEBUG] Invalid password for user: ${user.email}`);
+        return {
+          success: false,
+          message: 'Email/NIM atau password salah',
+        };
+      }
     }
 
     // Login berhasil
@@ -528,7 +716,8 @@ const login = async (nim, password, ipAddress, userAgent) => {
     console.log(`[DEBUG] Login successful for user:`, {
       id: user.id,
       email: user.email,
-      nim: user.nim
+      nim: user.nim,
+      hasPassword: !!user.passwordHash
     });
 
     return {
@@ -540,7 +729,10 @@ const login = async (nim, password, ipAddress, userAgent) => {
         fullName: user.fullName,
         email: user.email,
         nim: user.nim,
-        status: user.status
+        status: user.status,
+        authMethod: user.authMethod,
+        userType: user.userType,
+        isProfileComplete: user.isProfileComplete
       },
     };
 
@@ -588,6 +780,9 @@ const getUserById = async (userId) => {
         nim: true,
         googleId: true,
         status: true,
+        authMethod: true,
+        userType: true,
+        isProfileComplete: true,
         createdAt: true
       }
     });
@@ -600,7 +795,7 @@ const getUserById = async (userId) => {
 };
 
 // ========================================================
-// EXPORTS
+// EXPORTS - TAMBAH FUNGSI BARU
 // ========================================================
 module.exports = {
   register,
@@ -612,6 +807,11 @@ module.exports = {
   getUserById,
   createSession,
   logoutAllUserSessions,
-  checkNIMAvailability, // PERBAIKAN: Export fungsi baru
+  checkNIMAvailability,
+  updateUserVerification,
+  updateUserProfile,
+  // ✅ FUNGSI BARU
+  findOrCreateUserByEmail,
+  registerWithEmail,
   passport,
 };
