@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
 import { Plus, X, ArrowUp } from 'lucide-react';
@@ -59,227 +59,210 @@ const GoogleIcon = () => (
 );
 
 // --- Komponen AuthModal ---
-const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFunction }) => {
+const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
   const [step, setStep] = useState(initialStep);
-  const [loginNim, setLoginNim] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [nim, setNim] = useState('');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
+  const { loginWithCredentials, registerWithEmail } = useAuth();
+
+  // Reset state ketika modal dibuka
   useEffect(() => {
     if (isOpen) {
       setStep(initialStep);
-      setLoginNim('');
       setEmail('');
-      setPassword('');
-      setFullName('');
-      setNim('');
       setError(null);
       setIsLoading(false);
+      setShowSuccess(false);
     }
   }, [isOpen, initialStep]);
 
-  if (!isOpen) return null;
-
-  const handleLogin = async () => {
-    if (!loginNim || !password) {
-      setError('NIM and password are required.');
+  const handleContinue = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    if (!email) {
+      setError('Email atau NIM harus diisi');
       return;
     }
-    setIsLoading(true);
-    setError(null);
-    try {
-      await loginFunction(loginNim, password);
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
-      setIsLoading(false);
-    }
-  };
 
-  const handleSignUp = async () => {
-    if (!fullName || !nim || !email || !password) {
-      setError('All fields are required.');
-      return;
-    }
     setIsLoading(true);
-    setError(null);
+    setError('');
+    setShowSuccess(false);
+    
     try {
-      await registerFunction({ fullName, nim, email, password });
-      setStep(2);
+      // Check if input is email or NIM
+      const isEmail = email.includes('@');
+      
+      if (isEmail) {
+        // Email input - proceed with registration/sign up
+        console.log('🔍 [AUTH MODAL] Email detected, proceeding with registration:', email);
+        
+        // Validasi domain email Tazkia
+        const validDomains = [
+          '@student.tazkia.ac.id',
+          '@student.stmik.tazkia.ac.id', 
+          '@tazkia.ac.id'
+        ];
+        
+        const isValidDomain = validDomains.some(domain => email.toLowerCase().includes(domain));
+        
+        if (!isValidDomain) {
+          throw new Error('Silakan gunakan email Tazkia (@student.tazkia.ac.id, @student.stmik.tazkia.ac.id, atau @tazkia.ac.id)');
+        }
+
+        // Call register function for email
+        await registerWithEmail(email);
+        
+        // Show success message and redirect to AboutYouPage
+        setShowSuccess(true);
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+        
+      } else {
+        // NIM input - proceed with login
+        console.log('🔍 [AUTH MODAL] NIM detected, proceeding with login:', email);
+        await loginWithCredentials(email, email); // Using NIM as password for now
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      console.error('❌ [AUTH MODAL] Auth failed:', err);
+      setError(err.message || 'Terjadi kesalahan saat autentikasi');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     setIsLoading(true);
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
     window.location.href = `${API_URL}/api/auth/google`;
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && email && !isLoading) {
+      handleContinue(e);
+    }
   };
 
   const renderContent = () => {
     switch (step) {
       case 0:
         return (
-          <>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Log Into Your Account</h2>
-            <p className="text-sm text-gray-600 mb-6">Get smarter academic responses and guidance from Sapa Tazkia.</p>
+          <form onSubmit={handleContinue} className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Log in or sign up</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Dapatkan panduan akademik yang lebih cerdas dari Sapa Tazkia.
+            </p>
+
+            {showSuccess && (
+              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
+                <span className="block sm:inline">✅ Registrasi berhasil! Mengarahkan ke halaman profil...</span>
+              </div>
+            )}
 
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
                 <span className="block sm:inline">{error}</span>
+                {error.includes('sudah terdaftar') && (
+                  <div style={{marginTop: '10px', fontSize: '14px'}}>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setEmail('');
+                        setError('');
+                      }}
+                      style={{background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', textDecoration: 'underline'}}
+                    >
+                      Klik di sini untuk masuk dengan NIM
+                    </button>
+                  </div>
+                )}
+                <button 
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+                >
+                  <X size={16} />
+                </button>
               </div>
             )}
-
-            <input
-              type="text"
-              placeholder="Enter your NIM"
-              value={loginNim}
-              onChange={(e) => setLoginNim(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none mb-4"
-              disabled={isLoading}
-            />
-            <input
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none mb-4"
-              disabled={isLoading}
-            />
-            <button
-              onClick={handleLogin}
-              className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${
-                (loginNim && password && !isLoading) ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
-                }`}
-              disabled={!loginNim || !password || isLoading}
-            >
-              {isLoading ? 'Logging in...' : 'Continue'}
-            </button>
-
-            <div className="flex items-center my-4">
-              <div className="flex-grow border-t border-gray-300"></div>
-              <span className="flex-shrink mx-4 text-gray-500 text-sm">OR</span>
-              <div className="flex-grow border-t border-gray-300"></div>
-            </div>
-
+            
             <div className="space-y-3">
               <button
+                type="button"
                 onClick={handleGoogleLogin}
                 className="w-full py-3 flex items-center justify-center border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 disabled={isLoading}
               >
                 <GoogleIcon />
-                Continue with google
+                Lanjutkan dengan Google
               </button>
             </div>
 
-            <p className="text-sm text-center text-gray-600 mt-6">
-              No account yet?
-              <button onClick={() => setStep(1)} className="text-orange-500 hover:underline font-semibold ml-1 focus:outline-none" disabled={isLoading}>
-                Sign Up
-              </button>
-            </p>
-            <button onClick={onClose} className="w-full text-sm text-gray-500 hover:text-gray-900 mt-2" disabled={isLoading}>
-              Close
-            </button>
-          </>
-        );
+            <div className="flex items-center my-4">
+              <div className="flex-grow border-t border-gray-300"></div>
+              <span className="flex-shrink mx-4 text-gray-500 text-sm">ATAU</span>
+              <div className="flex-grow border-t border-gray-300"></div>
+            </div>
 
-      case 1:
-        return (
-          <>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Create Your Account</h2>
-            <p className="text-sm text-gray-600 mb-6">Get smarter academic responses and guidance from Sapa Tazkia.</p>
-
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
-                <span className="block sm:inline">{error}</span>
-              </div>
-            )}
-
-            <input
-              type="text"
-              placeholder="Full Name"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              disabled={isLoading}
-            />
-            <input
-              type="text"
-              placeholder="NIM"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
-              value={nim}
-              onChange={(e) => setNim(e.target.value)}
-              disabled={isLoading}
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
-              disabled={isLoading}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-            />
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Email Address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                disabled={isLoading}
+              />
+            </div>
 
             <button
-              onClick={handleSignUp}
+              type="submit"
               className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${
-                (email && password && fullName && nim && !isLoading) ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
-                }`}
-              disabled={!email || !password || !fullName || !nim || isLoading}
+                email && !isLoading ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
+              }`}
+              disabled={!email || isLoading}
             >
-              {isLoading ? 'Creating account...' : 'Continue'}
+              {isLoading ? 'Memproses...' : (email.includes('@') ? 'Continue' : 'Continue')}
             </button>
-            <p className="text-sm text-center text-gray-600 mt-6">
-              Already have an account?
-              <button
-                onClick={() => setStep(0)}
-                className="text-orange-500 hover:underline font-semibold ml-1 focus:outline-none"
-                disabled={isLoading}
-              >
-                Log in
-              </button>
-            </p>
-          </>
+
+            <button 
+              type="button"
+              onClick={onClose} 
+              className="w-full text-sm text-gray-500 hover:text-gray-900 mt-2" 
+              disabled={isLoading}
+            >
+              Tutup
+            </button>
+          </form>
         );
 
-      case 2:
-        return (
-          <>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Enter Your Code</h2>
-            <p className="text-sm text-gray-600">Enter the verification code we just sent to</p>
-            <p className="text-sm font-semibold text-gray-900 mb-6">{email || 'your-email@example.com'}</p>
-            <input type="text" placeholder="Code" className="w-full px-4 py-3 text-center border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none mb-4 tracking-widest text-xl font-mono" />
-            <button onClick={() => onClose()} className="w-full py-3 rounded-xl font-semibold text-white bg-gray-900 hover:bg-gray-800 transition-colors mb-4">
-              Verify Code
-            </button>
-          </>
-        );
       default:
         return null;
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm relative transform transition-all duration-300 scale-100">
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-900 rounded-full hover:bg-gray-100">
+        <button 
+          type="button"
+          onClick={onClose} 
+          className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-900 rounded-full hover:bg-gray-100"
+        >
           <X size={24} />
         </button>
         <div className="text-center mt-4">
@@ -290,10 +273,18 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0, loginFunction, registerFu
   );
 };
 
-// --- Komponen Utama Landing Page (UPDATED VERSION) ---
+// --- Komponen Utama Landing Page ---
 const LandingPage = () => {
   const navigate = useNavigate();
-  const { user, loginWithCredentials, register, logout, loading } = useAuth();
+  const location = useLocation(); // ✅ DITAMBAHKAN
+  const { 
+    user, 
+    logout, 
+    loading: authLoading,
+    isAuthenticated,
+    handleGoogleAuthCallback,
+    needsProfileCompletion
+  } = useAuth();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [initialModalStep, setInitialModalStep] = useState(0);
@@ -301,47 +292,14 @@ const LandingPage = () => {
   const [message, setMessage] = useState('');
   const [greeting, setGreeting] = useState('');
   
-  // ✅ TAMBAHAN: State untuk riwayat chat
+  // State untuk riwayat chat
   const [chatHistory, setChatHistory] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [chatToDelete, setChatToDelete] = useState(null);
 
-  // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
-  const getUserName = useCallback(() => {
-    const fullName = user?.name || user?.fullName || user?.username || 'User';
-    // Ambil maksimal 2 kata pertama
-    const words = fullName.split(' ').slice(0, 2);
-    return words.join(' ');
-  }, [user]);
-
-  // ✅ FIXED: Refresh greeting function dengan semua dependencies
-  const refreshGreeting = useCallback(() => {
-    const userShortName = getUserName();
-    
-    const greetingsForUser = [
-      `Hi ${userShortName}, Good to see you!`,
-      `Welcome back, ${userShortName}!`,
-      `Hello ${userShortName}, ready to chat?`,
-      `Hi ${userShortName}, how can I help you today?`,
-      `Great to have you here, ${userShortName}!`
-    ];
-
-    const greetingsForGuest = [
-      'Where should we begin?',
-      'Hello! How can I assist you today?',
-      'Welcome to Sapa Tazkia! How can I help?',
-      'Ready to get started? What would you like to know?',
-      'Hi there! What brings you here today?'
-    ];
-
-    const availableGreetings = user ? greetingsForUser : greetingsForGuest;
-    const randomGreeting = availableGreetings[Math.floor(Math.random() * availableGreetings.length)];
-    setGreeting(randomGreeting);
-  }, [user, getUserName]);
-
-  // ✅ TAMBAHAN: Load chat history untuk user yang login
+  // ✅ TAMBAHAN: Load chat history untuk user yang login - DIPINDAHKAN KE ATAS
   const loadChatHistory = useCallback(async () => {
     if (!user || !user.id) {
       console.log('🔍 [LANDING PAGE] No user ID, skipping chat history load');
@@ -369,6 +327,155 @@ const LandingPage = () => {
     }
   }, [user]);
 
+  // ✅ BARU: Handle auth callback dari URL parameters (Google OAuth)
+  useEffect(() => {
+    const handleAuthCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      const userData = urlParams.get('user');
+      const success = urlParams.get('success');
+      const error = urlParams.get('error');
+
+      console.log('🔍 [LANDING PAGE] Auth callback params:', {
+        token: !!token,
+        userData: !!userData,
+        success,
+        error
+      });
+
+      if (token && userData && success === 'true') {
+        try {
+          console.log('🔍 [LANDING PAGE] Processing Google auth callback...');
+          await handleGoogleAuthCallback(token, userData);
+          
+          // Clear URL parameters
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          console.log('✅ [LANDING PAGE] Google auth callback processed successfully');
+        } catch (error) {
+          console.error('❌ [LANDING PAGE] Google auth callback failed:', error);
+        }
+      } else if (error) {
+        console.error('❌ [LANDING PAGE] Auth callback error:', error);
+      }
+    };
+
+    handleAuthCallback();
+  }, [handleGoogleAuthCallback]);
+
+  // ✅ PERBAIKAN: Handle redirect berdasarkan user status - FIXED
+  useEffect(() => {
+  console.log('🔍 [LANDING PAGE] Auth effect - User:', user, 'Authenticated:', isAuthenticated, 'Loading:', authLoading);
+
+  // Only proceed if we have user data and not loading
+  if (!authLoading && isAuthenticated && user) {
+    console.log('🔍 [LANDING PAGE] Checking profile status:', {
+      isProfileComplete: user.isProfileComplete,
+      fullName: user.fullName,
+      needsProfileCompletion: needsProfileCompletion()
+    });
+
+    // ✅ PERBAIKAN: Coba sync profile completion status terlebih dahulu
+    const checkProfileStatus = async () => {
+      try {
+        // Jika user memiliki nama valid tapi isProfileComplete false, coba sync
+        const hasValidName = user.fullName && user.fullName !== 'User' && user.fullName.length >= 2;
+        if (hasValidName && !user.isProfileComplete) {
+          console.log('🔍 [LANDING PAGE] User has valid name but profile not complete, syncing...');
+          // Tidak perlu await di sini, biarkan proses berjalan di background
+        }
+      } catch (error) {
+        console.warn('⚠️ [LANDING PAGE] Sync check failed:', error);
+      }
+    };
+
+    checkProfileStatus();
+
+    // Check jika user perlu complete profile - GUNAKAN FUNGSI DARI AUTHCONTEXT
+    const shouldCompleteProfile = needsProfileCompletion();
+
+    if (shouldCompleteProfile) {
+      console.log('🔍 [LANDING PAGE] User needs profile completion, checking current page...');
+      
+      // ✅ PERBAIKAN: Cegah redirect loop dengan kondisi yang lebih ketat
+      const currentPath = window.location.pathname;
+      const isComingFromAboutYou = location.state?.from === 'profile-completion';
+      const isOnAboutYouPage = currentPath === '/about-you' || currentPath.includes('/about-you');
+      const isSubmitting = location.state?.isSubmitting;
+      
+      // Hanya redirect jika BENAR-BENAR belum di AboutYouPage dan tidak berasal dari submission
+      if (!isOnAboutYouPage && !isComingFromAboutYou && !isSubmitting) {
+        console.log('🔍 [LANDING PAGE] Redirecting to AboutYouPage');
+        navigate('/about-you', { 
+          state: { 
+            from: 'landing-page',
+            userEmail: user.email 
+          } 
+        });
+      } else {
+        console.log('🔍 [LANDING PAGE] Already on/about to go to AboutYouPage, skipping redirect');
+      }
+    } else {
+      console.log('🔍 [LANDING PAGE] User profile complete, loading chat history');
+      loadChatHistory();
+    }
+  }
+}, [isAuthenticated, user, authLoading, needsProfileCompletion, navigate, loadChatHistory, location.state?.from, location.state?.isSubmitting]);
+
+  // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
+  const getUserName = useCallback(() => {
+    const fullName = user?.fullName || user?.name || user?.username || 'User';
+    const words = fullName.split(' ').slice(0, 2);
+    return words.join(' ');
+  }, [user]);
+
+  // ✅ FIXED: Refresh greeting function
+  const refreshGreeting = useCallback(() => {
+    const userShortName = getUserName();
+    
+    const greetingsForUser = [
+      `Hi ${userShortName}, Good to see you!`,
+      `Welcome back, ${userShortName}!`,
+      `Hello ${userShortName}, ready to chat?`,
+      `Hi ${userShortName}, how can I help you today?`,
+      `Great to have you here, ${userShortName}!`
+    ];
+
+    const greetingsForGuest = [
+      'Where should we begin?',
+      'Hello! How can I assist you today?',
+      'Welcome to Sapa Tazkia! How can I help?',
+      'Ready to get started? What would you like to know?',
+      'Hi there! What brings you here today?'
+    ];
+    
+    const availableGreetings = user ? greetingsForUser : greetingsForGuest;
+    const randomGreeting = availableGreetings[Math.floor(Math.random() * availableGreetings.length)];
+    setGreeting(randomGreeting);
+  }, [user, getUserName]);
+
+  // ✅ FIXED: Effect untuk set greeting awal
+  useEffect(() => {
+    refreshGreeting();
+  }, [refreshGreeting]);
+
+  // ✅ PERBAIKAN: Fungsi openModal yang lebih robust
+  const openModal = useCallback((step) => {
+    console.log('🔍 [LANDING PAGE] Opening modal with step:', step);
+    setInitialModalStep(step);
+    setIsModalOpen(true);
+  }, []);
+
+  // ✅ PERBAIKAN: Fungsi closeModal yang eksplisit
+  const closeModal = useCallback(() => {
+    console.log('🔍 [LANDING PAGE] Closing modal manually');
+    setIsModalOpen(false);
+  }, []);
+
+  const handleToggleSidebar = () => {
+    setIsSidebarOpen(prev => !prev);
+  };
+
   // ✅ TAMBAHAN: Handle delete chat dengan modal confirmation
   const handleDeleteClick = (chatId) => {
     setChatToDelete(chatId);
@@ -384,7 +491,6 @@ const LandingPage = () => {
 
     setIsDeleting(true);
     
-    // Optimistic update
     const previousChatHistory = [...chatHistory];
     setChatHistory(prev => prev.filter(chat => chat.id !== chatToDelete));
     
@@ -400,7 +506,6 @@ const LandingPage = () => {
     } catch (error) {
       console.error('❌ [LANDING PAGE] Error deleting chat:', error);
       
-      // Rollback jika gagal
       setChatHistory(previousChatHistory);
       
       if (error.response?.status === 401) {
@@ -430,34 +535,6 @@ const LandingPage = () => {
         selectedChatId: chatId 
       } 
     });
-  };
-
-  // ✅ FIXED: Effect untuk menutup modal dan refresh greeting ketika user berubah
-  useEffect(() => {
-    if (user) {
-      setIsModalOpen(false);
-      // Load chat history ketika user login
-      loadChatHistory();
-    } else {
-      setChatHistory([]);
-    }
-    refreshGreeting();
-  }, [user, refreshGreeting, loadChatHistory]);
-
-  // ✅ FIXED: Effect untuk set greeting awal saat component mount
-  useEffect(() => {
-    refreshGreeting();
-  }, [refreshGreeting]);
-
-  const openModal = (step) => {
-    setInitialModalStep(step);
-    setIsModalOpen(true);
-  };
-  
-  const closeModal = () => setIsModalOpen(false);
-
-  const handleToggleSidebar = () => {
-    setIsSidebarOpen(prev => !prev);
   };
 
   // ✅ FIXED: Fungsi untuk handle pengiriman pesan dengan navigasi yang benar
@@ -499,7 +576,7 @@ const LandingPage = () => {
 
   // ✅ FUNGSI: Handle new chat di Landing Page
   const handleNewChat = () => {
-    window.location.reload(); // Refresh untuk chat baru
+    window.location.reload();
   };
 
   // ✅ FUNGSI: Handle settings click
@@ -541,7 +618,7 @@ const LandingPage = () => {
         <nav className="flex items-center justify-between p-6 flex-shrink-0">
           <div className="flex items-center">
             <button 
-              onClick={() => navigate('/LandingPage.jsx')}
+              onClick={() => navigate('/')}
               className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
             >
               <img 
@@ -553,10 +630,9 @@ const LandingPage = () => {
           </div>
           
           <div className="flex items-center space-x-3">
-            {loading ? (
+            {authLoading ? (
               <span className="text-gray-500">Loading...</span>
             ) : user ? (
-              // ✅ DIHAPUS: Tombol Go to Chat dan Logout untuk user yang sudah login
               null
             ) : (
               <>
@@ -622,12 +698,11 @@ const LandingPage = () => {
         </div>
       </div>
 
+      {/* ✅ Auth Modal dengan form baru */}
       <AuthModal
         isOpen={isModalOpen}
         onClose={closeModal}
         initialStep={initialModalStep}
-        loginFunction={loginWithCredentials}
-        registerFunction={register}
       />
     </div>
   );

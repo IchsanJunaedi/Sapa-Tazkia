@@ -74,6 +74,13 @@ router.post('/register',
 );
 
 /**
+ * @route   POST /api/auth/register-email
+ * @desc    Registrasi user dengan email saja (auto-create user)
+ * @access  Public
+ */
+router.post('/register-email', authController.registerWithEmail);
+
+/**
  * @route   GET /api/auth/check-nim/:nim
  * @desc    Check apakah NIM sudah terdaftar
  * @access  Public
@@ -105,11 +112,34 @@ router.get('/verify', authMiddleware.requireAuth, authController.verify);
  */
 router.get('/me', authMiddleware.requireAuth, authController.getProfile);
 
+// ========================================================
+// VERIFICATION ROUTES
+// ========================================================
+
 /**
- * @route   PUT /api/auth/profile
- * @desc    Update user profile
+ * @route   POST /api/auth/verify-student
+ * @desc    Verify student data dengan academic system
  * @access  Private
  */
+router.post('/verify-student', authMiddleware.requireAuth, authController.verifyStudent);
+
+/**
+ * @route   PATCH /api/auth/update-verification
+ * @desc    Update user verification status
+ * @access  Private
+ */
+router.patch('/update-verification', authMiddleware.requireAuth, authController.updateVerification);
+
+/**
+ * @route   PATCH /api/auth/update-profile
+ * @desc    Update user profile (untuk Google OAuth)
+ * @access  Private
+ */
+router.patch('/update-profile', authMiddleware.requireAuth, authController.updateProfile);
+
+// ========================================================
+// TEST ROUTES
+// ========================================================
 
 /**
  * @route   GET /api/auth/protected-test

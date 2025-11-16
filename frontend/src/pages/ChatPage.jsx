@@ -653,15 +653,15 @@ const ChatPage = () => {
                     {/* Logo */}
                     <div className="flex items-center">
                         <button 
-                            onClick={() => navigate('/')}
-                            className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
-                        >
-                            <img 
-                                src="/logosapatazkia.png" 
-                                alt="Sapa Tazkia Logo" 
-                                className="h-8 w-auto hover:scale-105 transition-transform duration-200"
-                            />
-                        </button>
+                onClick={() => navigate('/', { replace: true, state: { from: 'chat-page' } })}
+                className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
+                >
+                <img 
+                    src="/logosapatazkia.png" 
+                    alt="Sapa Tazkia Logo" 
+                    className="h-8 w-auto hover:scale-105 transition-transform duration-200"
+                />
+                </button>
                     </div>
                     
                     <div className="flex items-center space-x-4">

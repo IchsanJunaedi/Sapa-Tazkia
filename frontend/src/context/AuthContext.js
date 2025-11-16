@@ -17,6 +17,14 @@ const AuthLoading = () => (
   </div>
 );
 
+// Helper function untuk extract NIM dari email
+const extractNIMFromEmail = (email) => {
+  if (!email) return '';
+  const localPart = email.split('@')[0];
+  const nim = localPart.split('.')[0];
+  return nim.length === 12 ? nim : '';
+};
+
 // 2. Buat Provider (Pembungkus)
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -76,21 +84,17 @@ export const AuthProvider = ({ children }) => {
             throw new Error('Invalid user data structure');
           }
 
-          // ✅ PERBAIKAN: Pastikan ada field nama yang bisa digunakan
-          if (!userData.name && !userData.fullName && !userData.username) {
-            console.warn('⚠️ [AUTH CONTEXT] User data missing name fields:', userData);
-            // Tetap lanjutkan, tapi beri warning
-          }
-
           setUser(userData);
           setToken(storedToken);
           setIsAuthenticated(true);
           api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
           
           console.log('✅ [AUTH CONTEXT] User restored from storage:', {
-            name: userData.name || userData.fullName || userData.username || 'No Name',
+            name: userData.fullName || userData.name || 'No Name',
             email: userData.email,
-            id: userData.id
+            id: userData.id,
+            isProfileComplete: userData.isProfileComplete,
+            nim: userData.nim
           });
         } catch (error) {
           console.error('❌ [AUTH CONTEXT] Error restoring user:', error);
@@ -127,42 +131,18 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // ✅ PERBAIKAN: Fungsi Login dengan validasi lengkap dan debug
+  // ✅ PERBAIKAN: Fungsi Login yang lebih sederhana tanpa sync yang menyebabkan loop
   const login = async (token, userData) => {
     try {
       console.log('🔍 [AUTH CONTEXT] Login function called with:', { 
         tokenLength: token?.length,
-        tokenType: typeof token,
         userData: userData
       });
 
-      // ✅ VALIDASI LENGKAP: Pastikan parameter valid
-      if (!token) {
-        throw new Error('Token is required');
+      // Validasi parameter
+      if (!token || !userData) {
+        throw new Error('Token and user data are required');
       }
-
-      if (typeof token !== 'string') {
-        throw new Error(`Token must be string, got ${typeof token}`);
-      }
-
-      if (token.length < 20) {
-        console.warn('⚠️ [AUTH CONTEXT] Token might be invalid (too short):', token);
-      }
-
-      if (!userData || typeof userData !== 'object') {
-        throw new Error(`User data must be object, got ${typeof userData}`);
-      }
-
-      // ✅ PERBAIKAN: Log struktur user data untuk debugging
-      console.log('🔍 [AUTH CONTEXT] User data structure:', {
-        id: userData.id,
-        name: userData.name,
-        fullName: userData.fullName,
-        username: userData.username,
-        email: userData.email,
-        nim: userData.nim,
-        allKeys: Object.keys(userData)
-      });
 
       // Simpan token dan user data
       setAuthToken(token);
@@ -172,12 +152,28 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(userData));
       
       console.log('✅ [AUTH CONTEXT] Login successful!', {
-        userName: userData.name || userData.fullName || userData.username || 'No Name',
+        userName: userData.fullName || userData.name || 'User',
         userEmail: userData.email,
-        tokenLength: token.length
+        isProfileComplete: userData.isProfileComplete
       });
       
-      return { success: true, user: userData };
+      // ✅ PERBAIKAN: Sederhanakan pengecekan profile completion
+      const needsProfileCompletion = shouldCompleteProfile(userData);
+      
+      if (needsProfileCompletion) {
+        console.log('🔍 [AUTH CONTEXT] User needs profile completion, setting flag');
+        localStorage.setItem('needsProfileCompletion', 'true');
+      } else {
+        console.log('🔍 [AUTH CONTEXT] User profile is complete, clearing flag');
+        localStorage.removeItem('needsProfileCompletion');
+      }
+      
+      return { 
+        success: true, 
+        user: userData,
+        needsProfileCompletion: needsProfileCompletion
+      };
+      
     } catch (error) {
       console.error('❌ [AUTH CONTEXT] Login failed:', error);
       setAuthToken(null);
@@ -185,6 +181,27 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('user');
       throw error;
     }
+  };
+
+  // ✅ BARU: Fungsi helper untuk menentukan apakah user perlu complete profile
+  const shouldCompleteProfile = (userData) => {
+    if (!userData) return false;
+    
+    const hasValidName = userData.fullName && 
+                        userData.fullName !== 'User' && 
+                        userData.fullName.length >= 2;
+    
+    const needsCompletion = !userData.isProfileComplete || !hasValidName;
+    
+    console.log('🔍 [AUTH CONTEXT] Profile completion check:', {
+      hasValidName,
+      fullName: userData.fullName,
+      fullNameLength: userData.fullName?.length,
+      isProfileComplete: userData.isProfileComplete,
+      needsCompletion
+    });
+    
+    return needsCompletion;
   };
 
   // ✅ PERBAIKAN: Fungsi Login dengan NIM & Password dengan debug lengkap
@@ -213,11 +230,12 @@ export const AuthProvider = ({ children }) => {
         userExists: !!user,
         tokenLength: token?.length,
         userStructure: user ? {
-          name: user.name,
           fullName: user.fullName, 
-          username: user.username,
           email: user.email,
           nim: user.nim,
+          isProfileComplete: user.isProfileComplete,
+          authMethod: user.authMethod,
+          userType: user.userType,
           allKeys: Object.keys(user)
         } : 'NO USER'
       });
@@ -255,8 +273,76 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ✅ BARU: Fungsi Register dengan Email Only
+  const registerWithEmail = async (email) => {
+    setLoading(true);
+    try {
+      console.log('🔍 [AUTH CONTEXT] registerWithEmail called with email:', email);
+      
+      const response = await api.post('/api/auth/register-email', { email });
+      
+      console.log('🔍 [AUTH CONTEXT] Register with email response:', {
+        status: response.status,
+        data: response.data
+      });
+      
+      // ✅ PERBAIKAN: Validasi response structure
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Email registration failed');
+      }
+      
+      const { token, user, requiresProfileCompletion } = response.data.data;
+      
+      console.log('🔍 [AUTH CONTEXT] Email registration data:', {
+        tokenExists: !!token,
+        userExists: !!user,
+        requiresProfileCompletion: requiresProfileCompletion,
+        userStructure: user
+      });
+      
+      // ✅ Validasi token dan user
+      if (!token) {
+        throw new Error('No token received from server');
+      }
+      
+      if (!user) {
+        throw new Error('No user data received from server');
+      }
+      
+      // Simpan flag untuk new user
+      localStorage.setItem('isNewUser', 'true');
+      localStorage.setItem('userEmail', email);
+      
+      // ✅ Panggil login function dengan data yang sudah divalidasi
+      const result = await login(token, user);
+      
+      console.log('✅ [AUTH CONTEXT] registerWithEmail completed successfully');
+      
+      return {
+        ...result,
+        requiresProfileCompletion: requiresProfileCompletion || true
+      };
+    } catch (error) {
+      console.error('❌ [AUTH CONTEXT] registerWithEmail failed:', error);
+      
+      // ✅ PERBAIKAN: Throw error yang lebih informatif
+      if (error.response) {
+        if (error.response.status === 409) {
+          throw new Error('Email sudah terdaftar. Silakan login menggunakan NIM Anda.');
+        }
+        throw new Error(error.response.data.message || 'Email registration failed');
+      } else if (error.request) {
+        throw new Error('Network error: Cannot connect to server');
+      } else {
+        throw error;
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ✅ PERBAIKAN: Fungsi Register dengan debug lengkap
-  const register = async (userData) => {
+  const registerWithCredentials = async (userData) => {
     setLoading(true);
     try {
       console.log('🔍 [AUTH CONTEXT] Register called:', {
@@ -280,10 +366,10 @@ export const AuthProvider = ({ children }) => {
       }
       
       console.log('🔍 [AUTH CONTEXT] Register user data structure:', {
-        name: user.name,
         fullName: user.fullName,
-        username: user.username,
-        email: user.email
+        email: user.email,
+        nim: user.nim,
+        isProfileComplete: user.isProfileComplete
       });
       
       const result = await login(token, user);
@@ -304,6 +390,103 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ✅ BARU: Fungsi untuk handle Google Auth Callback
+  const handleGoogleAuthCallback = async (token, userData) => {
+    try {
+      console.log('🔍 [AUTH CONTEXT] handleGoogleAuthCallback called:', {
+        tokenLength: token?.length,
+        userData: userData
+      });
+
+      // Parse user data jika dalam bentuk string
+      let parsedUserData = userData;
+      if (typeof userData === 'string') {
+        try {
+          parsedUserData = JSON.parse(userData);
+        } catch (parseError) {
+          console.error('❌ [AUTH CONTEXT] Failed to parse user data:', parseError);
+          throw new Error('Invalid user data format');
+        }
+      }
+
+      // Validasi data
+      if (!token || !parsedUserData) {
+        throw new Error('Token and user data are required for Google auth');
+      }
+
+      // Simpan auth data
+      const result = await login(token, parsedUserData);
+
+      // Check jika user baru dari Google auth
+      const isNewUser = shouldCompleteProfile(parsedUserData);
+
+      if (isNewUser) {
+        console.log('🔍 [AUTH CONTEXT] New Google user detected, setting flags');
+        localStorage.setItem('isNewUser', 'true');
+        localStorage.setItem('userEmail', parsedUserData.email);
+      }
+
+      console.log('✅ [AUTH CONTEXT] Google auth callback completed successfully');
+      
+      return {
+        ...result,
+        isNewUser: isNewUser
+      };
+    } catch (error) {
+      console.error('❌ [AUTH CONTEXT] handleGoogleAuthCallback failed:', error);
+      throw error;
+    }
+  };
+
+  // ✅ PERBAIKAN: Fungsi untuk update user profile completion - FIXED!
+  const updateUserProfileCompletion = async (profileData) => {
+    try {
+      console.log('🔍 [AUTH CONTEXT] updateUserProfileCompletion called with:', profileData);
+      
+      if (!user) {
+        throw new Error('No user found');
+      }
+
+      // Update user data dengan profile info
+      const updatedUser = {
+        ...user,
+        fullName: profileData.fullName,
+        dateOfBirth: profileData.dateOfBirth,
+        isProfileComplete: true
+      };
+
+      console.log('🔍 [AUTH CONTEXT] Updated user data:', updatedUser);
+
+      // Update state dan localStorage
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      // ✅ PERBAIKAN KRITIS: Clear semua flags profile completion
+      localStorage.removeItem('isNewUser');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('needsProfileCompletion');
+
+      // Sync dengan backend
+      try {
+        await api.patch('/api/auth/update-profile', {
+          fullName: profileData.fullName,
+          dateOfBirth: profileData.dateOfBirth
+        });
+        console.log('✅ [AUTH CONTEXT] Profile completion synced with backend');
+      } catch (syncError) {
+        console.warn('⚠️ [AUTH CONTEXT] Failed to sync profile completion with backend:', syncError);
+        // Continue anyway - data sudah tersimpan di frontend
+      }
+
+      console.log('✅ [AUTH CONTEXT] User profile completion updated successfully');
+      return { success: true, user: updatedUser };
+      
+    } catch (error) {
+      console.error('❌ [AUTH CONTEXT] updateUserProfileCompletion failed:', error);
+      throw error;
+    }
+  };
+
   // ✅ PERBAIKAN: Fungsi untuk update user data
   const updateUser = (updatedUserData) => {
     console.log('🔍 [AUTH CONTEXT] updateUser called with:', updatedUserData);
@@ -313,8 +496,9 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(newUser));
       
       console.log('✅ [AUTH CONTEXT] User updated:', {
-        oldName: prevUser?.name || prevUser?.fullName,
-        newName: newUser.name || newUser.fullName
+        oldName: prevUser?.fullName || prevUser?.name,
+        newName: newUser.fullName || newUser.name,
+        isProfileComplete: newUser.isProfileComplete
       });
       
       return newUser;
@@ -338,10 +522,49 @@ export const AuthProvider = ({ children }) => {
     return isAuthenticated;
   };
 
+  // ✅ PERBAIKAN KRITIS: Fungsi untuk check jika user perlu complete profile
+  const needsProfileCompletion = () => {
+    if (!user) {
+      console.log('🔍 [AUTH CONTEXT] No user, no profile completion needed');
+      return false;
+    }
+    
+    const fromStorage = localStorage.getItem('needsProfileCompletion') === 'true';
+    const fromUser = shouldCompleteProfile(user);
+    
+    console.log('🔍 [AUTH CONTEXT] needsProfileCompletion check:', {
+      fromStorage,
+      fromUser,
+      userFullName: user.fullName,
+      userIsProfileComplete: user.isProfileComplete,
+      finalResult: fromStorage || fromUser
+    });
+    
+    return fromStorage || fromUser;
+  };
+
+  // ✅ BARU: Fungsi untuk check jika user adalah new user
+  const isNewUser = () => {
+    return localStorage.getItem('isNewUser') === 'true';
+  };
+
+  // ✅ PERBAIKAN: Fungsi untuk manually set profile completion status
+  const setProfileComplete = () => {
+    console.log('🔍 [AUTH CONTEXT] Manually setting profile as complete');
+    localStorage.removeItem('needsProfileCompletion');
+    localStorage.removeItem('isNewUser');
+    
+    if (user) {
+      const updatedUser = { ...user, isProfileComplete: true };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
   // ✅ PERBAIKAN: Fungsi Logout dengan cleanup lengkap
   const logout = () => {
     console.log('🔍 [AUTH CONTEXT] Logout called', {
-      currentUser: user?.name || user?.fullName || 'Unknown'
+      currentUser: user?.fullName || user?.name || 'Unknown'
     });
     
     // Clear semua data
@@ -351,6 +574,9 @@ export const AuthProvider = ({ children }) => {
     
     // ✅ PERBAIKAN: Clear semua related auth data
     localStorage.removeItem('token');
+    localStorage.removeItem('isNewUser');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('needsProfileCompletion');
     delete api.defaults.headers.common['Authorization'];
     
     console.log('✅ [AUTH CONTEXT] Logout successful');
@@ -367,17 +593,28 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     login,
     loginWithCredentials,
-    register,
+    register: registerWithCredentials, // ✅ PERBAIKAN: Alias untuk backward compatibility
+    registerWithCredentials,
+    registerWithEmail,           // ✅ BARU
+    handleGoogleAuthCallback,    // ✅ BARU
     logout,
     setAuthToken,
     updateUser,
+    updateUserProfileCompletion, // ✅ BARU
+    setProfileComplete,          // ✅ BARU: Manual profile completion
     checkAuthStatus,
+    needsProfileCompletion,      // ✅ BARU
+    isNewUser,                   // ✅ BARU
     // ✅ PERBAIKAN: Tambahkan helper function untuk mendapatkan nama user
-    getUserName: () => user?.name || user?.fullName || user?.username || 'User',
+    getUserName: () => user?.fullName || user?.name || 'User',
     getUserShortName: () => {
-      const fullName = user?.name || user?.fullName || user?.username || 'User';
+      const fullName = user?.fullName || user?.name || 'User';
       return fullName.split(' ')[0];
-    }
+    },
+    // ✅ BARU: Helper untuk mendapatkan NIM
+    getUserNIM: () => user?.nim || extractNIMFromEmail(user?.email),
+    // ✅ BARU: Helper untuk extract NIM dari email
+    extractNIMFromEmail
   };
 
   return (
