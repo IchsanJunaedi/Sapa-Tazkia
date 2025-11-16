@@ -55,23 +55,17 @@ router.get('/google/callback',
 
 /**
  * @route   POST /api/auth/login
- * @desc    Login user dengan NIM dan password
+ * @desc    Login user dengan email/NIM dan password
  * @access  Public
  */
-router.post('/login', 
-  // Tambahkan validation middleware jika ada
-  authController.login
-);
+router.post('/login', authController.login);
 
 /**
  * @route   POST /api/auth/register
  * @desc    Registrasi user baru dengan validasi
  * @access  Public
  */
-router.post('/register', 
-  // Tambahkan validation middleware jika ada  
-  authController.register
-);
+router.post('/register', authController.register);
 
 /**
  * @route   POST /api/auth/register-email
@@ -79,6 +73,35 @@ router.post('/register',
  * @access  Public
  */
 router.post('/register-email', authController.registerWithEmail);
+
+// ========================================================
+// ✅ BARU: EMAIL VERIFICATION ROUTES
+// ========================================================
+
+/**
+ * @route   POST /api/auth/verify-email
+ * @desc    Verifikasi email dengan kode 6 digit
+ * @access  Public
+ */
+router.post('/verify-email', authController.verifyEmailCode);
+
+/**
+ * @route   POST /api/auth/resend-verification
+ * @desc    Kirim ulang kode verifikasi email
+ * @access  Public
+ */
+router.post('/resend-verification', authController.resendVerificationCode);
+
+/**
+ * @route   GET /api/auth/check-verification/:email
+ * @desc    Cek status verifikasi email
+ * @access  Public
+ */
+router.get('/check-verification/:email', authController.checkEmailVerification);
+
+// ========================================================
+// UTILITY ROUTES
+// ========================================================
 
 /**
  * @route   GET /api/auth/check-nim/:nim
@@ -113,7 +136,7 @@ router.get('/verify', authMiddleware.requireAuth, authController.verify);
 router.get('/me', authMiddleware.requireAuth, authController.getProfile);
 
 // ========================================================
-// VERIFICATION ROUTES
+// VERIFICATION & PROFILE ROUTES
 // ========================================================
 
 /**

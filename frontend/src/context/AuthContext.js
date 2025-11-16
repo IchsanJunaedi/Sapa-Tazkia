@@ -31,6 +31,10 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // ✅ BARU: State untuk pending verification
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
 
   // ✅ PERBAIKAN 1: Enhanced shouldCompleteProfile function
   const shouldCompleteProfile = (userData) => {
@@ -65,47 +69,47 @@ export const AuthProvider = ({ children }) => {
 
   // ✅ PERBAIKAN 2: Enhanced needsProfileCompletion function dengan loading state handling
   const needsProfileCompletion = () => {
-  if (loading) {
-    console.log('🔍 [AUTH CONTEXT] Still loading, deferring profile check');
-    return false;
-  }
+    if (loading) {
+      console.log('🔍 [AUTH CONTEXT] Still loading, deferring profile check');
+      return false;
+    }
 
-  if (!user) {
-    console.log('🔍 [AUTH CONTEXT] No user available for profile completion check', {
-      loading: loading,
-      user: user,
-      token: token
+    if (!user) {
+      console.log('🔍 [AUTH CONTEXT] No user available for profile completion check', {
+        loading: loading,
+        user: user,
+        token: token
+      });
+      return true; // ✅ PERUBAHAN: Return true untuk safety default
+    }
+
+    console.log('🔍 [AUTH CONTEXT] Profile completion check:', {
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        isProfileComplete: user.isProfileComplete
+      },
+      fromStorage: localStorage.getItem('needsProfileCompletion')
     });
-    return true; // ✅ PERUBAHAN: Return true untuk safety default
-  }
 
-  console.log('🔍 [AUTH CONTEXT] Profile completion check:', {
-    user: {
-      id: user.id,
-      fullName: user.fullName,
-      isProfileComplete: user.isProfileComplete
-    },
-    fromStorage: localStorage.getItem('needsProfileCompletion')
-  });
+    // Check dari user data terlebih dahulu (prioritas utama)
+    if (user.isProfileComplete) {
+      console.log('✅ [AUTH CONTEXT] User profile is complete based on user data');
+      localStorage.removeItem('needsProfileCompletion');
+      return false;
+    }
 
-  // Check dari user data terlebih dahulu (prioritas utama)
-  if (user.isProfileComplete) {
-    console.log('✅ [AUTH CONTEXT] User profile is complete based on user data');
-    localStorage.removeItem('needsProfileCompletion');
-    return false;
-  }
+    // Check jika user punya fullName yang valid
+    const hasValidName = user.fullName && user.fullName.trim().length > 0;
+    if (hasValidName) {
+      console.log('✅ [AUTH CONTEXT] User has valid name, profile complete');
+      localStorage.removeItem('needsProfileCompletion');
+      return false;
+    }
 
-  // Check jika user punya fullName yang valid
-  const hasValidName = user.fullName && user.fullName.trim().length > 0;
-  if (hasValidName) {
-    console.log('✅ [AUTH CONTEXT] User has valid name, profile complete');
-    localStorage.removeItem('needsProfileCompletion');
-    return false;
-  }
-
-  console.log('🔍 [AUTH CONTEXT] User needs profile completion');
-  return true;
-};
+    console.log('🔍 [AUTH CONTEXT] User needs profile completion');
+    return true;
+  };
 
   // ✅ PERBAIKAN: Fungsi setAuthToken (tetap sama)
   const setAuthToken = (newToken) => {
@@ -223,7 +227,8 @@ export const AuthProvider = ({ children }) => {
       console.log('✅ [AUTH CONTEXT] Login successful!', {
         userName: userData.fullName || userData.name || 'User',
         userEmail: userData.email,
-        isProfileComplete: userData.isProfileComplete
+        isProfileComplete: userData.isProfileComplete,
+        isEmailVerified: userData.isEmailVerified
       });
       
       // ✅ PERBAIKAN: Gunakan shouldCompleteProfile yang sudah ditingkatkan
@@ -280,6 +285,7 @@ export const AuthProvider = ({ children }) => {
           email: user.email,
           nim: user.nim,
           isProfileComplete: user.isProfileComplete,
+          isEmailVerified: user.isEmailVerified,
           authMethod: user.authMethod,
           userType: user.userType,
           allKeys: Object.keys(user)
@@ -305,6 +311,13 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('user');
       
       if (error.response) {
+        // Handle email verification required case - ✅ PERBAIKAN: Gunakan Error object
+        if (error.response.data?.requiresVerification) {
+          const verificationError = new Error(error.response.data.message);
+          verificationError.requiresVerification = true;
+          verificationError.email = error.response.data.email;
+          throw verificationError;
+        }
         throw new Error(error.response.data.message || 'Login failed');
       } else if (error.request) {
         throw new Error('Network error: Cannot connect to server');
@@ -316,7 +329,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ BARU: Fungsi Register dengan Email Only
+  // ✅ PERBAIKAN BESAR: Fungsi Register dengan Email Only - DENGAN VERIFICATION FLOW
   const registerWithEmail = async (email) => {
     setLoading(true);
     try {
@@ -329,46 +342,49 @@ export const AuthProvider = ({ children }) => {
         data: response.data
       });
       
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Email registration failed');
+      // ✅ PERBAIKAN: Handle response structure yang berbeda
+      let responseData = response.data;
+      
+      // Jika response memiliki data property, gunakan itu
+      if (response.data.data) {
+        responseData = response.data.data;
       }
       
-      const { token, user, requiresProfileCompletion } = response.data.data;
-      
-      console.log('🔍 [AUTH CONTEXT] Email registration data:', {
-        tokenExists: !!token,
-        userExists: !!user,
-        requiresProfileCompletion: requiresProfileCompletion,
-        userStructure: user
-      });
-      
-      if (!token) {
-        throw new Error('No token received from server');
+      if (!responseData.success && response.status !== 201) {
+        throw new Error(responseData.message || 'Email registration failed');
       }
       
-      if (!user) {
-        throw new Error('No user data received from server');
-      }
+      // ✅ PERBAIKAN: Set state untuk pending verification
+      setPendingVerification(true);
+      setPendingEmail(email);
       
+      // Simpan email untuk verifikasi
+      localStorage.setItem('pendingVerificationEmail', email);
       localStorage.setItem('isNewUser', 'true');
-      localStorage.setItem('userEmail', email);
       
-      const result = await login(token, user);
-      
-      console.log('✅ [AUTH CONTEXT] registerWithEmail completed successfully');
+      console.log('✅ [AUTH CONTEXT] registerWithEmail completed successfully - Verification required');
       
       return {
-        ...result,
-        requiresProfileCompletion: requiresProfileCompletion || true
+        success: true,
+        message: responseData.message || 'Verification code sent to your email',
+        requiresVerification: true,
+        email: email,
+        data: {
+          email: email
+        }
       };
     } catch (error) {
       console.error('❌ [AUTH CONTEXT] registerWithEmail failed:', error);
+      
+      // Reset verification state on error
+      setPendingVerification(false);
+      setPendingEmail('');
       
       if (error.response) {
         if (error.response.status === 409) {
           throw new Error('Email sudah terdaftar. Silakan login menggunakan NIM Anda.');
         }
-        throw new Error(error.response.data.message || 'Email registration failed');
+        throw new Error(error.response.data?.message || 'Email registration failed');
       } else if (error.request) {
         throw new Error('Network error: Cannot connect to server');
       } else {
@@ -377,6 +393,167 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ PERBAIKAN: Fungsi untuk verifikasi email code
+  const verifyEmailCode = async (email, code) => {
+    setLoading(true);
+    try {
+      console.log('🔍 [AUTH CONTEXT] verifyEmailCode called:', { email, code });
+      
+      const response = await api.post('/api/auth/verify-email', {
+        email,
+        code
+      });
+      
+      console.log('🔍 [AUTH CONTEXT] Verify email response:', {
+        status: response.status,
+        data: response.data
+      });
+      
+      let responseData = response.data;
+      
+      // Handle nested data structure
+      if (response.data.data) {
+        responseData = response.data.data;
+      }
+      
+      if (!responseData.success) {
+        throw new Error(responseData.message || 'Email verification failed');
+      }
+      
+      const { token, user, requiresProfileCompletion } = responseData;
+      
+      console.log('🔍 [AUTH CONTEXT] Email verification result:', {
+        tokenExists: !!token,
+        userExists: !!user,
+        requiresProfileCompletion: requiresProfileCompletion,
+        userStructure: user
+      });
+      
+      if (!token || !user) {
+        throw new Error('Invalid verification response: missing token or user data');
+      }
+      
+      // Clear verification state
+      setPendingVerification(false);
+      setPendingEmail('');
+      
+      // Clear temporary storage
+      localStorage.removeItem('pendingVerificationEmail');
+      localStorage.removeItem('isNewUser');
+      
+      // Login user setelah verifikasi berhasil
+      const result = await login(token, user);
+      
+      console.log('✅ [AUTH CONTEXT] Email verification completed successfully');
+      
+      return {
+        ...result,
+        requiresProfileCompletion: requiresProfileCompletion || false
+      };
+    } catch (error) {
+      console.error('❌ [AUTH CONTEXT] verifyEmailCode failed:', error);
+      
+      if (error.response) {
+        throw new Error(error.response.data?.message || 'Email verification failed');
+      } else if (error.request) {
+        throw new Error('Network error: Cannot connect to server');
+      } else {
+        throw error;
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ PERBAIKAN: Fungsi untuk kirim ulang kode verifikasi
+  const resendVerificationCode = async (email) => {
+    try {
+      console.log('🔍 [AUTH CONTEXT] resendVerificationCode called for:', email);
+      
+      const response = await api.post('/api/auth/resend-verification', { email });
+      
+      console.log('🔍 [AUTH CONTEXT] Resend verification response:', {
+        status: response.status,
+        data: response.data
+      });
+      
+      let responseData = response.data;
+      
+      if (response.data.data) {
+        responseData = response.data.data;
+      }
+      
+      if (!responseData.success) {
+        throw new Error(responseData.message || 'Failed to resend verification code');
+      }
+      
+      console.log('✅ [AUTH CONTEXT] Verification code resent successfully');
+      
+      return {
+        success: true,
+        message: responseData.message || 'Verification code resent successfully'
+      };
+    } catch (error) {
+      console.error('❌ [AUTH CONTEXT] resendVerificationCode failed:', error);
+      
+      if (error.response) {
+        throw new Error(error.response.data?.message || 'Failed to resend verification code');
+      } else if (error.request) {
+        throw new Error('Network error: Cannot connect to server');
+      } else {
+        throw error;
+      }
+    }
+  };
+
+  // ✅ BARU: Fungsi untuk check status verifikasi email
+  const checkEmailVerificationStatus = async (email) => {
+    try {
+      console.log('🔍 [AUTH CONTEXT] checkEmailVerificationStatus called for:', email);
+      
+      const response = await api.get(`/api/auth/check-verification/${email}`);
+      
+      console.log('🔍 [AUTH CONTEXT] Check verification status response:', {
+        status: response.status,
+        data: response.data
+      });
+      
+      let responseData = response.data;
+      
+      if (response.data.data) {
+        responseData = response.data.data;
+      }
+      
+      if (!responseData.success) {
+        throw new Error(responseData.message || 'Failed to check verification status');
+      }
+      
+      return {
+        success: true,
+        data: responseData.data
+      };
+    } catch (error) {
+      console.error('❌ [AUTH CONTEXT] checkEmailVerificationStatus failed:', error);
+      
+      if (error.response) {
+        throw new Error(error.response.data?.message || 'Failed to check verification status');
+      } else if (error.request) {
+        throw new Error('Network error: Cannot connect to server');
+      } else {
+        throw error;
+      }
+    }
+  };
+
+  // ✅ BARU: Fungsi untuk clear pending verification
+  const clearPendingVerification = () => {
+    console.log('🔍 [AUTH CONTEXT] Clearing pending verification state');
+    setPendingVerification(false);
+    setPendingEmail('');
+    localStorage.removeItem('pendingVerificationEmail');
+    localStorage.removeItem('isNewUser');
   };
 
   // ✅ PERBAIKAN: Fungsi Register dengan debug lengkap
@@ -406,7 +583,8 @@ export const AuthProvider = ({ children }) => {
         fullName: user.fullName,
         email: user.email,
         nim: user.nim,
-        isProfileComplete: user.isProfileComplete
+        isProfileComplete: user.isProfileComplete,
+        isEmailVerified: user.isEmailVerified
       });
       
       const result = await login(token, user);
@@ -554,6 +732,16 @@ export const AuthProvider = ({ children }) => {
     return localStorage.getItem('isNewUser') === 'true';
   };
 
+  // ✅ BARU: Fungsi untuk check jika email perlu diverifikasi
+  const needsEmailVerification = () => {
+    return localStorage.getItem('pendingVerificationEmail') !== null || pendingVerification;
+  };
+
+  // ✅ BARU: Fungsi untuk mendapatkan email yang perlu diverifikasi
+  const getPendingVerificationEmail = () => {
+    return pendingEmail || localStorage.getItem('pendingVerificationEmail');
+  };
+
   // ✅ PERBAIKAN: Fungsi untuk manually set profile completion status
   const setProfileComplete = () => {
     console.log('🔍 [AUTH CONTEXT] Manually setting profile as complete');
@@ -573,14 +761,20 @@ export const AuthProvider = ({ children }) => {
       currentUser: user?.fullName || user?.name || 'Unknown'
     });
     
+    // Clear semua state
     setAuthToken(null);
     setUser(null);
-    localStorage.removeItem('user');
+    setPendingVerification(false);
+    setPendingEmail('');
     
+    // Clear semua localStorage
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     localStorage.removeItem('isNewUser');
     localStorage.removeItem('userEmail');
+    localStorage.removeItem('pendingVerificationEmail');
     localStorage.removeItem('needsProfileCompletion');
+    
     delete api.defaults.headers.common['Authorization'];
     
     console.log('✅ [AUTH CONTEXT] Logout successful');
@@ -594,11 +788,19 @@ export const AuthProvider = ({ children }) => {
     token,
     loading,
     isAuthenticated,
+    // ✅ STATE VERIFIKASI BARU
+    pendingVerification,
+    pendingEmail,
     login,
     loginWithCredentials,
     register: registerWithCredentials,
     registerWithCredentials,
     registerWithEmail,
+    // ✅ FUNGSI VERIFIKASI BARU
+    verifyEmailCode,
+    resendVerificationCode,
+    checkEmailVerificationStatus,
+    clearPendingVerification,
     handleGoogleAuthCallback,
     logout,
     setAuthToken,
@@ -606,8 +808,11 @@ export const AuthProvider = ({ children }) => {
     updateUserProfileCompletion,
     setProfileComplete,
     checkAuthStatus,
-    needsProfileCompletion, // ✅ SUDAH DIPERBAIKI
+    needsProfileCompletion,
     isNewUser,
+    // ✅ FUNGSI VERIFIKASI TAMBAHAN
+    needsEmailVerification,
+    getPendingVerificationEmail,
     getUserName: () => user?.fullName || user?.name || 'User',
     getUserShortName: () => {
       const fullName = user?.fullName || user?.name || 'User';

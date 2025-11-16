@@ -2,16 +2,211 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 require('dotenv').config();
 
 // Import Passport dan Strategi Google
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
+// Import email service
+const emailService = require('./emailService');
+
 const prisma = new PrismaClient();
 
 // ========================================================
-// ✅ BARU: FUNGSI FIND OR CREATE USER BY EMAIL
+// ✅ BARU: FUNGSI VERIFIKASI EMAIL
+// ========================================================
+
+/**
+ * Generate verification code (6 digit angka)
+ */
+const generateVerificationCode = () => {
+  return crypto.randomInt(100000, 999999).toString();
+};
+
+/**
+ * Send verification email
+ */
+const sendVerificationEmail = async (email, verificationCode) => {
+  try {
+    const subject = 'Kode Verifikasi Email - Sapa-Tazkia';
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Verifikasi Email Anda</h2>
+        <p>Terima kasih telah mendaftar di Sapa-Tazkia. Gunakan kode verifikasi berikut untuk menyelesaikan pendaftaran:</p>
+        
+        <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0;">
+          <h1 style="color: #2563eb; font-size: 32px; letter-spacing: 5px; margin: 0;">
+            ${verificationCode}
+          </h1>
+        </div>
+        
+        <p style="color: #6b7280; font-size: 14px;">
+          Kode ini akan kadaluarsa dalam 10 menit. Jangan berikan kode ini kepada siapapun.
+        </p>
+        
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+        <p style="color: #9ca3af; font-size: 12px;">
+          Jika Anda tidak merasa mendaftar, abaikan email ini.
+        </p>
+      </div>
+    `;
+
+    await emailService.sendEmail(email, subject, html);
+    console.log('✅ [AUTH SERVICE] Verification email sent to:', email);
+    
+    return true;
+  } catch (error) {
+    console.error('❌ [AUTH SERVICE] Failed to send verification email:', error);
+    throw new Error('Gagal mengirim email verifikasi');
+  }
+};
+
+/**
+ * Verify email with code
+ */
+const verifyEmailCode = async (email, code) => {
+  try {
+    console.log('🔍 [AUTH SERVICE] Verifying email code:', { email, code });
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      throw new Error('User tidak ditemukan');
+    }
+
+    // Check if email is already verified
+    if (user.isEmailVerified) {
+      return {
+        success: true,
+        message: 'Email sudah terverifikasi',
+        user: user
+      };
+    }
+
+    // Check verification code
+    if (!user.verificationCode || user.verificationCode !== code) {
+      // Increment verification attempts
+      await prisma.user.update({
+        where: { email },
+        data: {
+          verificationAttempts: { increment: 1 }
+        }
+      });
+
+      throw new Error('Kode verifikasi tidak valid');
+    }
+
+    // Check if code is expired
+    if (user.verificationCodeExpires && new Date() > user.verificationCodeExpires) {
+      throw new Error('Kode verifikasi sudah kadaluarsa');
+    }
+
+    // Check max attempts
+    if (user.verificationAttempts >= 5) {
+      throw new Error('Terlalu banyak percobaan. Silakan request kode baru.');
+    }
+
+    // Update user as verified
+    const updatedUser = await prisma.user.update({
+      where: { email },
+      data: {
+        isEmailVerified: true,
+        verificationCode: null, // Clear the code
+        verificationCodeExpires: null,
+        verificationAttempts: 0,
+        status: 'active'
+      },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        nim: true,
+        status: true,
+        authMethod: true,
+        userType: true,
+        isProfileComplete: true,
+        isEmailVerified: true
+      }
+    });
+
+    console.log('✅ [AUTH SERVICE] Email verified successfully:', email);
+
+    // Generate token for the verified user
+    const token = generateToken(updatedUser.id);
+
+    // Create session
+    await createSession(updatedUser.id, token, 'email-verification', 'email-verification');
+
+    return {
+      success: true,
+      message: 'Email berhasil diverifikasi',
+      user: updatedUser,
+      token: token
+    };
+
+  } catch (error) {
+    console.error('❌ [AUTH SERVICE] Verify email code error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Resend verification code
+ */
+const resendVerificationCode = async (email) => {
+  try {
+    console.log('🔍 [AUTH SERVICE] Resending verification code to:', email);
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      throw new Error('User tidak ditemukan');
+    }
+
+    if (user.isEmailVerified) {
+      throw new Error('Email sudah terverifikasi');
+    }
+
+    // Generate new verification code
+    const verificationCode = generateVerificationCode();
+    const expirationTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Update user with new verification code
+    await prisma.user.update({
+      where: { email },
+      data: {
+        verificationCode: verificationCode,
+        verificationCodeExpires: expirationTime,
+        verificationAttempts: 0
+      }
+    });
+
+    // Send verification email
+    await sendVerificationEmail(email, verificationCode);
+
+    console.log('✅ [AUTH SERVICE] Verification code resent to:', email);
+
+    return {
+      success: true,
+      message: 'Kode verifikasi baru telah dikirim ke email Anda'
+    };
+
+  } catch (error) {
+    console.error('❌ [AUTH SERVICE] Resend verification code error:', error);
+    throw error;
+  }
+};
+
+// ========================================================
+// ✅ BARU: FUNGSI FIND OR CREATE USER BY EMAIL - DIPERBAIKI DENGAN VERIFIKASI
 // ========================================================
 
 const findOrCreateUserByEmail = async (email, googleData = null) => {
@@ -56,6 +251,10 @@ const findOrCreateUserByEmail = async (email, googleData = null) => {
       fullName = googleData.name;
     }
 
+    // Generate verification code for new users
+    const verificationCode = generateVerificationCode();
+    const expirationTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
     // Create user data
     const userData = {
       nim: nim,
@@ -64,7 +263,11 @@ const findOrCreateUserByEmail = async (email, googleData = null) => {
       authMethod: googleData ? 'google' : 'email',
       userType: userType,
       isProfileComplete: !!fullName, // If name is provided, consider profile complete
-      status: 'active'
+      status: 'pending', // Set to pending until email verified
+      isEmailVerified: googleData ? true : false, // Google users are auto-verified
+      verificationCode: googleData ? null : verificationCode,
+      verificationCodeExpires: googleData ? null : expirationTime,
+      verificationAttempts: 0
     };
 
     user = await prisma.user.create({
@@ -78,6 +281,11 @@ const findOrCreateUserByEmail = async (email, googleData = null) => {
       isNewUser: true 
     });
 
+    // Send verification email for non-Google users
+    if (!googleData) {
+      await sendVerificationEmail(email, verificationCode);
+    }
+
     return { user, isNewUser: true };
 
   } catch (error) {
@@ -86,9 +294,8 @@ const findOrCreateUserByEmail = async (email, googleData = null) => {
   }
 };
 
-
 // ========================================================
-// ✅ BARU: FUNGSI REGISTER WITH EMAIL ONLY
+// ✅ BARU: FUNGSI REGISTER WITH EMAIL ONLY - DIPERBAIKI DENGAN VERIFIKASI
 // ========================================================
 
 const registerWithEmail = async (email) => {
@@ -128,7 +335,11 @@ const registerWithEmail = async (email) => {
       console.log('👤 [AUTH SERVICE] Regular user, generated NIM:', nim);
     }
 
-    // Create new user
+    // Generate verification code
+    const verificationCode = generateVerificationCode();
+    const expirationTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // ✅ PERBAIKAN: Create new user dengan field yang benar
     const newUser = await prisma.user.create({
       data: {
         nim: nim,
@@ -137,7 +348,11 @@ const registerWithEmail = async (email) => {
         authMethod: 'email',
         userType: userType,
         isProfileComplete: false,
-        status: 'active'
+        status: 'pending', // Pending until email verified
+        isEmailVerified: false,
+        verificationCode: verificationCode,
+        verificationCodeExpires: expirationTime,
+        verificationAttempts: 0
       }
     });
 
@@ -147,39 +362,15 @@ const registerWithEmail = async (email) => {
       type: userType 
     });
 
-    // Generate token
-    const token = jwt.sign(
-      { 
-        userId: newUser.id,
-        nim: newUser.nim,
-        email: newUser.email,
-        isProfileComplete: newUser.isProfileComplete,
-        userType: userType
-      },
-      process.env.JWT_SECRET || 'fallback-secret',
-      { expiresIn: '7d' }
-    );
-
-    // Create session
-    await createSession(newUser.id, token, 'email-registration', 'email-registration');
+    // Send verification email
+    await sendVerificationEmail(email, verificationCode);
 
     return {
       success: true,
-      message: userType === 'student' 
-        ? 'Registrasi berhasil. Silakan lengkapi profil Anda.' 
-        : 'Registration successful. Please complete your profile.',
+      message: 'Kode verifikasi telah dikirim ke email Anda. Silakan verifikasi email untuk melanjutkan.',
       data: {
-        user: {
-          id: newUser.id,
-          nim: newUser.nim,
-          email: newUser.email,
-          fullName: newUser.fullName,
-          isProfileComplete: newUser.isProfileComplete,
-          userType: userType,
-          authMethod: newUser.authMethod
-        },
-        token: token,
-        requiresProfileCompletion: true
+        email: newUser.email,
+        requiresVerification: true
       }
     };
 
@@ -263,6 +454,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           authMethod: true,
           userType: true,
           isProfileComplete: true,
+          isEmailVerified: true,
           passwordHash: true,
           phone: true,
           programStudiId: true,
@@ -385,6 +577,7 @@ const verifySession = async (token) => {
             authMethod: true,
             userType: true,
             isProfileComplete: true,
+            isEmailVerified: true,
             passwordHash: true,
             phone: true,
             programStudiId: true,
@@ -441,7 +634,8 @@ const updateUserVerification = async (userId, verificationData) => {
         status: true,
         authMethod: true,
         userType: true,
-        isProfileComplete: true
+        isProfileComplete: true,
+        isEmailVerified: true
       }
     });
 
@@ -479,7 +673,8 @@ const updateUserProfile = async (userId, profileData) => {
         status: true,
         authMethod: true,
         userType: true,
-        isProfileComplete: true
+        isProfileComplete: true,
+        isEmailVerified: true
       }
     });
 
@@ -569,7 +764,11 @@ const register = async (userData) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Buat user baru
+    // Generate verification code for email verification
+    const verificationCode = generateVerificationCode();
+    const expirationTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Buat user baru dengan status pending
     const user = await prisma.user.create({
       data: {
         fullName: fullName.trim(),
@@ -579,7 +778,11 @@ const register = async (userData) => {
         authMethod: 'nim',
         userType: 'student',
         isProfileComplete: true, // Complete profile for NIM registration
-        status: 'active'
+        status: 'pending', // Pending until email verified
+        isEmailVerified: false,
+        verificationCode: verificationCode,
+        verificationCodeExpires: expirationTime,
+        verificationAttempts: 0
       },
     });
 
@@ -589,26 +792,16 @@ const register = async (userData) => {
       nim: user.nim
     });
 
-    // Generate token
-    const token = generateToken(user.id);
-    
-    // Buat session
-    await createSession(user.id, token, 'registration', 'registration');
+    // Send verification email
+    await sendVerificationEmail(email, verificationCode);
 
     return {
       success: true,
-      message: 'Registrasi berhasil',
-      user: {
-        id: user.id,
-        fullName: user.fullName,
-        email: user.email,
-        nim: user.nim,
-        status: user.status,
-        authMethod: user.authMethod,
-        userType: user.userType,
-        isProfileComplete: user.isProfileComplete
-      },
-      token,
+      message: 'Registrasi berhasil. Kode verifikasi telah dikirim ke email Anda.',
+      requiresVerification: true,
+      data: {
+        email: user.email
+      }
     };
   } catch (error) {
     console.error('[ERROR] Register service error:', error);
@@ -672,6 +865,15 @@ const login = async (identifier, password, ipAddress, userAgent) => {
 
     // Cek status user
     if (user.status !== 'active') {
+      if (user.status === 'pending') {
+        return {
+          success: false,
+          message: 'Email belum diverifikasi. Silakan cek email Anda untuk kode verifikasi.',
+          requiresVerification: true,
+          email: user.email
+        };
+      }
+      
       console.log(`[DEBUG] User ${identifier} is not active`);
       return {
         success: false,
@@ -732,7 +934,8 @@ const login = async (identifier, password, ipAddress, userAgent) => {
         status: user.status,
         authMethod: user.authMethod,
         userType: user.userType,
-        isProfileComplete: user.isProfileComplete
+        isProfileComplete: user.isProfileComplete,
+        isEmailVerified: user.isEmailVerified
       },
     };
 
@@ -783,6 +986,7 @@ const getUserById = async (userId) => {
         authMethod: true,
         userType: true,
         isProfileComplete: true,
+        isEmailVerified: true,
         createdAt: true
       }
     });
@@ -795,7 +999,7 @@ const getUserById = async (userId) => {
 };
 
 // ========================================================
-// EXPORTS - TAMBAH FUNGSI BARU
+// EXPORTS - TAMBAH FUNGSI BARU VERIFIKASI
 // ========================================================
 module.exports = {
   register,
@@ -813,5 +1017,10 @@ module.exports = {
   // ✅ FUNGSI BARU
   findOrCreateUserByEmail,
   registerWithEmail,
+  // ✅ FUNGSI VERIFIKASI BARU
+  generateVerificationCode,
+  sendVerificationEmail,
+  verifyEmailCode,
+  resendVerificationCode,
   passport,
 };
