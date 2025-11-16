@@ -1,4 +1,6 @@
 const authService = require('../services/authService');
+const academicService = require('../services/academicService');
+
 
 const googleAuth = (req, res, next) => {
   console.log('[DEBUG] Initiating Google OAuth');
@@ -49,8 +51,10 @@ const googleCallbackSuccess = async (req, res) => {
       nim: req.user.nim,
       email: req.user.email,
       fullName: req.user.fullName,
-      googleId: req.user.googleId,
-      status: req.user.status
+      status: req.user.status,
+      authMethod: req.user.authMethod,
+      userType: req.user.userType,
+      isProfileComplete: req.user.isProfileComplete
     };
 
     console.log(`[DEBUG] User data to send:`, userData);
@@ -67,6 +71,41 @@ const googleCallbackSuccess = async (req, res) => {
   } catch (error) {
     console.error('[ERROR] Error in Google callback success:', error);
     res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=server_error`);
+  }
+};
+
+// ✅ BARU: REGISTER FUNCTION
+const register = async (req, res) => {
+  try {
+    const { fullName, nim, email, password } = req.body;
+
+    console.log('🔍 [AUTH CONTROLLER] Register attempt:', { fullName, nim, email });
+
+    // Validasi input
+    if (!fullName || !nim || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Semua field harus diisi'
+      });
+    }
+
+    // Panggil service register
+    const result = await authService.register({ fullName, nim, email, password });
+
+    if (result.success) {
+      console.log('✅ [AUTH CONTROLLER] Registration successful:', email);
+      res.status(201).json(result);
+    } else {
+      console.log('❌ [AUTH CONTROLLER] Registration failed:', result.message);
+      res.status(400).json(result);
+    }
+
+  } catch (error) {
+    console.error('❌ [AUTH CONTROLLER] Register error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server saat registrasi'
+    });
   }
 };
 
@@ -125,7 +164,10 @@ const login = async (req, res) => {
           nim: result.user.nim,
           email: result.user.email,
           fullName: result.user.fullName,
-          status: result.user.status
+          status: result.user.status,
+          authMethod: result.user.authMethod,
+          userType: result.user.userType,
+          isProfileComplete: result.user.isProfileComplete
         }
       });
     } else {
@@ -144,81 +186,163 @@ const login = async (req, res) => {
   }
 };
 
-// PERBAIKAN: Register dengan validasi yang lebih ketat
-const register = async (req, res) => {
+// ✅ BARU: REGISTER WITH EMAIL ONLY
+const registerWithEmail = async (req, res) => {
   try {
-    const { fullName, nim, email, password } = req.body;
+    const { email } = req.body;
+    
+    console.log('🔍 [AUTH CONTROLLER] Register with email request:', email);
 
-    console.log(`[DEBUG] Registration attempt for:`, { fullName, nim, email });
-
-    // Validasi required fields
-    if (!fullName || !nim || !email || !password) {
+    if (!email) {
       return res.status(400).json({
         success: false,
-        message: 'Semua field harus diisi'
+        message: 'Email harus diisi'
       });
     }
 
-    // Validasi format
-    if (fullName.length < 2) {
-      return res.status(400).json({
-        success: false,
-        message: 'Nama lengkap harus minimal 2 karakter'
-      });
-    }
-
-    if (nim.length < 3) {
-      return res.status(400).json({
-        success: false,
-        message: 'Format NIM tidak valid'
-      });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password harus minimal 6 karakter'
-      });
-    }
-
-    // Validasi email format sederhana
-    if (!email.includes('@')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Format email tidak valid'
-      });
-    }
-
-    const result = await authService.register(req.body);
+    // Panggil service registerWithEmail
+    const result = await authService.registerWithEmail(email);
 
     if (result.success) {
-      console.log(`[DEBUG] Registration successful for: ${email}`);
-      
-      // PERBAIKAN: Kirim user data yang lengkap
-      res.status(201).json({
-        success: true,
-        message: result.message,
-        token: result.token,
-        user: {
-          id: result.user.id,
-          nim: result.user.nim,
-          email: result.user.email,
-          fullName: result.user.fullName,
-          status: result.user.status
-        }
-      });
+      console.log('✅ [AUTH CONTROLLER] Email registration successful:', email);
+      return res.status(201).json(result);
     } else {
-      console.log(`[DEBUG] Registration failed for: ${email} - ${result.message}`);
-      res.status(400).json({
+      console.log('❌ [AUTH CONTROLLER] Email registration failed:', result.message);
+      return res.status(400).json(result);
+    }
+
+  } catch (error) {
+    console.error('❌ [AUTH CONTROLLER] Register with email error:', error);
+    
+    if (error.message === 'Email already registered') {
+      return res.status(409).json({
         success: false,
-        message: result.message
+        message: 'Email sudah terdaftar'
       });
     }
-  } catch (error) {
-    console.error('[ERROR] Register controller error:', error);
-    res.status(500).json({
+    
+    return res.status(500).json({
       success: false,
       message: 'Terjadi kesalahan server saat registrasi'
+    });
+  }
+};
+
+// ✅ BARU: Verify student data dengan academic system
+const verifyStudent = async (req, res) => {
+  try {
+    const { nim, fullName, birthDate } = req.body;
+    const userId = req.user.id;
+
+    console.log('🔍 [AUTH CONTROLLER] Verifying student:', { nim, fullName, birthDate, userId });
+
+    // Validasi input
+    if (!nim || !fullName || !birthDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'NIM, nama lengkap, dan tanggal lahir harus diisi'
+      });
+    }
+
+    // Validasi format NIM (10-12 digit)
+    if (nim.length < 10 || nim.length > 12) {
+      return res.status(400).json({
+        success: false,
+        message: 'NIM harus 10-12 digit'
+      });
+    }
+
+    // Validasi format tanggal lahir
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Format tanggal lahir tidak valid (gunakan YYYY-MM-DD)'
+      });
+    }
+
+    // Panggil academic service untuk validasi
+    const validationResult = await academicService.validateStudent(nim, fullName, birthDate);
+
+    if (validationResult.valid) {
+      console.log('✅ [AUTH CONTROLLER] Student validation successful:', validationResult.data);
+
+      // Update user verification status di database
+      await authService.updateUserVerification(userId, {
+        nim: validationResult.data.nim,
+        fullName: validationResult.data.fullName
+      });
+
+      res.json({
+        success: true,
+        valid: true,
+        data: validationResult.data,
+        message: validationResult.message
+      });
+    } else {
+      console.log('❌ [AUTH CONTROLLER] Student validation failed');
+      res.status(400).json({
+        success: false,
+        valid: false,
+        message: validationResult.message
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ [AUTH CONTROLLER] Verify student error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan sistem saat verifikasi'
+    });
+  }
+};
+
+// ✅ BARU: Update user verification status
+const updateVerification = async (req, res) => {
+  try {
+    const { nim, fullName } = req.body;
+    const userId = req.user.id;
+
+    console.log('🔍 [AUTH CONTROLLER] Updating verification:', { userId, nim, fullName });
+
+    await authService.updateUserVerification(userId, {
+      nim,
+      fullName
+    });
+
+    res.json({
+      success: true,
+      message: 'Status verifikasi berhasil diperbarui'
+    });
+
+  } catch (error) {
+    console.error('❌ [AUTH CONTROLLER] Update verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Gagal memperbarui status verifikasi'
+    });
+  }
+};
+
+// ✅ BARU: Update user profile
+const updateProfile = async (req, res) => {
+  try {
+    const { email, nim, fullName } = req.body;
+    const userId = req.user.id;
+
+    console.log('🔍 [AUTH CONTROLLER] Updating profile:', { userId, email, nim, fullName });
+
+    await authService.updateUserProfile(userId, { email, nim, fullName });
+
+    res.json({
+      success: true,
+      message: 'Profile berhasil diperbarui'
+    });
+
+  } catch (error) {
+    console.error('❌ [AUTH CONTROLLER] Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Gagal memperbarui profile'
     });
   }
 };
@@ -277,7 +401,10 @@ const verify = async (req, res) => {
           nim: result.user.nim,
           email: result.user.email,
           fullName: result.user.fullName,
-          status: result.user.status
+          status: result.user.status,
+          authMethod: result.user.authMethod,
+          userType: result.user.userType,
+          isProfileComplete: result.user.isProfileComplete
         }
       });
     } else {
@@ -398,7 +525,11 @@ module.exports = {
   googleCallback,
   googleCallbackSuccess,
   login,
-  register,
+  register,           // ✅ DITAMBAHKAN
+  registerWithEmail,  // ✅ DITAMBAHKAN
+  verifyStudent,
+  updateVerification,  
+  updateProfile,
   checkNIM,
   logout,
   verify,
