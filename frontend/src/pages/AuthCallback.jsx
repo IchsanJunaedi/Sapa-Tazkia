@@ -44,11 +44,13 @@ const AuthCallback = () => {
         const token = searchParams.get('token');
         const userParam = searchParams.get('user');
         const success = searchParams.get('success');
+        const requiresVerification = searchParams.get('requires_verification') === 'true';
 
         console.log('🔍 [AUTH CALLBACK] URL Parameters:', {
           token: token ? `✓ Available (${token.length} chars)` : '✗ Missing',
           userParam: userParam ? '✓ Available' : '✗ Missing', 
           success,
+          requiresVerification,
           fullURL: window.location.href
         });
 
@@ -90,12 +92,52 @@ const AuthCallback = () => {
             fullName: userData.fullName,
             email: userData.email,
             isProfileComplete: userData.isProfileComplete,
+            isEmailVerified: userData.isEmailVerified,
+            authMethod: userData.authMethod,
             nim: userData.nim
           });
 
+          // ✅ ✅ ✅ PERBAIKAN KRITIS: Cek apakah perlu verifikasi email
+          const needsEmailVerification = requiresVerification || 
+                                       (userData && !userData.isEmailVerified);
+
+          console.log('🔍 [AUTH CALLBACK] Verification check:', {
+            needsEmailVerification,
+            fromParams: requiresVerification,
+            fromUserData: userData?.isEmailVerified,
+            authMethod: userData?.authMethod
+          });
+
+          // ✅ PERBAIKAN: Prioritaskan verifikasi email untuk new user
+          if (needsEmailVerification) {
+            console.log('🔐 [AUTH CALLBACK] Email verification required - Redirecting to VERIFICATION PAGE');
+            
+            // Simpan data sementara untuk verifikasi
+            localStorage.setItem('pendingVerificationEmail', userData.email);
+            localStorage.setItem('verificationUserData', JSON.stringify(userData));
+            localStorage.setItem('verificationToken', token);
+            
+            // ✅ PERBAIKAN: Clear URL parameters SEBELUM redirect
+            const cleanUrl = window.location.origin + window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+            
+            setStatus('Redirecting to verification...');
+            
+            navigate('/verify-email', { 
+              replace: true,
+              state: { 
+                from: 'oauth-callback',
+                userData: userData,
+                token: token,
+                isNewUser: true
+              }
+            });
+            return;
+          }
+
           setStatus('Logging in...');
           
-          // ✅ PERBAIKAN 4: Tandai sebagai processed SEBELUM login
+          // ✅ PERBAIKAN: Tandai sebagai processed SEBELUM login
           hasProcessedRef.current = true;
 
           // Simpan data ke AuthContext
@@ -107,21 +149,22 @@ const AuthCallback = () => {
             needsProfileCompletion: result.needsProfileCompletion
           });
 
-          // ✅ PERBAIKAN 5: Clear URL parameters SEBELUM redirect
+          // ✅ PERBAIKAN: Clear URL parameters SEBELUM redirect
           const cleanUrl = window.location.origin + window.location.pathname;
           window.history.replaceState({}, document.title, cleanUrl);
           
           setStatus('Redirecting...');
           
-          // ✅ PERBAIKAN 6: Gunakan HANYA data dari loginResult
+          // ✅ PERBAIKAN: Gunakan HANYA data dari loginResult
           const needsCompletion = result.needsProfileCompletion;
           
           console.log('🔍 [AUTH CALLBACK] Final decision:', { 
             needsCompletion,
-            userProfileComplete: userData.isProfileComplete
+            userProfileComplete: userData.isProfileComplete,
+            isEmailVerified: userData.isEmailVerified
           });
 
-          // ✅ PERBAIKAN 7: Redirect langsung tanpa setTimeout
+          // ✅ PERBAIKAN: Redirect langsung tanpa setTimeout
           if (needsCompletion) {
             console.log('🔍 [AUTH CALLBACK] FIRST TIME USER - Redirecting to AboutYouPage');
             navigate('/about-you', { 
