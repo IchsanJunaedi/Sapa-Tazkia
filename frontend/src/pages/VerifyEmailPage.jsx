@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api/axiosConfig';
+import { useAuth } from '../context/AuthContext';
 
 const VerifyEmailPage = () => {
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
@@ -14,28 +15,58 @@ const VerifyEmailPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const inputRefs = useRef([]);
+  const { login } = useAuth();
 
   // Initialize input refs
   useEffect(() => {
     inputRefs.current = inputRefs.current.slice(0, 6);
   }, []);
 
-  // Get email from location state or localStorage
+  // ✅ PERBAIKAN: Get email from multiple sources including Google OAuth
   useEffect(() => {
     const locationEmail = location.state?.email;
     const storedEmail = localStorage.getItem('userEmail');
+    const pendingEmail = localStorage.getItem('pendingVerificationEmail');
+    const oauthUserData = location.state?.userData;
     
+    let finalEmail = '';
+    let finalUserData = null;
+    
+    console.log('🔍 [VERIFY EMAIL] Checking email sources:', {
+      locationEmail,
+      storedEmail,
+      pendingEmail,
+      oauthUserData: !!oauthUserData
+    });
+
+    // Priority order for email sources
     if (locationEmail) {
-      setEmail(locationEmail);
+      finalEmail = locationEmail;
       console.log('🔍 [VERIFY EMAIL] Email from location state:', locationEmail);
+    } else if (pendingEmail) {
+      finalEmail = pendingEmail;
+      console.log('🔍 [VERIFY EMAIL] Email from pending verification:', pendingEmail);
     } else if (storedEmail) {
-      setEmail(storedEmail);
+      finalEmail = storedEmail;
       console.log('🔍 [VERIFY EMAIL] Email from localStorage:', storedEmail);
+    } else if (oauthUserData?.email) {
+      finalEmail = oauthUserData.email;
+      finalUserData = oauthUserData;
+      console.log('🔍 [VERIFY EMAIL] Email from OAuth user data:', oauthUserData.email);
     } else {
       console.log('❌ [VERIFY EMAIL] No email found, redirecting to login');
       navigate('/login', { 
         state: { error: 'Sesi verifikasi telah berakhir. Silakan daftar ulang.' }
       });
+      return;
+    }
+    
+    setEmail(finalEmail);
+    
+    // ✅ PERBAIKAN: Simpan user data jika dari OAuth untuk digunakan setelah verifikasi
+    if (finalUserData) {
+      localStorage.setItem('verificationUserData', JSON.stringify(finalUserData));
+      console.log('✅ [VERIFY EMAIL] OAuth user data saved for post-verification');
     }
   }, [location, navigate]);
 
@@ -109,7 +140,7 @@ const VerifyEmailPage = () => {
   };
 
   /**
-   * Verify the email with the code
+   * ✅ PERBAIKAN: Verify the email with the code - Handle Google OAuth case
    */
   const handleVerification = async () => {
     const code = verificationCode.join('');
@@ -140,35 +171,82 @@ const VerifyEmailPage = () => {
       if (response.data.success) {
         setSuccess('Email berhasil diverifikasi!');
         
-        // Save token and user data
+        // ✅ PERBAIKAN: Handle both API response data AND Google OAuth stored data
         const { token, user, requiresProfileCompletion } = response.data;
         
-        if (token && user) {
-          localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(user));
+        // ✅ PERBAIKAN: Cek jika ada OAuth data yang tersimpan
+        const oauthToken = localStorage.getItem('verificationToken');
+        const oauthUserData = localStorage.getItem('verificationUserData');
+        
+        const finalToken = token || oauthToken;
+        let finalUser = user;
+        
+        // ✅ Jika dari Google OAuth, gunakan data yang disimpan
+        if (!finalUser && oauthUserData) {
+          try {
+            finalUser = JSON.parse(oauthUserData);
+            // Update status verifikasi untuk user OAuth
+            finalUser.isEmailVerified = true;
+            console.log('✅ [VERIFY EMAIL] Using OAuth user data with verified status');
+          } catch (e) {
+            console.error('❌ [VERIFY EMAIL] Error parsing OAuth user data:', e);
+          }
+        }
+
+        if (finalToken && finalUser) {
+          // ✅ PERBAIKAN: Simpan token dan user data
+          localStorage.setItem('token', finalToken);
+          localStorage.setItem('user', JSON.stringify(finalUser));
           
-          // Clear temporary storage
+          // ✅ PERBAIKAN: Login ke AuthContext untuk konsistensi state
+          try {
+            await login(finalToken, finalUser);
+            console.log('✅ [VERIFY EMAIL] User logged in to AuthContext');
+          } catch (loginError) {
+            console.error('❌ [VERIFY EMAIL] AuthContext login failed:', loginError);
+            // Continue anyway since we have localStorage
+          }
+          
+          // ✅ PERBAIKAN: Clear semua temporary storage
           localStorage.removeItem('userEmail');
           localStorage.removeItem('isNewUser');
+          localStorage.removeItem('pendingVerificationEmail');
+          localStorage.removeItem('verificationUserData');
+          localStorage.removeItem('verificationToken');
           
           console.log('🔍 [VERIFY EMAIL] User data after verification:', {
-            user,
-            requiresProfileCompletion
+            user: finalUser,
+            requiresProfileCompletion,
+            isEmailVerified: finalUser.isEmailVerified,
+            isProfileComplete: finalUser.isProfileComplete
           });
 
-          // Redirect based on profile completion status
+          // ✅ PERBAIKAN: Redirect logic yang lebih baik
           setTimeout(() => {
-            if (requiresProfileCompletion || !user.isProfileComplete) {
-              console.log('🔍 [VERIFY EMAIL] Redirecting to AboutYouPage');
+            // Prioritaskan profile completion jika diperlukan
+            const needsProfileCompletion = requiresProfileCompletion || 
+                                         !finalUser.isProfileComplete || 
+                                         !finalUser.fullName ||
+                                         finalUser.fullName.trim().length === 0;
+            
+            console.log('🔍 [VERIFY EMAIL] Redirect decision:', {
+              needsProfileCompletion,
+              requiresProfileCompletion,
+              isProfileComplete: finalUser.isProfileComplete,
+              hasFullName: !!finalUser.fullName && finalUser.fullName.trim().length > 0
+            });
+
+            if (needsProfileCompletion) {
+              console.log('🔍 [VERIFY EMAIL] Profile incomplete - Redirecting to AboutYouPage');
               navigate('/about-you', { 
                 state: { 
                   from: 'email-verification',
-                  userData: user
+                  userData: finalUser
                 }
               });
             } else {
-              console.log('🔍 [VERIFY EMAIL] Redirecting to chat');
-              navigate('/chat', { 
+              console.log('🔍 [VERIFY EMAIL] All complete - Redirecting to landing page');
+              navigate('/', { 
                 state: { 
                   from: 'email-verification',
                   welcome: true
@@ -176,6 +254,8 @@ const VerifyEmailPage = () => {
               });
             }
           }, 1500);
+        } else {
+          throw new Error('Invalid verification response: missing token or user data');
         }
       } else {
         setError(response.data.message || 'Verifikasi gagal');
@@ -251,13 +331,28 @@ const VerifyEmailPage = () => {
   };
 
   /**
-   * Navigate back to registration
+   * ✅ PERBAIKAN: Navigate back dengan handle Google OAuth case
    */
   const handleBackToRegistration = () => {
+    // Clear semua temporary storage
     localStorage.removeItem('userEmail');
-    navigate('/login', { 
-      state: { showEmailRegistration: true }
-    });
+    localStorage.removeItem('isNewUser');
+    localStorage.removeItem('pendingVerificationEmail');
+    localStorage.removeItem('verificationUserData');
+    localStorage.removeItem('verificationToken');
+    
+    // Redirect berdasarkan source
+    if (location.state?.from === 'oauth-callback') {
+      navigate('/login', { 
+        state: { 
+          message: 'Verifikasi dibatalkan. Silakan coba login kembali.' 
+        }
+      });
+    } else {
+      navigate('/login', { 
+        state: { showEmailRegistration: true }
+      });
+    }
   };
 
   return (
@@ -286,6 +381,13 @@ const VerifyEmailPage = () => {
             Masukkan kode verifikasi 6 digit yang dikirim ke
           </p>
           <p className="text-blue-600 font-medium">{email}</p>
+          
+          {/* ✅ PERBAIKAN: Tampilkan source verification */}
+          {location.state?.from === 'oauth-callback' && (
+            <p className="text-xs text-green-600 mt-2">
+              ✅ Verifikasi untuk akun Google OAuth
+            </p>
+          )}
         </div>
 
         {/* Success Message */}
