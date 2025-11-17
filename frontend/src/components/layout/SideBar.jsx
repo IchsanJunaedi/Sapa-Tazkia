@@ -229,139 +229,144 @@ const Sidebar = ({
           )}
         </div>
 
-        {/* ✅ DIUBAH: Area Chat History dengan flex-1 agar profile tetap di bawah */}
-        {isChatsSectionOpen && isSidebarOpen && (
-          <div className="flex-1 overflow-y-auto mt-2 space-y-4 min-h-0 custom-scrollbar">
-            {/* Today */}
-            {groupedChats.today.length > 0 && (
-              <div className="space-y-1">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Today</h3>
-                {groupedChats.today.map(chat => (
-                  <ChatItem 
-                    key={chat.id}
-                    chat={chat}
-                    currentChatId={currentChatId}
-                    onSelectChat={onSelectChat}
-                    onDeleteChat={onDeleteChat}
-                    isDeleting={isDeleting}
-                    handleMoreClick={handleMoreClick}
-                    isSidebarOpen={isSidebarOpen}
-                  />
-                ))}
-              </div>
-            )}
+        {/* ✅ DIUBAH: Area Chat History dengan struktur yang benar */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {isChatsSectionOpen && isSidebarOpen ? (
+            <div className="flex-1 overflow-y-auto mt-4 space-y-4 custom-scrollbar">
+              {/* Today */}
+              {groupedChats.today.length > 0 && (
+                <div className="space-y-1">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Today</h3>
+                  {groupedChats.today.map(chat => (
+                    <ChatItem 
+                      key={chat.id}
+                      chat={chat}
+                      currentChatId={currentChatId}
+                      onSelectChat={onSelectChat}
+                      onDeleteChat={onDeleteChat}
+                      isDeleting={isDeleting}
+                      handleMoreClick={handleMoreClick}
+                      isSidebarOpen={isSidebarOpen}
+                    />
+                  ))}
+                </div>
+              )}
 
-            {/* Yesterday */}
-            {groupedChats.yesterday.length > 0 && (
-              <div className="space-y-1">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Yesterday</h3>
-                {groupedChats.yesterday.map(chat => (
-                  <ChatItem 
-                    key={chat.id}
-                    chat={chat}
-                    currentChatId={currentChatId}
-                    onSelectChat={onSelectChat}
-                    onDeleteChat={onDeleteChat}
-                    isDeleting={isDeleting}
-                    handleMoreClick={handleMoreClick}
-                    isSidebarOpen={isSidebarOpen}
-                  />
-                ))}
-              </div>
-            )}
+              {/* Yesterday */}
+              {groupedChats.yesterday.length > 0 && (
+                <div className="space-y-1">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Yesterday</h3>
+                  {groupedChats.yesterday.map(chat => (
+                    <ChatItem 
+                      key={chat.id}
+                      chat={chat}
+                      currentChatId={currentChatId}
+                      onSelectChat={onSelectChat}
+                      onDeleteChat={onDeleteChat}
+                      isDeleting={isDeleting}
+                      handleMoreClick={handleMoreClick}
+                      isSidebarOpen={isSidebarOpen}
+                    />
+                  ))}
+                </div>
+              )}
 
-            {/* Last 7 Days */}
-            {groupedChats.last7Days.length > 0 && (
-              <div className="space-y-1">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Previous 7 Days</h3>
-                {groupedChats.last7Days.map(chat => (
-                  <ChatItem 
-                    key={chat.id}
-                    chat={chat}
-                    currentChatId={currentChatId}
-                    onSelectChat={onSelectChat}
-                    onDeleteChat={onDeleteChat}
-                    isDeleting={isDeleting}
-                    handleMoreClick={handleMoreClick}
-                    isSidebarOpen={isSidebarOpen}
-                  />
-                ))}
-              </div>
-            )}
+              {/* Last 7 Days */}
+              {groupedChats.last7Days.length > 0 && (
+                <div className="space-y-1">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Previous 7 Days</h3>
+                  {groupedChats.last7Days.map(chat => (
+                    <ChatItem 
+                      key={chat.id}
+                      chat={chat}
+                      currentChatId={currentChatId}
+                      onSelectChat={onSelectChat}
+                      onDeleteChat={onDeleteChat}
+                      isDeleting={isDeleting}
+                      handleMoreClick={handleMoreClick}
+                      isSidebarOpen={isSidebarOpen}
+                    />
+                  ))}
+                </div>
+              )}
 
-            {/* Last 30 Days */}
-            {groupedChats.last30Days.length > 0 && (
-              <div className="space-y-1">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Previous 30 Days</h3>
-                {groupedChats.last30Days.map(chat => (
-                  <ChatItem 
-                    key={chat.id}
-                    chat={chat}
-                    currentChatId={currentChatId}
-                    onSelectChat={onSelectChat}
-                    onDeleteChat={onDeleteChat}
-                    isDeleting={isDeleting}
-                    handleMoreClick={handleMoreClick}
-                    isSidebarOpen={isSidebarOpen}
-                  />
-                ))}
-              </div>
-            )}
+              {/* Last 30 Days */}
+              {groupedChats.last30Days.length > 0 && (
+                <div className="space-y-1">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Previous 30 Days</h3>
+                  {groupedChats.last30Days.map(chat => (
+                    <ChatItem 
+                      key={chat.id}
+                      chat={chat}
+                      currentChatId={currentChatId}
+                      onSelectChat={onSelectChat}
+                      onDeleteChat={onDeleteChat}
+                      isDeleting={isDeleting}
+                      handleMoreClick={handleMoreClick}
+                      isSidebarOpen={isSidebarOpen}
+                    />
+                  ))}
+                </div>
+              )}
 
-            {/* Older chats grouped by month */}
-            {groupedChats.older.length > 0 && (
-              <div className="space-y-1">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">
-                  {formatMonthYear(groupedChats.older[0].timestamp)}
-                </h3>
-                {groupedChats.older.map(chat => (
-                  <ChatItem 
-                    key={chat.id}
-                    chat={chat}
-                    currentChatId={currentChatId}
-                    onSelectChat={onSelectChat}
-                    onDeleteChat={onDeleteChat}
-                    isDeleting={isDeleting}
-                    handleMoreClick={handleMoreClick}
-                    isSidebarOpen={isSidebarOpen}
-                  />
-                ))}
-              </div>
-            )}
+              {/* Older chats grouped by month */}
+              {groupedChats.older.length > 0 && (
+                <div className="space-y-1">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">
+                    {formatMonthYear(groupedChats.older[0].timestamp)}
+                  </h3>
+                  {groupedChats.older.map(chat => (
+                    <ChatItem 
+                      key={chat.id}
+                      chat={chat}
+                      currentChatId={currentChatId}
+                      onSelectChat={onSelectChat}
+                      onDeleteChat={onDeleteChat}
+                      isDeleting={isDeleting}
+                      handleMoreClick={handleMoreClick}
+                      isSidebarOpen={isSidebarOpen}
+                    />
+                  ))}
+                </div>
+              )}
 
-            {/* Empty State */}
-            {chatHistory.length === 0 && user && (
-              <p className="p-2 text-xs text-gray-500 text-center">
-                Belum ada riwayat chat.
-              </p>
-            )}
-            {!user && (
-              <p className="p-2 text-xs text-gray-500 text-center">
-                Login untuk melihat riwayat chat Anda.
-              </p>
-            )}
-          </div>
-        )}
+              {/* Empty State */}
+              {chatHistory.length === 0 && user && (
+                <p className="p-2 text-xs text-gray-500 text-center">
+                  Belum ada riwayat chat.
+                </p>
+              )}
+              {!user && (
+                <p className="p-2 text-xs text-gray-500 text-center">
+                  Login untuk melihat riwayat chat Anda.
+                </p>
+              )}
+            </div>
+          ) : (
+            // ✅ TAMBAHAN: Empty space ketika chat history tidak ditampilkan
+            <div className="flex-1"></div>
+          )}
+        </div>
 
-        {/* ✅ DIUBAH: Profile Section - PASTIKAN SELALU DI BAWAH */}
-        <div className="mt-auto flex-shrink-0">
-          <div className="flex justify-center mb-4">
+        {/* ✅ DIUBAH: Profile Section dengan margin top yang cukup */}
+        <div className="mt-8 flex-shrink-0">
+          <div className="flex justify-center">
             <button
-              className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-auto ${
+              className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${
                 user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c80]'
-              } text-white rounded-xl shadow-lg transition-all flex flex-col items-start group relative gap-1 p-3`}
+              } text-white rounded-xl shadow-lg transition-all flex items-center`}
               title={user ? `Logged in as ${getUserName()}. NIM: ${getUserNIM()}` : 'Login as Mahasiswa'}
               onClick={handleProfileClick}
             >
-              <div className="flex items-center gap-3 w-full">
+              <div className={`flex items-center ${isSidebarOpen ? 'gap-3 w-full' : 'justify-center w-full'}`}>
                 <User size={20} />
                 {isSidebarOpen && (
-                  <div className="flex flex-col items-start">
-                    <span className="text-sm font-semibold whitespace-nowrap truncate max-w-[160px]">
+                  <div className="flex flex-col items-start flex-1 min-w-0">
+                    <span className="text-sm font-semibold whitespace-nowrap truncate">
                       {user ? getUserName() : 'Login Mahasiswa'}
                     </span>
                     {user && (
-                      <span className="text-xs text-gray-300 whitespace-nowrap truncate max-w-[160px]">
+                      <span className="text-xs text-gray-300 whitespace-nowrap truncate">
                         {getUserNIM()}
                       </span>
                     )}
