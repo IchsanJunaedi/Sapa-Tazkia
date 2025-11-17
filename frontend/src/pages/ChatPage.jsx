@@ -197,6 +197,74 @@ const ChatPage = () => {
         }
     };
 
+    // ✅ FUNGSI: Mengelompokkan chat berdasarkan waktu (BARU)
+    const groupChatsByTime = useCallback((chats) => {
+        if (!chats || !Array.isArray(chats)) {
+            return {
+                today: [],
+                yesterday: [],
+                last7Days: [],
+                last30Days: [],
+                older: []
+            };
+        }
+
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const groups = {
+            today: [],
+            yesterday: [],
+            last7Days: [],
+            last30Days: [],
+            older: []
+        };
+
+        chats.forEach(chat => {
+            // Handle berbagai format timestamp
+            let chatDate;
+            if (chat.timestamp) {
+                chatDate = new Date(chat.timestamp);
+            } else if (chat.createdAt) {
+                chatDate = new Date(chat.createdAt);
+            } else if (chat.lastMessageAt) {
+                chatDate = new Date(chat.lastMessageAt);
+            } else if (chat.updatedAt) {
+                chatDate = new Date(chat.updatedAt);
+            } else {
+                chatDate = new Date(); // Fallback ke waktu sekarang
+            }
+
+            const chatDay = new Date(chatDate.getFullYear(), chatDate.getMonth(), chatDate.getDate());
+
+            if (chatDay.getTime() === today.getTime()) {
+                groups.today.push(chat);
+            } else if (chatDay.getTime() === yesterday.getTime()) {
+                groups.yesterday.push(chat);
+            } else if (chatDate >= sevenDaysAgo) {
+                groups.last7Days.push(chat);
+            } else if (chatDate >= thirtyDaysAgo) {
+                groups.last30Days.push(chat);
+            } else {
+                groups.older.push(chat);
+            }
+        });
+
+        return groups;
+    }, []);
+
+    // ✅ FUNGSI: Format bulan dan tahun (BARU)
+    const formatMonthYear = useCallback((timestamp) => {
+        const date = new Date(timestamp);
+        return date.toLocaleDateString('id-ID', { year: 'numeric', month: 'long' });
+    }, []);
+
     // Attach event listener untuk close menu ketika klik di luar
     useEffect(() => {
         if (showMenu) {
@@ -218,7 +286,16 @@ const ChatPage = () => {
             console.log('🔍 [CHAT PAGE] Loading chat history for user:', user.id);
             const response = await api.get('/api/ai/conversations');
             console.log('✅ [CHAT PAGE] Chat history loaded:', response.data.conversations);
-            setChatHistory(response.data.conversations || []);
+            
+            // ✅ PERBAIKAN: Format data chat history dengan timestamp yang benar
+            const formattedChats = (response.data.conversations || []).map(chat => ({
+                id: chat.id,
+                title: chat.title || chat.conversationTitle || 'Untitled Chat',
+                timestamp: chat.lastMessageAt || chat.updatedAt || chat.createdAt || chat.timestamp || new Date().toISOString(),
+                // Tambahkan properti lain yang diperlukan oleh Sidebar
+            }));
+            
+            setChatHistory(formattedChats);
         } catch (error) {
             console.error('❌ [CHAT PAGE] Error loading chat history:', error);
             
@@ -619,7 +696,7 @@ const ChatPage = () => {
                 isDeleting={isDeleting}
             />
 
-            {/* ✅ UPDATED: Menggunakan komponen Sidebar reusable */}
+            {/* ✅ UPDATED: Menggunakan komponen Sidebar reusable dengan grouping */}
             <Sidebar
                 user={user}
                 onLogin={handleLogin}
@@ -633,6 +710,9 @@ const ChatPage = () => {
                 onToggleSidebar={handleToggleSidebar}
                 onNewChat={handleNewChat}
                 onSettingsClick={handleSettingsClick}
+                // ✅ BARU: Props untuk grouping chat history
+                groupChatsByTime={groupChatsByTime}
+                formatMonthYear={formatMonthYear}
             />
 
             <div className="flex-1 flex flex-col overflow-hidden">
@@ -640,15 +720,15 @@ const ChatPage = () => {
                     {/* Logo */}
                     <div className="flex items-center">
                         <button 
-                onClick={() => navigate('/', { replace: true, state: { from: 'chat-page' } })}
-                className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
-                >
-                <img 
-                    src="/logosapatazkia.png" 
-                    alt="Sapa Tazkia Logo" 
-                    className="h-8 w-auto hover:scale-105 transition-transform duration-200"
-                />
-                </button>
+                            onClick={() => navigate('/', { replace: true, state: { from: 'chat-page' } })}
+                            className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
+                        >
+                            <img 
+                                src="/logosapatazkia.png" 
+                                alt="Sapa Tazkia Logo" 
+                                className="h-8 w-auto hover:scale-105 transition-transform duration-200"
+                            />
+                        </button>
                     </div>
                     
                     <div className="flex items-center space-x-4">
