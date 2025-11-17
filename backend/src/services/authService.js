@@ -81,10 +81,12 @@ const verifyEmailCode = async (email, code) => {
 
     // Check if email is already verified
     if (user.isEmailVerified) {
+      console.log('✅ [AUTH SERVICE] Email already verified, returning user data');
       return {
         success: true,
         message: 'Email sudah terverifikasi',
-        user: user
+        user: user,
+        requiresProfileCompletion: !user.isProfileComplete || !user.fullName || user.fullName.trim() === ''
       };
     }
 
@@ -111,7 +113,7 @@ const verifyEmailCode = async (email, code) => {
       throw new Error('Terlalu banyak percobaan. Silakan request kode baru.');
     }
 
-    // Update user as verified
+    // ✅ PERBAIKAN: Update user as verified - TAPI JANGAN set profile complete untuk new user
     const updatedUser = await prisma.user.update({
       where: { email },
       data: {
@@ -120,6 +122,8 @@ const verifyEmailCode = async (email, code) => {
         verificationCodeExpires: null,
         verificationAttempts: 0,
         status: 'active'
+        // ✅ JANGAN set isProfileComplete: true di sini!
+        // Biarkan false agar user diarahkan ke AboutYouPage
       },
       select: {
         id: true,
@@ -129,12 +133,16 @@ const verifyEmailCode = async (email, code) => {
         status: true,
         authMethod: true,
         userType: true,
-        isProfileComplete: true,
+        isProfileComplete: true,  // Ini akan false untuk new user
         isEmailVerified: true
       }
     });
 
-    console.log('✅ [AUTH SERVICE] Email verified successfully:', email);
+    console.log('✅ [AUTH SERVICE] Email verified successfully:', {
+      email: updatedUser.email,
+      isProfileComplete: updatedUser.isProfileComplete,
+      fullName: updatedUser.fullName
+    });
 
     // Generate token for the verified user
     const token = generateToken(updatedUser.id);
@@ -142,11 +150,17 @@ const verifyEmailCode = async (email, code) => {
     // Create session
     await createSession(updatedUser.id, token, 'email-verification', 'email-verification');
 
+    // ✅ PERBAIKAN: Return requiresProfileCompletion yang benar
+    const requiresProfileCompletion = !updatedUser.isProfileComplete || 
+                                    !updatedUser.fullName || 
+                                    updatedUser.fullName.trim() === '';
+
     return {
       success: true,
       message: 'Email berhasil diverifikasi',
       user: updatedUser,
-      token: token
+      token: token,
+      requiresProfileCompletion: requiresProfileCompletion
     };
 
   } catch (error) {
@@ -206,7 +220,7 @@ const resendVerificationCode = async (email) => {
 };
 
 // ========================================================
-// ✅ BARU: FUNGSI FIND OR CREATE USER BY EMAIL - DIPERBAIKI DENGAN VERIFIKASI
+// ✅ PERBAIKAN BESAR: FUNGSI FIND OR CREATE USER BY EMAIL - SEMUA USER BUTUH VERIFIKASI
 // ========================================================
 
 const findOrCreateUserByEmail = async (email, googleData = null) => {
@@ -251,22 +265,26 @@ const findOrCreateUserByEmail = async (email, googleData = null) => {
       fullName = googleData.name;
     }
 
-    // Generate verification code for new users
+    // ✅ ✅ ✅ PERBAIKAN KRITIS: Generate verification code untuk SEMUA new users (termasuk Google)
     const verificationCode = generateVerificationCode();
     const expirationTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Create user data
+    // ✅ PERBAIKAN: Untuk new user, set isProfileComplete ke false
+    const isProfileComplete = !!(googleData?.name && googleData.name.trim() !== '');
+
+    // ✅ ✅ ✅ PERBAIKAN PENTING: SEMUA new user (termasuk Google) harus through verification
     const userData = {
       nim: nim,
       email: email,
       fullName: fullName,
       authMethod: googleData ? 'google' : 'email',
       userType: userType,
-      isProfileComplete: !!fullName, // If name is provided, consider profile complete
+      isProfileComplete: isProfileComplete, // ✅ Hanya true jika ada nama dari Google
       status: 'pending', // Set to pending until email verified
-      isEmailVerified: googleData ? true : false, // Google users are auto-verified
-      verificationCode: googleData ? null : verificationCode,
-      verificationCodeExpires: googleData ? null : expirationTime,
+      // ✅ ✅ ✅ KRITIS: SEMUA new user butuh verifikasi email
+      isEmailVerified: false, // ❗ UBAH: dari true menjadi false untuk Google users
+      verificationCode: verificationCode, // ❗ UBAH: dari null menjadi verificationCode untuk Google
+      verificationCodeExpires: expirationTime, // ❗ UBAH: dari null menjadi expirationTime untuk Google
       verificationAttempts: 0
     };
 
@@ -278,13 +296,14 @@ const findOrCreateUserByEmail = async (email, googleData = null) => {
       email: user.email, 
       nim: user.nim, 
       type: userType,
-      isNewUser: true 
+      isProfileComplete: user.isProfileComplete,
+      isEmailVerified: user.isEmailVerified, // Harus false
+      hasVerificationCode: !!user.verificationCode // Harus true
     });
 
-    // Send verification email for non-Google users
-    if (!googleData) {
-      await sendVerificationEmail(email, verificationCode);
-    }
+    // ✅ ✅ ✅ PERBAIKAN: Kirim verification email untuk SEMUA new users (termasuk Google)
+    await sendVerificationEmail(email, verificationCode);
+    console.log('✅ [AUTH SERVICE] Verification email sent for Google OAuth user:', email);
 
     return { user, isNewUser: true };
 
@@ -339,15 +358,15 @@ const registerWithEmail = async (email) => {
     const verificationCode = generateVerificationCode();
     const expirationTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // ✅ PERBAIKAN: Create new user dengan field yang benar
+    // ✅ PERBAIKAN: Create new user dengan isProfileComplete: false
     const newUser = await prisma.user.create({
       data: {
         nim: nim,
         email: email,
-        fullName: '', // Will be filled in AboutYouPage
+        fullName: '', // Kosong, akan diisi di AboutYouPage
         authMethod: 'email',
         userType: userType,
-        isProfileComplete: false,
+        isProfileComplete: false, // ✅ FALSE agar user diarahkan ke AboutYouPage
         status: 'pending', // Pending until email verified
         isEmailVerified: false,
         verificationCode: verificationCode,
@@ -359,7 +378,8 @@ const registerWithEmail = async (email) => {
     console.log('✅ [AUTH SERVICE] User created with email:', { 
       email: newUser.email, 
       nim: newUser.nim, 
-      type: userType 
+      type: userType,
+      isProfileComplete: newUser.isProfileComplete // Harus false
     });
 
     // Send verification email
@@ -410,7 +430,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
           const userEmail = profile.emails[0].value;
           
-          // ✅ PERBAIKAN: Gunakan fungsi findOrCreateUserByEmail yang baru
+          // ✅ PERBAIKAN: Gunakan fungsi findOrCreateUserByEmail yang sudah diperbaiki
           const { user, isNewUser } = await findOrCreateUserByEmail(userEmail, {
             name: profile.displayName,
             picture: profile.photos?.[0]?.value
@@ -419,7 +439,10 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           console.log(`[DEBUG] Google OAuth result:`, {
             email: userEmail,
             isNewUser: isNewUser,
-            nim: user.nim
+            nim: user.nim,
+            isProfileComplete: user.isProfileComplete,
+            isEmailVerified: user.isEmailVerified, // Harus false
+            hasVerificationCode: !!user.verificationCode // Harus true
           });
 
           return done(null, user);
