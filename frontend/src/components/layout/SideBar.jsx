@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MessageSquare, PenSquare, User, Settings, Trash2, MoreHorizontal, LogOut } from 'lucide-react';
+import { MessageSquare, PenSquare, User, Settings, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight } from 'lucide-react';
 
 const Sidebar = ({ 
   // Props untuk user dan auth
@@ -29,6 +29,7 @@ const Sidebar = ({
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [isProfilePopupVisible, setIsProfilePopupVisible] = useState(false);
+  const [isChatsSectionOpen, setIsChatsSectionOpen] = useState(true); // State untuk toggle section Chats
   
   // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
   const getUserName = () => {
@@ -102,6 +103,11 @@ const Sidebar = ({
     }
   };
 
+  // ✅ FUNGSI: Toggle section Chats
+  const toggleChatsSection = () => {
+    setIsChatsSectionOpen(!isChatsSectionOpen);
+  };
+
   const ToggleIcon = ({ open }) => (
     <img
       src="https://www.svgrepo.com/show/493722/sidebar-toggle-nav-side-aside.svg"
@@ -144,7 +150,7 @@ const Sidebar = ({
           </div>
         )}
 
-        {/* ✅ DIUBAH: Container untuk bagian atas yang TIDAK bisa di-scroll (NEW CHAT & RIWAYAT CHAT) */}
+        {/* Container untuk bagian atas yang TIDAK bisa di-scroll (NEW CHAT & RIWAYAT CHAT) */}
         <div className="flex flex-col flex-shrink-0">
           {/* Tombol New Chat */}
           <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
@@ -160,11 +166,11 @@ const Sidebar = ({
             </button>
           </div>
 
-          {/* Tombol Riwayat Chat (Label) */}
+          {/* Label Riwayat Chat (statis) */}
           <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
             <div
               className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 rounded-xl flex items-center group relative gap-3`}
-              title="Chats"
+              title="Riwayat Chat"
             >
               <MessageSquare size={20} />
               <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
@@ -174,46 +180,67 @@ const Sidebar = ({
           </div>
         </div>
 
-        {/* ✅ DIUBAH: Area Riwayat Chat dengan custom scrollbar */}
-        <div className="flex-1 overflow-y-auto mt-0 space-y-2 min-h-0 custom-scrollbar">
-          {isSidebarOpen && user && chatHistory.length > 0 && chatHistory.map(chat => (
-            <div key={chat.id} className="flex items-center group">
-              <button
-                onClick={() => onSelectChat?.(chat.id)}
-                className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
-                  currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
-                }`}
-                title={chat.title}
-                disabled={isDeleting}
-              >
-                {chat.title}
-              </button>
-              {onDeleteChat && isSidebarOpen && (
-                <button
-                  onClick={(e) => handleMoreClick(chat.id, e)}
-                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100 ml-1 disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="More options"
-                  disabled={isDeleting}
-                >
-                  <MoreHorizontal size={14} />
-                </button>
+        {/* Section Chats dengan toggle - TANPA ICON */}
+        <div className="mt-2 flex-shrink-0">
+          {/* Header Section Chats dengan toggle */}
+          {isSidebarOpen && (
+            <button
+              onClick={toggleChatsSection}
+              className="w-full flex items-center justify-between p-2 px-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              title={isChatsSectionOpen ? "Sembunyikan Chats" : "Tampilkan Chats"}
+            >
+              <span className="text-sm font-medium">Chats</span>
+              {isChatsSectionOpen ? (
+                <ChevronDown size={16} className="text-gray-400" />
+              ) : (
+                <ChevronRight size={16} className="text-gray-400" />
               )}
-            </div>
-          ))}
-          {isSidebarOpen && user && chatHistory.length === 0 && (
-            <p className="p-2 text-xs text-gray-500 text-center">
-              Belum ada riwayat chat.
-            </p>
-          )}
-          {isSidebarOpen && !user && (
-            <p className="p-2 text-xs text-gray-500 text-center">
-              Login untuk melihat riwayat chat Anda.
-            </p>
+            </button>
           )}
         </div>
 
-        {/* ✅ DIUBAH: Profile dipindah ke bawah - TIDAK bisa di-scroll */}
-        <div className="mt-auto flex-shrink-0">
+        {/* ✅ DIUBAH: Area Riwayat Chat dengan tambahan margin atas */}
+        {isChatsSectionOpen && (
+          <div className="flex-1 overflow-y-auto mt-4 space-y-2 min-h-0 custom-scrollbar">
+            {isSidebarOpen && user && chatHistory.length > 0 && chatHistory.map(chat => (
+              <div key={chat.id} className="flex items-center group">
+                <button
+                  onClick={() => onSelectChat?.(chat.id)}
+                  className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
+                    currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
+                  }`}
+                  title={chat.title}
+                  disabled={isDeleting}
+                >
+                  {chat.title}
+                </button>
+                {onDeleteChat && isSidebarOpen && (
+                  <button
+                    onClick={(e) => handleMoreClick(chat.id, e)}
+                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100 ml-1 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="More options"
+                    disabled={isDeleting}
+                  >
+                    <MoreHorizontal size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+            {isSidebarOpen && user && chatHistory.length === 0 && (
+              <p className="p-2 text-xs text-gray-500 text-center">
+                Belum ada riwayat chat.
+              </p>
+            )}
+            {isSidebarOpen && !user && (
+              <p className="p-2 text-xs text-gray-500 text-center">
+                Login untuk melihat riwayat chat Anda.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ✅ DIUBAH: Profile dengan tambahan margin atas */}
+        <div className="mt-8 flex-shrink-0">
           <div className="flex justify-center mb-4">
             <button
               className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-auto ${
@@ -241,7 +268,7 @@ const Sidebar = ({
           </div>
         </div>
 
-        {/* ✅ TAMBAHAN: CSS untuk custom scrollbar */}
+        {/* CSS untuk custom scrollbar */}
         <style jsx>{`
           .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
@@ -263,7 +290,7 @@ const Sidebar = ({
         `}</style>
       </div>
 
-      {/* ✅ POPUP DELETE */}
+      {/* POPUP DELETE */}
       {isPopupVisible && (
         <>
           {/* Overlay untuk menutup popup ketika klik di luar */}
@@ -304,7 +331,7 @@ const Sidebar = ({
         </>
       )}
 
-      {/* ✅ POPUP PROFILE */}
+      {/* POPUP PROFILE */}
       {isProfilePopupVisible && user && (
         <>
           {/* Overlay untuk menutup popup ketika klik di luar */}
@@ -336,8 +363,8 @@ const Sidebar = ({
                   </p>
                 </div>
               </div>
-                <div className="text-xs text-gray-400">
-                {getUserNIM()} {getUserNIM()} 
+              <div className="text-xs text-gray-400">
+                {getUserNIM()}
               </div>
             </div>
 
