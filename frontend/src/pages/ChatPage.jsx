@@ -12,7 +12,7 @@ const ChatWindow = ({ messages, isLoading, userName, isGuest = false }) => {
     if (messages.length === 0 && !isLoading) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500">
-                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center m-4">
+                <div className="w-12 h-12 bg-orange-100 rounded-3xl flex items-center justify-center m-4">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><path d="M4 14s1.5-1 4-1 4 1 4 1v3H4z" /><path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /><path d="M10 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /></svg>
                 </div>
                 <h2 className="text-lg font-semibold text-gray-700">
@@ -452,7 +452,7 @@ const ChatPage = () => {
         }
     }, [location.state, isGuest]);
 
-    // 2. SECOND: Handle initial message - DENGAN GUARD
+    // 2. SECOND: Handle initial message - DENGAN GUARD YANG DIPERBAIKI
     useEffect(() => {
         const initialMessage = location.state?.initialMessage;
         const guestMode = location.state?.isGuest;
@@ -461,10 +461,12 @@ const ChatPage = () => {
             initialMessage, 
             guestMode,
             currentGuestState: isGuest,
-            hasProcessed: hasProcessedInitialMessage.current
+            hasProcessed: hasProcessedInitialMessage.current,
+            messagesLength: messages.length
         });
 
-        if (initialMessage && !hasProcessedInitialMessage.current) {
+        // ✅ PERBAIKAN: Tambah kondisi messages.length === 0 dan clear state setelah diproses
+        if (initialMessage && !hasProcessedInitialMessage.current && messages.length === 0) {
             console.log('🚨 [CHAT PAGE] Processing initial message:', initialMessage);
             hasProcessedInitialMessage.current = true;
             
@@ -479,8 +481,11 @@ const ChatPage = () => {
 
             setMessages([userMessage]);
             handleAIMessage(initialMessage, guestMode || isGuest);
+            
+            // ✅ CLEAR LOCATION STATE setelah diproses untuk mencegah auto-send saat refresh
+            window.history.replaceState({}, document.title);
         }
-    }, [location.state, handleAIMessage, isGuest]);
+    }, [location.state, handleAIMessage, isGuest, messages.length]); // ✅ TAMBAH messages.length di dependency
 
     // 3. THIRD: Auth check - dengan guest mode protection
     useEffect(() => {
