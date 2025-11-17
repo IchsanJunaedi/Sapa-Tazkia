@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MessageSquare, PenSquare, User, Settings, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight } from 'lucide-react';
+import { PenSquare, User, Settings, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight } from 'lucide-react';
 
 const Sidebar = ({ 
   // Props untuk user dan auth
@@ -29,7 +29,7 @@ const Sidebar = ({
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [isProfilePopupVisible, setIsProfilePopupVisible] = useState(false);
-  const [isChatsSectionOpen, setIsChatsSectionOpen] = useState(true); // State untuk toggle section Chats
+  const [isChatsSectionOpen, setIsChatsSectionOpen] = useState(true);
   
   // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
   const getUserName = () => {
@@ -48,13 +48,58 @@ const Sidebar = ({
     return user?.email || 'Email tidak tersedia';
   };
 
+  // ✅ FUNGSI: Mengelompokkan chat berdasarkan waktu
+  const groupChatsByTime = () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const groups = {
+      today: [],
+      yesterday: [],
+      last7Days: [],
+      last30Days: [],
+      older: []
+    };
+
+    chatHistory.forEach(chat => {
+      const chatDate = new Date(chat.timestamp || chat.createdAt || Date.now());
+      const chatDay = new Date(chatDate.getFullYear(), chatDate.getMonth(), chatDate.getDate());
+
+      if (chatDay.getTime() === today.getTime()) {
+        groups.today.push(chat);
+      } else if (chatDay.getTime() === yesterday.getTime()) {
+        groups.yesterday.push(chat);
+      } else if (chatDate >= sevenDaysAgo) {
+        groups.last7Days.push(chat);
+      } else if (chatDate >= thirtyDaysAgo) {
+        groups.last30Days.push(chat);
+      } else {
+        groups.older.push(chat);
+      }
+    });
+
+    return groups;
+  };
+
+  // ✅ FUNGSI: Format bulan dan tahun
+  const formatMonthYear = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('id-ID', { year: 'numeric', month: 'long' });
+  };
+
   // ✅ FUNGSI: Menampilkan popup delete
   const handleMoreClick = (chatId, event) => {
     if (!isSidebarOpen) return;
     
     const rect = event.currentTarget.getBoundingClientRect();
     setPopupPosition({
-      x: rect.left - 120, // Posisi popup di sebelah kiri tombol
+      x: rect.left - 120,
       y: rect.top
     });
     setSelectedChatId(chatId);
@@ -64,7 +109,6 @@ const Sidebar = ({
   // ✅ FUNGSI: Menampilkan popup profile
   const handleProfileClick = (event) => {
     if (!user || !isSidebarOpen) {
-      // Jika belum login, panggil onLogin
       if (!user) {
         onLogin?.();
       }
@@ -72,10 +116,9 @@ const Sidebar = ({
     }
 
     const rect = event.currentTarget.getBoundingClientRect();
-    // Posisi popup di atas tombol profile
     setPopupPosition({
       x: rect.left,
-      y: rect.top - 200 // Sesuaikan tinggi popup
+      y: rect.top - 200
     });
     setIsProfilePopupVisible(true);
   };
@@ -116,6 +159,8 @@ const Sidebar = ({
     />
   );
 
+  const groupedChats = groupChatsByTime();
+
   return (
     <>
       <div className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative ${className}`}>
@@ -150,88 +195,147 @@ const Sidebar = ({
           </div>
         )}
 
-        {/* Container untuk bagian atas yang TIDAK bisa di-scroll (NEW CHAT & RIWAYAT CHAT) */}
+        {/* ✅ DIUBAH: New Chat Section dengan full rounded dan konten ditengah */}
         <div className="flex flex-col flex-shrink-0">
-          {/* Tombol New Chat */}
-          <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} space-y-3`}>
+          <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
             <button
-              className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors flex items-center group relative gap-3`}
+              className={`${isSidebarOpen ? 'w-full justify-center p-3' : 'w-12 h-12 justify-center'} h-12 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full transition-colors flex items-center group relative gap-3 shadow-sm`}
               title="New Chat"
               onClick={onNewChat}
             >
               <PenSquare size={20} />
-              <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-                New Chat
+              <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap font-medium`}>
+                New chat
               </span>
             </button>
           </div>
-
-          {/* Label Riwayat Chat (statis) */}
-          <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'} mt-3`}>
-            <div
-              className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-gray-700 rounded-xl flex items-center group relative gap-3`}
-              title="Riwayat Chat"
-            >
-              <MessageSquare size={20} />
-              <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap`}>
-                Riwayat Chat
-              </span>
-            </div>
-          </div>
         </div>
 
-        {/* Section Chats dengan toggle - TANPA ICON */}
-        <div className="mt-2 flex-shrink-0">
-          {/* Header Section Chats dengan toggle */}
+        {/* Chats Section Header dengan Toggle */}
+        <div className="mt-6 flex-shrink-0">
           {isSidebarOpen && (
             <button
               onClick={toggleChatsSection}
-              className="w-full flex items-center justify-between p-2 px-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="w-full flex items-center justify-between p-2 text-gray-700 hover:text-gray-900 rounded-lg transition-colors"
               title={isChatsSectionOpen ? "Sembunyikan Chats" : "Tampilkan Chats"}
             >
-              <span className="text-sm font-medium">Chats</span>
+              <span className="text-sm font-semibold">Chats</span>
               {isChatsSectionOpen ? (
-                <ChevronDown size={16} className="text-gray-400" />
+                <ChevronDown size={16} className="text-gray-500" />
               ) : (
-                <ChevronRight size={16} className="text-gray-400" />
+                <ChevronRight size={16} className="text-gray-500" />
               )}
             </button>
           )}
         </div>
 
-        {/* ✅ DIUBAH: Area Riwayat Chat dengan tambahan margin atas */}
-        {isChatsSectionOpen && (
-          <div className="flex-1 overflow-y-auto mt-4 space-y-2 min-h-0 custom-scrollbar">
-            {isSidebarOpen && user && chatHistory.length > 0 && chatHistory.map(chat => (
-              <div key={chat.id} className="flex items-center group">
-                <button
-                  onClick={() => onSelectChat?.(chat.id)}
-                  className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
-                    currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
-                  }`}
-                  title={chat.title}
-                  disabled={isDeleting}
-                >
-                  {chat.title}
-                </button>
-                {onDeleteChat && isSidebarOpen && (
-                  <button
-                    onClick={(e) => handleMoreClick(chat.id, e)}
-                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100 ml-1 disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="More options"
-                    disabled={isDeleting}
-                  >
-                    <MoreHorizontal size={14} />
-                  </button>
-                )}
+        {/* ✅ DIUBAH: Area Chat History dengan flex-1 agar profile tetap di bawah */}
+        {isChatsSectionOpen && isSidebarOpen && (
+          <div className="flex-1 overflow-y-auto mt-2 space-y-4 min-h-0 custom-scrollbar">
+            {/* Today */}
+            {groupedChats.today.length > 0 && (
+              <div className="space-y-1">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Today</h3>
+                {groupedChats.today.map(chat => (
+                  <ChatItem 
+                    key={chat.id}
+                    chat={chat}
+                    currentChatId={currentChatId}
+                    onSelectChat={onSelectChat}
+                    onDeleteChat={onDeleteChat}
+                    isDeleting={isDeleting}
+                    handleMoreClick={handleMoreClick}
+                    isSidebarOpen={isSidebarOpen}
+                  />
+                ))}
               </div>
-            ))}
-            {isSidebarOpen && user && chatHistory.length === 0 && (
+            )}
+
+            {/* Yesterday */}
+            {groupedChats.yesterday.length > 0 && (
+              <div className="space-y-1">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Yesterday</h3>
+                {groupedChats.yesterday.map(chat => (
+                  <ChatItem 
+                    key={chat.id}
+                    chat={chat}
+                    currentChatId={currentChatId}
+                    onSelectChat={onSelectChat}
+                    onDeleteChat={onDeleteChat}
+                    isDeleting={isDeleting}
+                    handleMoreClick={handleMoreClick}
+                    isSidebarOpen={isSidebarOpen}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Last 7 Days */}
+            {groupedChats.last7Days.length > 0 && (
+              <div className="space-y-1">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Previous 7 Days</h3>
+                {groupedChats.last7Days.map(chat => (
+                  <ChatItem 
+                    key={chat.id}
+                    chat={chat}
+                    currentChatId={currentChatId}
+                    onSelectChat={onSelectChat}
+                    onDeleteChat={onDeleteChat}
+                    isDeleting={isDeleting}
+                    handleMoreClick={handleMoreClick}
+                    isSidebarOpen={isSidebarOpen}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Last 30 Days */}
+            {groupedChats.last30Days.length > 0 && (
+              <div className="space-y-1">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Previous 30 Days</h3>
+                {groupedChats.last30Days.map(chat => (
+                  <ChatItem 
+                    key={chat.id}
+                    chat={chat}
+                    currentChatId={currentChatId}
+                    onSelectChat={onSelectChat}
+                    onDeleteChat={onDeleteChat}
+                    isDeleting={isDeleting}
+                    handleMoreClick={handleMoreClick}
+                    isSidebarOpen={isSidebarOpen}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Older chats grouped by month */}
+            {groupedChats.older.length > 0 && (
+              <div className="space-y-1">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">
+                  {formatMonthYear(groupedChats.older[0].timestamp)}
+                </h3>
+                {groupedChats.older.map(chat => (
+                  <ChatItem 
+                    key={chat.id}
+                    chat={chat}
+                    currentChatId={currentChatId}
+                    onSelectChat={onSelectChat}
+                    onDeleteChat={onDeleteChat}
+                    isDeleting={isDeleting}
+                    handleMoreClick={handleMoreClick}
+                    isSidebarOpen={isSidebarOpen}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Empty State */}
+            {chatHistory.length === 0 && user && (
               <p className="p-2 text-xs text-gray-500 text-center">
                 Belum ada riwayat chat.
               </p>
             )}
-            {isSidebarOpen && !user && (
+            {!user && (
               <p className="p-2 text-xs text-gray-500 text-center">
                 Login untuk melihat riwayat chat Anda.
               </p>
@@ -239,8 +343,8 @@ const Sidebar = ({
           </div>
         )}
 
-        {/* ✅ DIUBAH: Profile dengan tambahan margin atas */}
-        <div className="mt-8 flex-shrink-0">
+        {/* ✅ DIUBAH: Profile Section - PASTIKAN SELALU DI BAWAH */}
+        <div className="mt-auto flex-shrink-0">
           <div className="flex justify-center mb-4">
             <button
               className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-auto ${
@@ -293,13 +397,10 @@ const Sidebar = ({
       {/* POPUP DELETE */}
       {isPopupVisible && (
         <>
-          {/* Overlay untuk menutup popup ketika klik di luar */}
           <div 
             className="fixed inset-0 z-40"
             onClick={handleCloseAllPopups}
           />
-          
-          {/* Popup Container */}
           <div 
             className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 p-4 w-48"
             style={{
@@ -307,7 +408,6 @@ const Sidebar = ({
               top: `${popupPosition.y}px`
             }}
           >
-            {/* Header Popup */}
             <div className="flex items-center gap-3 mb-3 pb-2 border-b border-gray-100">
               <div className="p-2 bg-red-50 rounded-lg">
                 <Trash2 size={18} className="text-red-500" />
@@ -317,8 +417,6 @@ const Sidebar = ({
                 <p className="text-xs text-gray-500">Tindakan ini tidak dapat dibatalkan</p>
               </div>
             </div>
-            
-            {/* Tombol Delete */}
             <button
               onClick={handleDeleteFromPopup}
               disabled={isDeleting}
@@ -334,13 +432,10 @@ const Sidebar = ({
       {/* POPUP PROFILE */}
       {isProfilePopupVisible && user && (
         <>
-          {/* Overlay untuk menutup popup ketika klik di luar */}
           <div 
             className="fixed inset-0 z-40"
             onClick={handleCloseAllPopups}
           />
-          
-          {/* Popup Profile Container */}
           <div 
             className="fixed z-50 bg-white rounded-xl shadow-xl border border-gray-200 w-64"
             style={{
@@ -348,7 +443,6 @@ const Sidebar = ({
               top: `${popupPosition.y - 10}px`
             }}
           >
-            {/* Header Profile */}
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-10 h-10 bg-[#172c66] rounded-full flex items-center justify-center">
@@ -367,10 +461,7 @@ const Sidebar = ({
                 {getUserNIM()}
               </div>
             </div>
-
-            {/* Menu Options */}
             <div className="p-2">
-              {/* Tombol Logout */}
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -379,8 +470,6 @@ const Sidebar = ({
                 <span>Log out</span>
               </button>
             </div>
-
-            {/* Footer - Plan Info */}
             <div className="px-4 py-3 bg-gray-50 rounded-b-xl border-t border-gray-100">
               <div className="flex items-center justify-between">
               </div>
@@ -391,5 +480,39 @@ const Sidebar = ({
     </>
   );
 };
+
+// Komponen terpisah untuk Chat Item
+const ChatItem = ({ 
+  chat, 
+  currentChatId, 
+  onSelectChat, 
+  onDeleteChat, 
+  isDeleting, 
+  handleMoreClick, 
+  isSidebarOpen 
+}) => (
+  <div className="flex items-center group">
+    <button
+      onClick={() => onSelectChat?.(chat.id)}
+      className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
+        currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
+      }`}
+      title={chat.title}
+      disabled={isDeleting}
+    >
+      {chat.title}
+    </button>
+    {onDeleteChat && isSidebarOpen && (
+      <button
+        onClick={(e) => handleMoreClick(chat.id, e)}
+        className="p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100 ml-1 disabled:opacity-30 disabled:cursor-not-allowed"
+        title="More options"
+        disabled={isDeleting}
+      >
+        <MoreHorizontal size={14} />
+      </button>
+    )}
+  </div>
+);
 
 export default Sidebar;
