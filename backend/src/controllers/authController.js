@@ -1,6 +1,8 @@
 const authService = require('../services/authService');
 const academicService = require('../services/academicService');
 const emailService = require('../services/emailService');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 const googleAuth = (req, res, next) => {
   console.log('[DEBUG] Initiating Google OAuth');
@@ -21,7 +23,7 @@ const googleCallback = (req, res, next) => {
   })(req, res, next);
 };
 
-// PERBAIKAN: Google Callback Success - DITAMBAH VALIDASI DOMAIN
+// ✅ ✅ ✅ PERBAIKAN BESAR: Google Callback Success - SET isEmailVerified: false UNTUK NEW USER
 const googleCallbackSuccess = async (req, res) => {
   try {
     console.log('[DEBUG] Google callback success handler called');
@@ -36,7 +38,7 @@ const googleCallbackSuccess = async (req, res) => {
     const userEmail = req.user.email;
     console.log(`[DEBUG] Google OAuth successful for user: ${userEmail}`);
 
-    // ✅ ✅ ✅ TAMBAHKAN VALIDASI DOMAIN DI SINI ✅ ✅ ✅
+    // Validasi domain
     const validDomains = [
       'student.tazkia.ac.id',
       'student.stmik.tazkia.ac.id', 
@@ -50,7 +52,33 @@ const googleCallbackSuccess = async (req, res) => {
       console.log(`🚫 [AUTH CONTROLLER] Google login rejected - Invalid domain: ${userEmail}`);
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=invalid_domain&message=Hanya email Tazkia yang diizinkan&email=${encodeURIComponent(userEmail)}`);
     }
-    // ✅ ✅ ✅ END OF VALIDASI ✅ ✅ ✅
+
+    // ✅ ✅ ✅ DEBUG DETAIL: Cek apakah user baru atau existing
+    console.log(`[DEBUG] Checking if user is new for: ${userEmail}`);
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: {
+        id: true,
+        isEmailVerified: true,
+        isProfileComplete: true,
+        createdAt: true,
+        authMethod: true
+      }
+    });
+
+    console.log(`[DEBUG] Existing user query result:`, existingUser);
+
+    // ✅ PERBAIKAN: Logic yang lebih akurat untuk deteksi new user
+    const isNewUser = !existingUser || 
+                     (existingUser.authMethod === 'google' && 
+                      (new Date() - new Date(existingUser.createdAt)) < 300000); // 5 minutes
+
+    console.log(`[DEBUG] User status - isNewUser: ${isNewUser}, existing: ${!!existingUser}`);
+
+    const shouldVerifyEmail = isNewUser;
+
+    console.log(`[DEBUG] Final decision - shouldVerifyEmail: ${shouldVerifyEmail}`);
 
     // Generate token untuk API calls
     const token = authService.generateToken(req.user.id);
@@ -60,9 +88,8 @@ const googleCallbackSuccess = async (req, res) => {
     await authService.createSession(req.user.id, token, req.ip, req.get('User-Agent'));
 
     console.log(`[DEBUG] Database session created for user: ${req.user.email}`);
-    console.log(`[DEBUG] User authenticated in session:`, req.isAuthenticated());
 
-    // PERBAIKAN: Siapkan user data lengkap untuk frontend
+    // ✅ PERBAIKAN PENTING: Set isEmailVerified berdasarkan status user
     const userData = {
       id: req.user.id,
       nim: req.user.nim,
@@ -72,16 +99,21 @@ const googleCallbackSuccess = async (req, res) => {
       authMethod: req.user.authMethod,
       userType: req.user.userType,
       isProfileComplete: req.user.isProfileComplete,
-      isEmailVerified: req.user.isEmailVerified
+      // ✅ KRITIS: User baru via Google harus melalui verifikasi email
+      isEmailVerified: shouldVerifyEmail ? false : req.user.isEmailVerified
     };
 
     console.log(`[DEBUG] User data to send:`, userData);
+    console.log(`[DEBUG] Email verification required: ${shouldVerifyEmail}`);
 
     // PERBAIKAN: Encode user data untuk URL
     const encodedUserData = encodeURIComponent(JSON.stringify(userData));
 
+    // ✅ PERBAIKAN: Jika user baru butuh verifikasi, set flag di URL
+    const verificationFlag = shouldVerifyEmail ? '&requires_verification=true' : '';
+    
     // PERBAIKAN: Redirect ke frontend dengan token DAN user data
-    const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}&user=${encodedUserData}&success=true`;
+    const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}&user=${encodedUserData}&success=true${verificationFlag}`;
     console.log(`[DEBUG] Redirecting to: ${redirectUrl}`);
     
     res.redirect(redirectUrl);
@@ -233,8 +265,8 @@ const resendVerificationCode = async (req, res) => {
     }
     
     res.status(500).json({
-      success: false,
-      message: 'Terjadi kesalahan server saat mengirim ulang kode verifikasi'
+        success: false,
+        message: 'Terjadi kesalahan server saat mengirim ulang kode verifikasi'
     });
   }
 };
@@ -252,10 +284,6 @@ const checkEmailVerification = async (req, res) => {
         message: 'Email harus diisi'
       });
     }
-
-    // Cek user di database
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
 
     const user = await prisma.user.findUnique({
       where: { email },

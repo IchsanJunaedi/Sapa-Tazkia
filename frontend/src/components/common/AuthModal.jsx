@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Mail, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import api from '../../api/axiosConfig';
 
 // Komponen ikon Google
@@ -13,77 +14,317 @@ const GoogleIcon = () => (
   </svg>
 );
 
+// Komponen Verification Form
+const VerificationForm = ({ email, onVerify, onResend, onBack, isLoading, error }) => {
+  const [code, setCode] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (code.trim().length >= 4) {
+      onVerify(code.trim());
+    }
+  };
+
+  const handleResend = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    setResendLoading(true);
+    setResendSuccess(false);
+    
+    try {
+      await onResend();
+      setResendSuccess(true);
+      setTimeout(() => setResendSuccess(false), 3000);
+    } catch (err) {
+      console.error('Resend failed:', err);
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && code.trim().length >= 4 && !isLoading) {
+      handleSubmit(e);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <h2 className="text-2xl font-bold text-gray-800 mb-2">Verifikasi Email</h2>
+      <p className="text-sm text-gray-600 mb-6">
+        Kami telah mengirim kode verifikasi ke: <strong>{email}</strong>
+      </p>
+
+      {resendSuccess && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
+          <span className="block sm:inline">✅ Kode verifikasi telah dikirim ulang!</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
+          <span className="block sm:inline">{error}</span>
+          <button 
+            type="button"
+            onClick={() => error && typeof error === 'object' && error.onClose ? error.onClose() : null}
+            className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Masukkan kode verifikasi"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          onKeyPress={handleKeyPress}
+          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+          disabled={isLoading}
+          maxLength={6}
+        />
+        <p className="text-xs text-gray-500 mt-2">
+          Masukkan kode 6 digit yang dikirim ke email Anda
+        </p>
+      </div>
+
+      <button
+        type="submit"
+        className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-3 ${
+          code.trim().length >= 4 && !isLoading ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
+        }`}
+        disabled={code.trim().length < 4 || isLoading}
+      >
+        {isLoading ? 'Memverifikasi...' : 'Verifikasi'}
+      </button>
+
+      <div className="flex space-x-3">
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={resendLoading}
+          className="flex-1 py-2 text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+        >
+          {resendLoading ? 'Mengirim...' : 'Kirim Ulang Kode'}
+        </button>
+        
+        <button
+          type="button"
+          onClick={onBack}
+          disabled={isLoading}
+          className="flex-1 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:text-gray-400"
+        >
+          Kembali
+        </button>
+      </div>
+    </form>
+  );
+};
+
 const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
   const [step, setStep] = useState(initialStep);
-
-  // State untuk Login dan Register
-  const [loginNim, setLoginNim] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [nim, setNim] = useState('');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Use Auth Context
-  const { loginWithCredentials, registerWithCredentials } = useAuth();
+  const { 
+    loginWithCredentials, 
+    registerWithEmail, 
+    verifyEmailCode, 
+    resendVerificationCode,
+    pendingVerification,
+    pendingEmail,
+    clearPendingVerification
+  } = useAuth();
+
+  const navigate = useNavigate();
 
   // Reset state saat modal dibuka
   useEffect(() => {
     if (isOpen) {
-      setStep(initialStep);
-      setLoginNim('');
-      setEmail('');
-      setPassword('');
-      setFullName('');
-      setNim('');
+      // Jika ada pending verification, langsung ke step verifikasi
+      if (pendingVerification && pendingEmail) {
+        setStep(2);
+        setEmail(pendingEmail);
+      } else {
+        setStep(initialStep);
+        setEmail('');
+      }
       setError(null);
       setIsLoading(false);
       setShowSuccess(false);
     }
-  }, [isOpen, initialStep]);
+  }, [isOpen, initialStep, pendingVerification, pendingEmail]);
 
-  if (!isOpen) return null;
-
-  // Fungsi untuk guest chat
-  const handleGuestChat = () => {
-    window.location.href = '/chat?mode=guest';
+  // Handle ketika modal ditutup
+  const handleClose = () => {
+    // Clear pending verification state jika modal ditutup
+    if (pendingVerification) {
+      clearPendingVerification();
+    }
+    onClose();
   };
 
-  // Fungsi handleLogin
-  const handleLogin = async () => {
-    if (!loginNim || !password) {
-      setError('NIM and password are required.');
+  // ✅ PERBAIKAN: Handle Continue dengan redirect ke AboutYouPage
+  const handleContinue = async () => {
+    if (!email) {
+      setError('Email atau NIM harus diisi');
       return;
     }
-    setIsLoading(true);
-    setError(null);
-    try {
-      await loginWithCredentials(loginNim, password);
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
-      setIsLoading(false);
-    }
-  };
 
-  // Fungsi handleSignUp (untuk form sign up lengkap)
-  const handleSignUp = async () => {
-    if (!fullName || !nim || !email || !password) {
-      setError('All fields are required.');
-      return;
-    }
     setIsLoading(true);
-    setError(null);
+    setError('');
+    setShowSuccess(false);
+    
     try {
-      await registerWithCredentials({ fullName, nim, email, password });
-      setStep(2); // Go to verification step
+      // Check if input is email or NIM
+      const isEmail = email.includes('@');
+      
+      if (isEmail) {
+        // Email input - proceed with registration/sign up
+        console.log('🔍 [AUTH MODAL] Email detected, proceeding with registration:', email);
+        
+        // Validasi domain email Tazkia
+        const validDomains = [
+          '@student.tazkia.ac.id',
+          '@student.stmik.tazkia.ac.id', 
+          '@tazkia.ac.id'
+        ];
+        
+        const isValidDomain = validDomains.some(domain => email.toLowerCase().includes(domain));
+        
+        if (!isValidDomain) {
+          throw new Error('Silakan gunakan email Tazkia (@student.tazkia.ac.id, @student.stmik.tazkia.ac.id, atau @tazkia.ac.id)');
+        }
+
+        // Call register function for email
+        const result = await registerWithEmail(email);
+        
+        console.log('🔍 [AUTH MODAL] Register result:', result);
+        
+        // Jika memerlukan verifikasi, pindah ke step verifikasi
+        if (result.requiresVerification) {
+          setStep(2);
+          setShowSuccess(false);
+        } else {
+          // Jika tidak memerlukan verifikasi (langsung berhasil)
+          setShowSuccess(true);
+          setTimeout(() => {
+            handleClose();
+          }, 1500);
+        }
+        
+      } else {
+        // NIM input - proceed with login
+        console.log('🔍 [AUTH MODAL] NIM detected, proceeding with login:', email);
+        await loginWithCredentials(email, email); // Using NIM as password for now
+        setShowSuccess(true);
+        setTimeout(() => {
+          handleClose();
+        }, 1500);
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      console.error('❌ [AUTH MODAL] Auth failed:', err);
+      setError(err.message || 'Terjadi kesalahan saat autentikasi');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // ✅ PERBAIKAN: Handle Verification dengan redirect ke AboutYouPage
+  const handleVerification = async (code) => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      console.log('🔍 [AUTH MODAL] Verifying code for email:', email);
+      const result = await verifyEmailCode(email, code);
+      
+      console.log('🔍 [AUTH MODAL] Verification result:', result);
+      
+      if (result.success) {
+        // ✅ PERBAIKAN: Check jika user perlu complete profile
+        const needsProfileCompletion = result.requiresProfileCompletion || 
+                                     !result.user.isProfileComplete ||
+                                     !result.user.fullName ||
+                                     result.user.fullName.trim() === '';
+        
+        console.log('🔍 [AUTH MODAL] Profile completion check:', {
+          requiresProfileCompletion: result.requiresProfileCompletion,
+          isProfileComplete: result.user.isProfileComplete,
+          fullName: result.user.fullName,
+          needsProfileCompletion: needsProfileCompletion
+        });
+        
+        if (needsProfileCompletion) {
+          console.log('🔍 [AUTH MODAL] New user detected, redirecting to AboutYouPage');
+          // Redirect ke AboutYouPage untuk new user
+          handleClose(); // Tutup modal dulu
+          navigate('/about-you', {
+            state: {
+              from: 'email-verification',
+              userEmail: email,
+              isNewUser: true
+            }
+          });
+        } else {
+          console.log('🔍 [AUTH MODAL] Returning user, closing modal');
+          // Returning user - tutup modal saja
+          setShowSuccess(true);
+          setTimeout(() => {
+            handleClose();
+          }, 1500);
+        }
+        
+      } else {
+        throw new Error(result.error || 'Verifikasi gagal');
+      }
+    } catch (err) {
+      console.error('❌ [AUTH MODAL] Verification failed:', err);
+      setError(err.message || 'Kode verifikasi salah atau telah kedaluwarsa');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    try {
+      console.log('🔍 [AUTH MODAL] Resending code to:', email);
+      const result = await resendVerificationCode(email);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Gagal mengirim ulang kode');
+      }
+      
+      return result;
+    } catch (err) {
+      console.error('❌ [AUTH MODAL] Resend failed:', err);
+      throw err;
+    }
+  };
+
+  const handleBackToEmail = () => {
+    setStep(0);
+    setError('');
+    clearPendingVerification();
+  };
+
+  // Fungsi untuk guest chat
+  const handleGuestChat = () => {
+    navigate('/chat', { 
+      state: { 
+        isGuest: true 
+      }
+    });
   };
 
   // Fungsi handleGoogleLogin
@@ -94,76 +335,11 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
     window.location.href = `${API_URL}/api/auth/google`;
   };
 
-  // NEW: Function untuk handle continue dengan email/NIM
-  const handleContinue = async () => {
-    if (!email) {
-      setError('Email atau NIM harus diisi');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError('');
-      setShowSuccess(false);
-
-      // Check if input is email or NIM
-      const isEmail = email.includes('@');
-      
-      if (isEmail) {
-        // Email input - proceed with registration/sign up
-        console.log('🔍 [AUTH MODAL] Email detected, proceeding with registration:', email);
-        
-        // Call register function for email
-        await registerWithEmail(email);
-        
-        // Show success message and redirect to AboutYouPage
-        setShowSuccess(true);
-        setTimeout(() => {
-          onClose(); // Close modal
-          // Redirect will be handled by LandingPage useEffect
-        }, 1500);
-        
-      } else {
-        // NIM input - proceed with login
-        console.log('🔍 [AUTH MODAL] NIM detected, proceeding with login:', email);
-        await loginWithCredentials(email, email); // Using NIM as password for now
-        
-        // Login successful, modal will close automatically via AuthContext
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && email && !isLoading) {
+      if (step === 0) {
+        handleContinue();
       }
-    } catch (err) {
-      console.error('❌ [AUTH MODAL] Auth failed:', err);
-      setError(err.message || 'Terjadi kesalahan saat autentikasi');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // NEW: Add registerWithEmail function
-  const registerWithEmail = async (email) => {
-    try {
-      console.log('🔍 [AUTH MODAL] Registering with email:', email);
-      
-      const response = await api.post('/api/auth/register-email', {
-        email: email,
-        // No password needed for email-based registration
-      });
-
-      if (response.data.success) {
-        console.log('✅ [AUTH MODAL] Registration successful');
-        // Store the temp token or flag to indicate new user
-        localStorage.setItem('isNewUser', 'true');
-        localStorage.setItem('userEmail', email);
-        return response.data;
-      }
-    } catch (error) {
-      console.error('❌ [AUTH MODAL] Registration failed:', error);
-      
-      // If user already exists, guide them to login with NIM
-      if (error.response?.status === 409) {
-        throw new Error('Email sudah terdaftar. Silakan login menggunakan NIM Anda.');
-      }
-      
-      throw new Error(error.response?.data?.message || 'Registrasi gagal');
     }
   };
 
@@ -178,7 +354,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
 
             {showSuccess && (
               <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
-                <span className="block sm:inline">✅ Registrasi berhasil! Mengarahkan ke halaman profil...</span>
+                <span className="block sm:inline">✅ Autentikasi berhasil! Mengarahkan...</span>
               </div>
             )}
 
@@ -202,31 +378,6 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
               </div>
             )}
 
-            <input
-              type="text"
-              placeholder="Masukkan NIM atau Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none mb-4"
-              disabled={isLoading}
-            />
-            
-            <button
-              onClick={handleContinue}
-              disabled={!email || isLoading}
-              className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${
-                (email && !isLoading) ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {isLoading ? 'Memproses...' : (email.includes('@') ? 'Daftar dengan Email' : 'Masuk dengan NIM')}
-            </button>
-
-            <div className="flex items-center my-4">
-              <div className="flex-grow border-t border-gray-300"></div>
-              <span className="flex-shrink mx-4 text-gray-500 text-sm">ATAU</span>
-              <div className="flex-grow border-t border-gray-300"></div>
-            </div>
-
             <div className="space-y-3">
               <button
                 onClick={handleGoogleLogin}
@@ -236,140 +387,67 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
                 <GoogleIcon />
                 Lanjutkan dengan Google
               </button>
-
-              {/* Tombol Guest Chat */}
-              <button
-                onClick={handleGuestChat}
-                className="w-full py-3 flex items-center justify-center border border-blue-300 bg-blue-50 rounded-xl font-medium text-blue-600 hover:bg-blue-100 transition-colors"
-                disabled={isLoading}
-              >
-                <MessageSquare size={20} className="mr-2" />
-                Coba sebagai Guest
-              </button>
             </div>
 
-            <p className="text-sm text-center text-gray-600 mt-6">
-              Butuh akun lengkap?
-              <button onClick={() => setStep(1)} className="text-orange-500 hover:underline font-semibold ml-1 focus:outline-none" disabled={isLoading}>
-                Daftar Lengkap
-              </button>
-            </p>
-            <button onClick={onClose} className="w-full text-sm text-gray-500 hover:text-gray-900 mt-2" disabled={isLoading}>
-              Tutup
-            </button>
-          </>
-        );
+            <div className="flex items-center my-4">
+              <div className="flex-grow border-t border-gray-300"></div>
+              <span className="flex-shrink mx-4 text-gray-500 text-sm">ATAU</span>
+              <div className="flex-grow border-t border-gray-300"></div>
+            </div>
 
-      case 1: // Signup Step 1 - Form lengkap
-        return (
-          <>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Buat Akun Lengkap</h2>
-            <p className="text-sm text-gray-600 mb-6">Dapatkan panduan akademik yang lebih cerdas dari Sapa Tazkia.</p>
-
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
-                <span className="block sm:inline">{error}</span>
-              </div>
-            )}
-
-            <input
-              type="text"
-              placeholder="Nama Lengkap"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              disabled={isLoading}
-            />
-            <input
-              type="text"
-              placeholder="NIM"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
-              value={nim}
-              onChange={(e) => setNim(e.target.value)}
-              disabled={isLoading}
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
-              disabled={isLoading}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-            />
-
-            <button
-              onClick={handleSignUp}
-              className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${
-                (email && password && fullName && nim && !isLoading) ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
-              }`}
-              disabled={!email || !password || !fullName || !nim || isLoading}
-            >
-              {isLoading ? 'Membuat akun...' : 'Daftar'}
-            </button>
-
-            <p className="text-sm text-center text-gray-600 mt-6">
-              Sudah punya akun?
-              <button
-                onClick={() => setStep(0)}
-                className="text-orange-500 hover:underline font-semibold ml-1 focus:outline-none"
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Masukkan Email atau NIM"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
                 disabled={isLoading}
-              >
-                Masuk
-              </button>
-            </p>
-            <button onClick={onClose} className="w-full text-sm text-gray-500 hover:text-gray-900 mt-2" disabled={isLoading}>
-              Tutup
-            </button>
-          </>
-        );
-
-      case 2: // Signup Step 2: Verify Code
-        return (
-          <>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Masukkan Kode Verifikasi</h2>
-            <p className="text-sm text-gray-600">Masukkan kode verifikasi yang kami kirim ke</p>
-            <p className="text-sm font-semibold text-gray-900 mb-6">{email || 'email-anda@example.com'}</p>
-            
-            <input 
-              type="text"
-              placeholder="Kode"
-              className="w-full px-4 py-3 text-center border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none mb-4 tracking-widest text-xl font-mono"
-            />
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Untuk email: gunakan email Tazkia (@student.tazkia.ac.id, @student.stmik.tazkia.ac.id, atau @tazkia.ac.id)
+              </p>
+            </div>
 
             <button
-              onClick={() => onClose()}
-              className="w-full py-3 rounded-xl font-semibold text-white bg-gray-900 hover:bg-gray-800 transition-colors mb-4"
+              onClick={handleContinue}
+              disabled={!email || isLoading}
+              className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${
+                (email && !isLoading) ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
+              }`}
             >
-              Verifikasi Kode
+              {isLoading ? 'Memproses...' : 'Lanjutkan'}
             </button>
 
-            <button className="w-full text-sm text-blue-600 hover:text-blue-800 mb-6">
-              Kirim ulang kode
+            {/* Tombol Guest Chat */}
+            <button
+              onClick={handleGuestChat}
+              className="w-full py-3 flex items-center justify-center border border-blue-300 bg-blue-50 rounded-xl font-medium text-blue-600 hover:bg-blue-100 transition-colors mb-4"
+              disabled={isLoading}
+            >
+              <MessageSquare size={20} className="mr-2" />
+              Coba sebagai Guest
             </button>
 
-            <p className="text-center text-xs text-gray-500 mb-10">
-              <a href="#" className="hover:underline">Syarat penggunaan</a> | <a href="#" className="hover:underline">Kebijakan privasi</a>
-            </p>
-
-            <p className="text-sm text-center text-gray-600 mt-6">
-              Sudah punya akun? 
-              <button onClick={() => setStep(0)} className="text-orange-500 hover:underline font-semibold ml-1">
-                Masuk
-              </button>
-            </p>
-            <button onClick={onClose} className="w-full text-sm text-gray-500 hover:text-gray-900 mt-2">
+            <button onClick={handleClose} className="w-full text-sm text-gray-500 hover:text-gray-900 mt-2" disabled={isLoading}>
               Tutup
             </button>
           </>
         );
+
+      case 2: // Verification Step
+        return (
+          <VerificationForm
+            email={email}
+            onVerify={handleVerification}
+            onResend={handleResendCode}
+            onBack={handleBackToEmail}
+            isLoading={isLoading}
+            error={error}
+          />
+        );
+
       default:
         return null;
     }
@@ -378,7 +456,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm relative transform transition-all duration-300 scale-100">
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-900 rounded-full hover:bg-gray-100">
+        <button onClick={handleClose} className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-900 rounded-full hover:bg-gray-100" disabled={isLoading}>
           <X size={24} />
         </button>
         <div className="text-center mt-4">
