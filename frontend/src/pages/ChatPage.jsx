@@ -12,7 +12,7 @@ const ChatWindow = ({ messages, isLoading, userName, isGuest = false }) => {
     if (messages.length === 0 && !isLoading) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500">
-                <div className="w-12 h-12 bg-orange-100 rounded-3xl flex items-center justify-center m-4">
+                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center m-4">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><path d="M4 14s1.5-1 4-1 4 1 4 1v3H4z" /><path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /><path d="M10 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /></svg>
                 </div>
                 <h2 className="text-lg font-semibold text-gray-700">
@@ -143,11 +143,25 @@ const ChatInput = ({ onSend, disabled }) => {
 const ChatPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, logout, loading, isAuthenticated, token } = useAuth();
+    const { user, logout, loading, isAuthenticated } = useAuth();
 
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [currentChatId, setCurrentChatId] = useState(null);
+    
+    // ✅ PERBAIKAN KRITIS: State untuk currentChatId dengan localStorage persistence
+    const [currentChatId, setCurrentChatId] = useState(() => {
+        const saved = localStorage.getItem('chatpage_state');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                return parsed.currentChatId || null;
+            } catch (e) {
+                return null;
+            }
+        }
+        return null;
+    });
+    
     const [chatHistory, setChatHistory] = useState([]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isGuest, setIsGuest] = useState(false);
@@ -163,16 +177,54 @@ const ChatPage = () => {
     const chatContainerRef = useRef(null);
     const menuButtonRef = useRef(null);
 
-    // ✅ FIX: Tambahkan ref untuk mencegah multiple executions
-    const hasProcessedInitialMessage = useRef(false);
-    const hasProcessedUrlMessage = useRef(false);
+    // ✅ PERBAIKAN UTAMA: Gunakan SINGLE ref untuk tracking semua initial processing
+    const initializationRef = useRef({
+        hasProcessedInitialMessage: false,
+        hasProcessedUrlMessage: false,
+        hasLoadedChatHistory: false,
+        hasCheckedAuth: false,
+        isSelectingChat: false
+    });
+
+    // ✅ PERBAIKAN: State untuk new chat tracking dengan localStorage persistence
+    const [isNewChat, setIsNewChat] = useState(() => {
+        const saved = localStorage.getItem('chatpage_state');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                return parsed.isNewChat !== undefined ? parsed.isNewChat : true;
+            } catch (e) {
+                return true;
+            }
+        }
+        return true;
+    });
+
+    // ✅ PERBAIKAN: Save state ke localStorage dengan debounce
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            const stateToSave = {
+                isNewChat,
+                currentChatId,
+                messages: messages.slice(-10),
+                timestamp: Date.now()
+            };
+            localStorage.setItem('chatpage_state', JSON.stringify(stateToSave));
+            console.log('💾 [CHAT PAGE] State saved to localStorage:', { 
+                currentChatId, 
+                isNewChat,
+                messagesCount: messages.length
+            });
+        }, 100);
+
+        return () => clearTimeout(timeoutId);
+    }, [isNewChat, currentChatId, messages]);
 
     // ✅ FUNCTION DEFINITIONS
 
     // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
     const getUserName = useCallback(() => {
         const fullName = user?.name || user?.fullName || user?.username || 'User';
-        // Ambil maksimal 2 kata pertama
         const words = fullName.split(' ').slice(0, 2);
         return words.join(' ');
     }, [user]);
@@ -197,74 +249,6 @@ const ChatPage = () => {
         }
     };
 
-    // ✅ FUNGSI: Mengelompokkan chat berdasarkan waktu (BARU)
-    const groupChatsByTime = useCallback((chats) => {
-        if (!chats || !Array.isArray(chats)) {
-            return {
-                today: [],
-                yesterday: [],
-                last7Days: [],
-                last30Days: [],
-                older: []
-            };
-        }
-
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const sevenDaysAgo = new Date(today);
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        const groups = {
-            today: [],
-            yesterday: [],
-            last7Days: [],
-            last30Days: [],
-            older: []
-        };
-
-        chats.forEach(chat => {
-            // Handle berbagai format timestamp
-            let chatDate;
-            if (chat.timestamp) {
-                chatDate = new Date(chat.timestamp);
-            } else if (chat.createdAt) {
-                chatDate = new Date(chat.createdAt);
-            } else if (chat.lastMessageAt) {
-                chatDate = new Date(chat.lastMessageAt);
-            } else if (chat.updatedAt) {
-                chatDate = new Date(chat.updatedAt);
-            } else {
-                chatDate = new Date(); // Fallback ke waktu sekarang
-            }
-
-            const chatDay = new Date(chatDate.getFullYear(), chatDate.getMonth(), chatDate.getDate());
-
-            if (chatDay.getTime() === today.getTime()) {
-                groups.today.push(chat);
-            } else if (chatDay.getTime() === yesterday.getTime()) {
-                groups.yesterday.push(chat);
-            } else if (chatDate >= sevenDaysAgo) {
-                groups.last7Days.push(chat);
-            } else if (chatDate >= thirtyDaysAgo) {
-                groups.last30Days.push(chat);
-            } else {
-                groups.older.push(chat);
-            }
-        });
-
-        return groups;
-    }, []);
-
-    // ✅ FUNGSI: Format bulan dan tahun (BARU)
-    const formatMonthYear = useCallback((timestamp) => {
-        const date = new Date(timestamp);
-        return date.toLocaleDateString('id-ID', { year: 'numeric', month: 'long' });
-    }, []);
-
     // Attach event listener untuk close menu ketika klik di luar
     useEffect(() => {
         if (showMenu) {
@@ -275,30 +259,28 @@ const ChatPage = () => {
         }
     }, [showMenu, handleCloseMenu]);
 
-    const loadChatHistory = useCallback(async () => {
+    // ✅ PERBAIKAN UTAMA: Load Chat History
+    const loadChatHistory = useCallback(async (forceReload = false) => {
         if (isGuest || !user || !user.id) {
             console.log('🔍 [CHAT PAGE] Guest mode or no user ID, skipping chat history load');
             setChatHistory([]);
             return;
         }
 
+        if (!forceReload && initializationRef.current.hasLoadedChatHistory) {
+            console.log('🔄 [CHAT PAGE] Chat history already loaded, skipping');
+            return;
+        }
+
         try {
             console.log('🔍 [CHAT PAGE] Loading chat history for user:', user.id);
+            initializationRef.current.hasLoadedChatHistory = true;
+            
             const response = await api.get('/api/ai/conversations');
             console.log('✅ [CHAT PAGE] Chat history loaded:', response.data.conversations);
-            
-            // ✅ PERBAIKAN: Format data chat history dengan timestamp yang benar
-            const formattedChats = (response.data.conversations || []).map(chat => ({
-                id: chat.id,
-                title: chat.title || chat.conversationTitle || 'Untitled Chat',
-                timestamp: chat.lastMessageAt || chat.updatedAt || chat.createdAt || chat.timestamp || new Date().toISOString(),
-                // Tambahkan properti lain yang diperlukan oleh Sidebar
-            }));
-            
-            setChatHistory(formattedChats);
+            setChatHistory(response.data.conversations || []);
         } catch (error) {
             console.error('❌ [CHAT PAGE] Error loading chat history:', error);
-            
             if (error.response?.status === 401) {
                 console.log('🛑 [CHAT PAGE] 401 Unauthorized - Token invalid, logging out');
                 logout();
@@ -328,14 +310,16 @@ const ChatPage = () => {
 
         setIsDeleting(true);
         
-        // ✅ OPTIMISTIC UPDATE: Langsung update UI
         const previousChatHistory = [...chatHistory];
         setChatHistory(prev => prev.filter(chat => chat.id !== chatToDelete));
         
-        // Jika chat yang dihapus sedang aktif, reset ke new chat
         if (currentChatId === chatToDelete) {
             setCurrentChatId(null);
             setMessages([]);
+            setIsNewChat(true);
+            initializationRef.current.hasProcessedInitialMessage = false;
+            initializationRef.current.hasProcessedUrlMessage = false;
+            initializationRef.current.isSelectingChat = false;
         }
 
         try {
@@ -343,10 +327,12 @@ const ChatPage = () => {
             await api.delete(`/api/ai/conversations/${chatToDelete}`);
             console.log('✅ [CHAT PAGE] Chat deleted successfully');
 
+            setTimeout(() => {
+                loadChatHistory(true);
+            }, 300);
+
         } catch (error) {
             console.error('❌ [CHAT PAGE] Error deleting chat:', error);
-            
-            // ✅ ROLLBACK jika backend gagal
             setChatHistory(previousChatHistory);
             
             if (error.response?.status === 401) {
@@ -370,12 +356,34 @@ const ChatPage = () => {
         setChatToDelete(null);
     };
 
+    // ✅ PERBAIKAN KRITIS: Handle AI Message dengan FIXED currentChatId management
     const handleAIMessage = useCallback(async (messageText, isGuestMode = false) => {
         setIsLoading(true);
 
         try {
-            console.log('🤖 [CHAT PAGE] Sending to AI:', { messageText, isGuestMode });
-            const response = await sendMessageToAI(messageText, isGuestMode);
+            console.log('🤖 [CHAT PAGE] Sending to AI:', { 
+                messageText, 
+                isGuestMode, 
+                isNewChat,
+                currentChatId 
+            });
+
+            // ✅ PERBAIKAN PENTING: Tentukan apakah ini benar-benar new chat
+            const shouldCreateNewChat = !currentChatId && isNewChat;
+            
+            console.log('🔍 [CHAT PAGE] Chat creation decision:', {
+                shouldCreateNewChat,
+                currentChatId,
+                isNewChat
+            });
+
+            const response = await sendMessageToAI(
+                messageText, 
+                isGuestMode, 
+                shouldCreateNewChat,
+                currentChatId
+            );
+            
             console.log('✅ [CHAT PAGE] AI Response:', response);
 
             const botMessage = {
@@ -388,10 +396,27 @@ const ChatPage = () => {
 
             setMessages(prev => [...prev, botMessage]);
 
-            if (!isGuestMode && user && response.conversationId && !currentChatId) {
-                console.log('🔄 [CHAT PAGE] New conversation created:', response.conversationId);
+            // ✅ PERBAIKAN KRITIS: Update currentChatId dari response dengan BENAR
+            if (response.conversationId) {
+                console.log('🔄 [CHAT PAGE] Setting currentChatId from response:', response.conversationId);
+                
+                // ✅ PERBAIKAN PENTING: Update currentChatId dan isNewChat state
                 setCurrentChatId(response.conversationId);
-                setTimeout(() => loadChatHistory(), 500);
+                
+                // ✅ HANYA set isNewChat ke false jika ini adalah new chat yang berhasil dibuat
+                if (shouldCreateNewChat) {
+                    console.log('🔄 [CHAT PAGE] First message completed, setting isNewChat to false');
+                    setIsNewChat(false);
+                }
+                
+                // ✅ PERBAIKAN: Reload chat history untuk menampilkan chat baru
+                setTimeout(() => {
+                    console.log('🔄 [CHAT PAGE] Reloading chat history after conversation update');
+                    initializationRef.current.hasLoadedChatHistory = false;
+                    loadChatHistory(true);
+                }, 500);
+            } else {
+                console.log('⚠️ [CHAT PAGE] No conversationId in response, maintaining current state');
             }
 
         } catch (error) {
@@ -410,8 +435,9 @@ const ChatPage = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [user, currentChatId, loadChatHistory]);
+    }, [currentChatId, loadChatHistory, isNewChat]);
 
+    // ✅ PERBAIKAN: Handle Send Message
     const handleSendMessage = async (messageText) => {
         if (!isGuest && (!isAuthenticated || !user)) {
             console.error('❌ [CHAT PAGE] Cannot send message - user not authenticated');
@@ -447,27 +473,44 @@ const ChatPage = () => {
         }
     };
 
-    const handleNewChat = () => {
-        console.log('🔄 [CHAT PAGE] Starting new chat');
+    // ✅ PERBAIKAN: Handle New Chat dengan reset state yang benar
+    const handleNewChat = useCallback((options = {}) => {
+        console.log('🔄 [CHAT PAGE] Starting new chat with options:', options);
+        
         setMessages([]);
         setCurrentChatId(null);
+        setIsNewChat(true);
         
-        // ✅ FIX: Reset processing flags untuk new chat
-        hasProcessedInitialMessage.current = false;
-        hasProcessedUrlMessage.current = false;
+        initializationRef.current = {
+            hasProcessedInitialMessage: false,
+            hasProcessedUrlMessage: false,
+            hasLoadedChatHistory: false,
+            hasCheckedAuth: false,
+            isSelectingChat: false
+        };
         
+        localStorage.removeItem('chatpage_state');
+        
+        console.log('✅ [CHAT PAGE] New chat state reset complete');
+
         if (isGuest) {
             setIsGuest(false);
-            navigate('/chat');
         }
-    };
+    }, [isGuest]);
 
+    // ✅ PERBAIKAN UTAMA: Handle Select Chat dari history
     const handleSelectChat = async (chatId) => {
         if (!chatId || chatId === currentChatId || !user || isGuest) return;
 
         console.log('🔍 [CHAT PAGE] Selecting chat:', chatId);
         
+        initializationRef.current.isSelectingChat = true;
+        initializationRef.current.hasProcessedInitialMessage = true;
+        initializationRef.current.hasProcessedUrlMessage = true;
+        initializationRef.current.hasCheckedAuth = true;
+        
         setCurrentChatId(chatId);
+        setIsNewChat(false);
         setIsLoading(true);
         setMessages([]);
 
@@ -499,6 +542,9 @@ const ChatPage = () => {
             ]);
         } finally {
             setIsLoading(false);
+            setTimeout(() => {
+                initializationRef.current.isSelectingChat = false;
+            }, 100);
         }
     };
 
@@ -508,7 +554,7 @@ const ChatPage = () => {
 
     // ✅ FUNGSI: Handle login redirect
     const handleLogin = () => {
-        navigate('/'); // Redirect ke landing page untuk login
+        navigate('/');
     };
 
     // ✅ FUNGSI: Handle settings click
@@ -516,111 +562,80 @@ const ChatPage = () => {
         console.log('Settings clicked');
     };
 
-    // ✅ USE EFFECTS dengan proper guards
-
-    // 1. FIRST: Set guest mode from location state - HANYA SEKALI
+    // ✅ PERBAIKAN UTAMA: SINGLE MASTER useEffect untuk initialization
     useEffect(() => {
-        const guestMode = location.state?.isGuest;
-        console.log('🔍 [CHAT PAGE] Checking location state for guest mode:', guestMode);
-
-        if (guestMode && !isGuest) {
-            console.log('👤 [CHAT PAGE] Setting guest mode from location state');
-            setIsGuest(true);
-        }
-    }, [location.state, isGuest]);
-
-    // 2. SECOND: Handle initial message - DENGAN GUARD YANG DIPERBAIKI
-    useEffect(() => {
-        const initialMessage = location.state?.initialMessage;
-        const guestMode = location.state?.isGuest;
-
-        console.log('📨 [CHAT PAGE] Processing initial message check:', { 
-            initialMessage, 
-            guestMode,
-            currentGuestState: isGuest,
-            hasProcessed: hasProcessedInitialMessage.current,
-            messagesLength: messages.length
-        });
-
-        // ✅ PERBAIKAN: Tambah kondisi messages.length === 0 dan clear state setelah diproses
-        if (initialMessage && !hasProcessedInitialMessage.current && messages.length === 0) {
-            console.log('🚨 [CHAT PAGE] Processing initial message:', initialMessage);
-            hasProcessedInitialMessage.current = true;
-            
-            const userMessage = {
-                id: Date.now(),
-                content: initialMessage,
-                sender: 'user',
-                role: 'user',
-                timestamp: new Date().toISOString(),
-                isGuest: guestMode || isGuest
-            };
-
-            setMessages([userMessage]);
-            handleAIMessage(initialMessage, guestMode || isGuest);
-            
-            // ✅ CLEAR LOCATION STATE setelah diproses untuk mencegah auto-send saat refresh
-            window.history.replaceState({}, document.title);
-        }
-    }, [location.state, handleAIMessage, isGuest, messages.length]); // ✅ TAMBAH messages.length di dependency
-
-    // 3. THIRD: Auth check - dengan guest mode protection
-    useEffect(() => {
-        console.log('🔍 [CHAT PAGE] Auth Status Check:', {
-            loading,
-            isAuthenticated,
-            user: user ? { id: user.id, name: getUserName() } : 'No user',
-            tokenLength: token?.length,
-            isGuest: isGuest,
-            locationState: location.state,
-            locationSearch: location.search
-        });
-
-        // ✅ CEK SEMUA SUMBER untuk guest mode
-        const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
-        const guestFromState = location.state?.isGuest;
+        console.log('🎯 [CHAT PAGE] MASTER INITIALIZATION EFFECT');
         
-        if (guestFromUrl || guestFromState) {
-            console.log('👤 [CHAT PAGE] Guest mode detected - skipping auth checks');
-            setIsGuest(true);
+        if (initializationRef.current.isSelectingChat) {
+            console.log('⏩ [CHAT PAGE] Skipping initialization - currently selecting chat from sidebar');
+            return;
+        }
+        
+        if (currentChatId && !isNewChat) {
+            console.log('⏩ [CHAT PAGE] Skipping initialization - chat already selected:', currentChatId);
             return;
         }
 
-        // ✅ JIKA GUEST MODE SUDAH AKTIF, SKIP
-        if (isGuest) {
-            console.log('👤 [CHAT PAGE] Guest mode active - skipping auth checks');
-            return;
-        }
+        const initializeChat = async () => {
+            const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
+            const guestFromState = location.state?.isGuest;
+            const initialMessage = location.state?.initialMessage;
+            const messageFromUrl = new URLSearchParams(location.search).get('message');
 
-        // ✅ HANYA JALANKAN AUTH CHECKS JIKA BUKAN GUEST
-        if (!loading && !isAuthenticated) {
-            console.log('❌ [CHAT PAGE] User not authenticated and not guest, redirecting to home');
-            navigate('/', { replace: true });
-            return;
-        }
-    }, [loading, isAuthenticated, user, token, navigate, logout, isGuest, location.state, location.search, getUserName]);
+            console.log('🔍 [CHAT PAGE] Initialization data:', {
+                guestFromUrl,
+                guestFromState,
+                initialMessage,
+                messageFromUrl,
+                currentGuest: isGuest,
+                currentChatId,
+                isNewChat,
+                hasCheckedAuth: initializationRef.current.hasCheckedAuth,
+                isSelectingChat: initializationRef.current.isSelectingChat
+            });
 
-    // 4. FOURTH: Handle URL parameters - DENGAN GUARD
-    useEffect(() => {
-        // ✅ CEK URL PARAMETERS untuk guest mode
-        const urlParams = new URLSearchParams(location.search);
-        const guestFromUrl = urlParams.get('guest') === 'true';
-        const messageFromUrl = urlParams.get('message');
+            if ((guestFromUrl || guestFromState) && !isGuest) {
+                console.log('👤 [CHAT PAGE] Setting guest mode');
+                setIsGuest(true);
+            }
 
-        console.log('🔗 [CHAT PAGE] URL Parameters:', { 
-            guestFromUrl, 
-            messageFromUrl,
-            locationSearch: location.search,
-            hasProcessed: hasProcessedUrlMessage.current
-        });
+            if (!isGuest && !initializationRef.current.hasCheckedAuth) {
+                if (!loading && !isAuthenticated) {
+                    console.log('❌ [CHAT PAGE] User not authenticated, redirecting');
+                    navigate('/', { replace: true });
+                    return;
+                }
+                initializationRef.current.hasCheckedAuth = true;
+            }
 
-        if (guestFromUrl && !hasProcessedUrlMessage.current) {
-            console.log('👤 [CHAT PAGE] Guest mode detected from URL');
-            setIsGuest(true);
-            
-            if (messageFromUrl) {
+            if (!isGuest && isAuthenticated && user && !initializationRef.current.hasLoadedChatHistory) {
+                console.log('📚 [CHAT PAGE] Loading chat history for authenticated user');
+                initializationRef.current.hasLoadedChatHistory = true;
+                await loadChatHistory();
+            }
+
+            if (!initializationRef.current.hasProcessedInitialMessage && initialMessage && isNewChat && !currentChatId) {
+                console.log('🚨 [CHAT PAGE] Processing initial message from state:', initialMessage);
+                initializationRef.current.hasProcessedInitialMessage = true;
+                
+                const userMessage = {
+                    id: Date.now(),
+                    content: initialMessage,
+                    sender: 'user',
+                    role: 'user',
+                    timestamp: new Date().toISOString(),
+                    isGuest: isGuest
+                };
+
+                setMessages([userMessage]);
+                handleAIMessage(initialMessage, isGuest);
+                
+                navigate('/chat', { replace: true, state: {} });
+            }
+
+            if (!initializationRef.current.hasProcessedUrlMessage && messageFromUrl && isNewChat && !currentChatId) {
                 console.log('🚨 [CHAT PAGE] Processing message from URL:', messageFromUrl);
-                hasProcessedUrlMessage.current = true;
+                initializationRef.current.hasProcessedUrlMessage = true;
                 
                 const userMessage = {
                     id: Date.now(),
@@ -634,21 +649,52 @@ const ChatPage = () => {
                 setMessages([userMessage]);
                 handleAIMessage(decodeURIComponent(messageFromUrl), true);
                 
-                // ✅ HAPUS PARAMETERS dari URL setelah diproses
                 navigate('/chat', { replace: true });
             }
-        }
-    }, [location.search, navigate, handleAIMessage]);
+        };
 
-    // 5. Load chat history for authenticated users
+        const timeoutId = setTimeout(() => {
+            initializeChat();
+        }, 50);
+
+        return () => clearTimeout(timeoutId);
+    }, [
+        location.state,
+        location.search,
+        isGuest,
+        loading,
+        isAuthenticated,
+        user,
+        navigate,
+        isNewChat,
+        currentChatId,
+        handleAIMessage,
+        loadChatHistory
+    ]);
+
+    // ✅ PERBAIKAN: Effect untuk load chat history
     useEffect(() => {
-        if (!loading && isAuthenticated && user && user.id && !isGuest) {
-            console.log('🔄 [CHAT PAGE] Loading chat history...');
+        if (!isGuest && isAuthenticated && user && user.id) {
+            console.log('👤 [CHAT PAGE] User authenticated, loading chat history');
+            initializationRef.current.hasLoadedChatHistory = false;
             loadChatHistory();
         }
-    }, [loadChatHistory, loading, isAuthenticated, user, isGuest]);
+    }, [isAuthenticated, user, isGuest, loadChatHistory]);
 
-    // 6. Auto-scroll to bottom
+    // ✅ PERBAIKAN: Debug effect untuk melacak state changes
+    useEffect(() => {
+        console.log('🔍 [CHAT PAGE] STATE UPDATE', {
+            messagesCount: messages.length,
+            currentChatId,
+            isNewChat,
+            isGuest,
+            user: user ? `User ${user.id}` : 'No user',
+            isSelectingChat: initializationRef.current.isSelectingChat,
+            chatHistoryCount: chatHistory.length
+        });
+    }, [messages, currentChatId, isNewChat, isGuest, user, chatHistory]);
+
+    // Auto-scroll to bottom
     useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -696,7 +742,7 @@ const ChatPage = () => {
                 isDeleting={isDeleting}
             />
 
-            {/* ✅ UPDATED: Menggunakan komponen Sidebar reusable dengan grouping */}
+            {/* ✅ UPDATED: Menggunakan komponen Sidebar reusable */}
             <Sidebar
                 user={user}
                 onLogin={handleLogin}
@@ -710,9 +756,6 @@ const ChatPage = () => {
                 onToggleSidebar={handleToggleSidebar}
                 onNewChat={handleNewChat}
                 onSettingsClick={handleSettingsClick}
-                // ✅ BARU: Props untuk grouping chat history
-                groupChatsByTime={groupChatsByTime}
-                formatMonthYear={formatMonthYear}
             />
 
             <div className="flex-1 flex flex-col overflow-hidden">
