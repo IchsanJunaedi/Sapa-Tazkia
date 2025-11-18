@@ -590,7 +590,7 @@ const LandingPage = () => {
     handleAuthCallback();
   }, [handleGoogleAuthCallback]);
 
-  // ✅ PERBAIKAN: Handle redirect berdasarkan user status
+  // ✅ PERBAIKAN: Handle redirect berdasarkan user status - DIPERBAIKI
   useEffect(() => {
     console.log('🔍 [LANDING PAGE] Auth effect - User:', user, 'Authenticated:', isAuthenticated, 'Loading:', authLoading);
 
@@ -620,7 +620,8 @@ const LandingPage = () => {
             state: { 
               from: 'landing-page',
               userEmail: user.email 
-            } 
+            },
+            replace: true // ✅ DITAMBAHKAN: replace: true untuk mencegah redirect loop
           });
         } else {
           console.log('🔍 [LANDING PAGE] Already on/about to go to AboutYouPage, skipping redirect');
@@ -737,17 +738,18 @@ const LandingPage = () => {
     setChatToDelete(null);
   };
 
-  // ✅ TAMBAHAN: Handle select chat - navigasi ke chat page dengan chat yang dipilih
+  // ✅ PERBAIKAN: Handle select chat - navigasi ke chat page dengan chat yang dipilih - DIPERBAIKI
   const handleSelectChat = (chatId) => {
     console.log('🔍 [LANDING PAGE] Selecting chat:', chatId);
     navigate('/chat', { 
       state: { 
         selectedChatId: chatId 
-      } 
+      },
+      replace: true // ✅ DITAMBAHKAN: replace: true untuk mencegah redirect loop
     });
   };
 
-  // ✅ FIXED: Fungsi untuk handle pengiriman pesan dengan navigasi yang benar
+  // ✅ PERBAIKAN: Fungsi untuk handle pengiriman pesan dengan navigasi yang benar - DIPERBAIKI
   const handleSendMessage = () => {
     if (message.trim()) {
       if (user) {
@@ -755,14 +757,16 @@ const LandingPage = () => {
           state: { 
             initialMessage: message.trim(),
             isGuest: false 
-          } 
+          },
+          replace: true // ✅ DITAMBAHKAN: replace: true untuk mencegah redirect loop
         });
       } else {
         navigate('/chat', { 
           state: { 
             initialMessage: message.trim(),
             isGuest: true 
-          }
+          },
+          replace: true // ✅ DITAMBAHKAN: replace: true untuk guest mode
         });
       }
     }
@@ -775,12 +779,14 @@ const LandingPage = () => {
     }
   };
 
-  // ✅ FIXED: Fungsi untuk langsung ke chat sebagai guest
+  // ✅ PERBAIKAN: Fungsi untuk langsung ke chat sebagai guest - DIPERBAIKI
   const handleGuestChat = () => {
+    console.log('🔍 [LANDING PAGE] Starting guest chat');
     navigate('/chat', { 
       state: { 
         isGuest: true 
-      }
+      },
+      replace: true // ✅ DITAMBAHKAN: replace: true untuk mencegah redirect loop
     });
   };
 
