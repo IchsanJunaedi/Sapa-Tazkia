@@ -151,6 +151,22 @@ const Sidebar = ({
     setIsChatsSectionOpen(!isChatsSectionOpen);
   };
 
+  // ✅ PERBAIKAN: Handle new chat dengan reset state yang benar
+  const handleNewChat = () => {
+    console.log('🔄 New chat clicked - resetting conversation state');
+    
+    // Panggil onNewChat dengan parameter yang jelas
+    if (onNewChat) {
+      onNewChat({
+        resetHistory: true,
+        isNewChat: true
+      });
+    }
+    
+    // Tutup popup jika ada yang terbuka
+    handleCloseAllPopups();
+  };
+
   const ToggleIcon = ({ open }) => (
     <img
       src="https://www.svgrepo.com/show/493722/sidebar-toggle-nav-side-aside.svg"
@@ -195,13 +211,13 @@ const Sidebar = ({
           </div>
         )}
 
-        {/* ✅ DIUBAH: New Chat Section dengan full rounded dan konten ditengah */}
+        {/* ✅ PERBAIKAN: New Chat Section dengan handler yang benar */}
         <div className="flex flex-col flex-shrink-0">
           <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
             <button
               className={`${isSidebarOpen ? 'w-full justify-center p-3' : 'w-12 h-12 justify-center'} h-12 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full transition-colors flex items-center group relative gap-3 shadow-sm`}
               title="New Chat"
-              onClick={onNewChat}
+              onClick={handleNewChat} // ✅ Gunakan handleNewChat yang sudah diperbaiki
             >
               <PenSquare size={20} />
               <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap font-medium`}>
@@ -229,7 +245,7 @@ const Sidebar = ({
           )}
         </div>
 
-        {/* ✅ DIUBAH: Area Chat History dengan struktur yang benar */}
+        {/* Area Chat History dengan struktur yang benar */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {isChatsSectionOpen && isSidebarOpen ? (
             <div className="flex-1 overflow-y-auto mt-4 space-y-4 custom-scrollbar">
@@ -343,12 +359,12 @@ const Sidebar = ({
               )}
             </div>
           ) : (
-            // ✅ TAMBAHAN: Empty space ketika chat history tidak ditampilkan
+            // Empty space ketika chat history tidak ditampilkan
             <div className="flex-1"></div>
           )}
         </div>
 
-        {/* ✅ DIUBAH: Profile Section dengan margin top yang cukup */}
+        {/* Profile Section dengan margin top yang cukup */}
         <div className="mt-8 flex-shrink-0">
           <div className="flex justify-center">
             <button
