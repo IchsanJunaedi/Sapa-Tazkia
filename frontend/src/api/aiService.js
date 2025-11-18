@@ -73,12 +73,17 @@ export const sendGuestMessage = async (message, sessionId = null) => {
 /**
  * Send message untuk authenticated users
  */
-export const sendAuthenticatedMessage = async (message, conversationId = null) => {
+export const sendAuthenticatedMessage = async (message, isNewChat = false, conversationId = null) => {
   try {
-    console.log('🔐 [AI SERVICE] Sending authenticated message:', { message, conversationId });
+    console.log('🔐 [AI SERVICE] Sending authenticated message:', { 
+      message, 
+      isNewChat, 
+      conversationId 
+    });
     
-    const response = await api.post('/ai/chat', {  // ✅ UPDATE: /ai/chat bukan /chat
+    const response = await api.post('/ai/chat', {
       message: message,
+      isNewChat: isNewChat, // ✅ PERBAIKAN: Kirim isNewChat ke backend
       conversationId: conversationId
     });
     
@@ -111,7 +116,7 @@ export const getConversationHistory = async (conversationId) => {
   try {
     console.log('📚 [AI SERVICE] Getting conversation history:', conversationId);
     
-    const response = await api.get(`/ai/history/${conversationId}`);  // ✅ UPDATE: /ai/history
+    const response = await api.get(`/ai/history/${conversationId}`);
     console.log('✅ [AI SERVICE] Conversation history received:', response.data);
     return response.data;
 
@@ -128,7 +133,7 @@ export const getAllConversations = async () => {
   try {
     console.log('📚 [AI SERVICE] Getting all conversations');
     
-    const response = await api.get('/ai/conversations');  // ✅ UPDATE: /ai/conversations
+    const response = await api.get('/ai/conversations');
     console.log('✅ [AI SERVICE] All conversations received:', response.data);
     return response.data;
 
@@ -172,13 +177,22 @@ export const getGuestSessionId = () => {
 };
 
 /**
- * Unified function untuk mengirim pesan (auto-detect guest/authenticated)
+ * ✅ PERBAIKAN UTAMA: Unified function untuk mengirim pesan dengan parameter yang benar
  */
-export const sendMessageToAI = async (message, isGuest = false, options = {}) => {
+export const sendMessageToAI = async (message, isGuest = false, isNewChat = false, conversationId = null) => {
+  console.log('🔄 [AI SERVICE] sendMessageToAI called with:', {
+    message,
+    isGuest,
+    isNewChat,
+    conversationId
+  });
+
   if (isGuest) {
-    return await sendGuestMessage(message, options.sessionId);
+    const sessionId = getGuestSessionId();
+    return await sendGuestMessage(message, sessionId);
   } else {
-    return await sendAuthenticatedMessage(message, options.conversationId);
+    // ✅ PERBAIKAN PENTING: Kirim isNewChat dan conversationId dengan benar
+    return await sendAuthenticatedMessage(message, isNewChat, conversationId);
   }
 };
 
