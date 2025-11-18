@@ -68,13 +68,19 @@ const testGeminiConnectionHandler = async (req, res) => {
   }
 };
 
-// ✅ FUNCTION SEND CHAT - SEKARANG PAKAI PRISMA DAN SIMPAN KE DATABASE
+// ✅ PERBAIKAN UTAMA: FUNCTION SEND CHAT - DENGAN LOGIC isNewChat YANG BENAR
 const sendChat = async (req, res) => {
   try {
-    const { message, conversationId } = req.body;
+    const { message, conversationId, isNewChat } = req.body;
     const userId = req.user?.id;
 
-    console.log('💬 Chat Request:', { userId, message, conversationId });
+    console.log('💬 Chat Request:', { 
+      userId, 
+      message, 
+      conversationId, 
+      isNewChat,
+      requestBody: req.body // ✅ DEBUG: Log seluruh request body
+    });
 
     // Validasi manual
     if (!message || message.trim() === '') {
@@ -91,62 +97,25 @@ const sendChat = async (req, res) => {
       });
     }
 
-    const deleteConversation = async (req, res) => {
-    try {
-        const { chatId } = req.params;
-        const userId = req.user.id;
-
-        console.log(`🗑️ [AI CONTROLLER] Deleting conversation: ${chatId} for user: ${userId}`);
-
-        // Cari conversation di database
-        const conversation = await Conversation.findById(chatId);
-
-        if (!conversation) {
-            console.log(`❌ [AI CONTROLLER] Conversation not found: ${chatId}`);
-            return res.status(404).json({
-                success: false,
-                message: 'Conversation not found'
-            });
-        }
-
-        // Validasi: Pastikan conversation milik user yang login
-        if (conversation.userId.toString() !== userId) {
-            console.log(`🚫 [AI CONTROLLER] Unauthorized delete attempt. User: ${userId}, Conversation Owner: ${conversation.userId}`);
-            return res.status(403).json({
-                success: false,
-                message: 'Not authorized to delete this conversation'
-            });
-        }
-
-        // Hapus conversation dari database
-        await Conversation.findByIdAndDelete(chatId);
-        
-        console.log(`✅ [AI CONTROLLER] Conversation deleted successfully: ${chatId}`);
-
-        res.json({
-            success: true,
-            message: 'Conversation deleted successfully'
-        });
-
-    } catch (error) {
-        console.error('❌ [AI CONTROLLER] Error deleting conversation:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error while deleting conversation',
-            error: error.message
-        });
-    }
-};
-
-
     // ✅ PANGGIL GEMINI SERVICE
     const aiResponse = await generateGeminiResponse(message);
     
     let currentConversationId;
     const conversationTitle = message.substring(0, 50) + (message.length > 50 ? '...' : '');
 
-    if (!conversationId) {
+    // ✅ PERBAIKAN PENTING: LOGIC UNTUK MENENTUKAN APAKAH BUAT CONVERSATION BARU ATAU LANJUTKAN EXISTING
+    const shouldCreateNewConversation = isNewChat || !conversationId;
+
+    console.log('🔍 [AI CONTROLLER] Conversation decision:', {
+      shouldCreateNewConversation,
+      isNewChat,
+      conversationId,
+      hasConversationId: !!conversationId
+    });
+
+    if (shouldCreateNewConversation) {
       // ✅ BUAT CONVERSATION BARU + SIMPAN MESSAGES
+      console.log('🆕 [AI CONTROLLER] Creating NEW conversation');
       const newConversation = await prisma.conversation.create({
         data: {
           userId: userId,
@@ -166,8 +135,10 @@ const sendChat = async (req, res) => {
         }
       });
       currentConversationId = newConversation.id;
+      console.log('✅ [AI CONTROLLER] New conversation created:', currentConversationId);
     } else {
-      // ✅ UPDATE CONVERSATION YANG SUDAH ADA
+      // ✅ PERBAIKAN: LANJUTKAN CONVERSATION YANG SUDAH ADA
+      console.log('🔄 [AI CONTROLLER] Continuing EXISTING conversation:', conversationId);
       currentConversationId = parseInt(conversationId);
       
       // Verifikasi conversation milik user
@@ -179,53 +150,90 @@ const sendChat = async (req, res) => {
       });
 
       if (!existingConversation) {
-        return res.status(404).json({
-          success: false,
-          message: "Conversation not found"
-        });
-      }
-
-      // Tambahkan messages baru
-      await prisma.message.createMany({
-        data: [
-          {
-            conversationId: currentConversationId,
-            role: 'user',
-            content: message
-          },
-          {
-            conversationId: currentConversationId,
-            role: 'bot',
-            content: aiResponse
+        console.log('❌ [AI CONTROLLER] Conversation not found, creating new one');
+        // Jika conversation tidak ditemukan, buat yang baru
+        const newConversation = await prisma.conversation.create({
+          data: {
+            userId: userId,
+            title: conversationTitle,
+            messages: {
+              create: [
+                {
+                  role: 'user',
+                  content: message
+                },
+                {
+                  role: 'bot',
+                  content: aiResponse
+                }
+              ]
+            }
           }
-        ]
-      });
+        });
+        currentConversationId = newConversation.id;
+      } else {
+        // ✅ TAMBAHKAN MESSAGES BARU KE CONVERSATION EXISTING
+        console.log('📝 [AI CONTROLLER] Adding messages to existing conversation');
+        await prisma.message.createMany({
+          data: [
+            {
+              conversationId: currentConversationId,
+              role: 'user',
+              content: message
+            },
+            {
+              conversationId: currentConversationId,
+              role: 'bot',
+              content: aiResponse
+            }
+          ]
+        });
 
-      // Update judul conversation
-      await prisma.conversation.update({
-        where: {
-          id: currentConversationId
-        },
-        data: {
-          title: conversationTitle,
-          updatedAt: new Date()
+        // Update judul conversation hanya jika perlu
+        if (existingConversation.title.length < 10) { // Hanya update jika judul terlalu pendek
+          await prisma.conversation.update({
+            where: {
+              id: currentConversationId
+            },
+            data: {
+              title: conversationTitle,
+              updatedAt: new Date()
+            }
+          });
+        } else {
+          // Hanya update timestamp
+          await prisma.conversation.update({
+            where: {
+              id: currentConversationId
+            },
+            data: {
+              updatedAt: new Date()
+            }
+          });
         }
-      });
+        console.log('✅ [AI CONTROLLER] Messages added to existing conversation');
+      }
     }
 
     const responseData = {
       success: true,
       reply: aiResponse,
-      conversationId: currentConversationId, // Sekarang ID integer dari database
+      conversationId: currentConversationId,
       timestamp: new Date().toISOString(),
-      hasPDF: false
+      hasPDF: false,
+      isNewConversation: shouldCreateNewConversation // ✅ DEBUG: Kirim info apakah conversation baru
     };
 
-    console.log('✅ Chat Response saved to database');
+    console.log('✅ [AI CONTROLLER] Chat Response saved to database:', {
+      conversationId: currentConversationId,
+      isNewConversation: shouldCreateNewConversation,
+      messageCount: '2 messages added'
+    });
+
     res.json(responseData);
 
   } catch (error) {
-    console.error('❌ Chat Error:', error);
+    console.error('❌ [AI CONTROLLER] Chat Error:', error);
     res.status(500).json({
       success: false,
       message: "Chat service error",
@@ -406,7 +414,7 @@ const deleteConversation = async (req, res) => {
 // ✅ EXPORTS FUNCTION - PERBAIKI NAMA
 module.exports = {
   testAI,
-  testGeminiConnection: testGeminiConnectionHandler, // ✅ PERBAIKI: Export dengan nama yang benar
+  testGeminiConnection: testGeminiConnectionHandler,
   sendChat,
   getConversations,
   getChatHistory,
