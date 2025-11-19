@@ -144,6 +144,23 @@ export const getAllConversations = async () => {
 };
 
 /**
+ * Delete conversation untuk authenticated users
+ */
+export const deleteConversation = async (conversationId) => {
+  try {
+    console.log('🗑️ [AI SERVICE] Deleting conversation:', conversationId);
+    
+    const response = await api.delete(`/ai/conversations/${conversationId}`);
+    console.log('✅ [AI SERVICE] Conversation deleted:', response.data);
+    return response.data;
+
+  } catch (error) {
+    console.error('❌ [AI SERVICE] Delete conversation error:', error);
+    throw error;
+  }
+};
+
+/**
  * Get guest conversation history
  */
 export const getGuestConversation = async (sessionId) => {
@@ -156,6 +173,107 @@ export const getGuestConversation = async (sessionId) => {
 
   } catch (error) {
     console.error('❌ [AI SERVICE] Get guest conversation error:', error);
+    throw error;
+  }
+};
+
+/**
+ * ✅ NEW: Analyze academic performance untuk authenticated users
+ */
+export const analyzeAcademicPerformance = async () => {
+  try {
+    console.log('🧠 [AI SERVICE] Analyzing academic performance');
+    
+    const response = await api.post('/ai/analyze-academic');
+    console.log('✅ [AI SERVICE] Academic analysis received:', response.data);
+    return response.data;
+
+  } catch (error) {
+    console.error('❌ [AI SERVICE] Academic analysis error:', error);
+    
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      throw new Error('Sesi telah berakhir. Silakan login kembali.');
+    } else if (error.response?.data?.error) {
+      throw new Error(error.response.data.error);
+    } else {
+      throw new Error('Terjadi kesalahan saat menganalisis performa akademik. Silakan coba lagi.');
+    }
+  }
+};
+
+/**
+ * ✅ NEW: Get study recommendations untuk authenticated users
+ */
+export const getStudyRecommendations = async () => {
+  try {
+    console.log('💡 [AI SERVICE] Getting study recommendations');
+    
+    const response = await api.post('/ai/study-recommendations');
+    console.log('✅ [AI SERVICE] Study recommendations received:', response.data);
+    return response.data;
+
+  } catch (error) {
+    console.error('❌ [AI SERVICE] Study recommendations error:', error);
+    
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      throw new Error('Sesi telah berakhir. Silakan login kembali.');
+    } else if (error.response?.data?.error) {
+      throw new Error(error.response.data.error);
+    } else {
+      throw new Error('Terjadi kesalahan saat mendapatkan rekomendasi belajar. Silakan coba lagi.');
+    }
+  }
+};
+
+/**
+ * ✅ NEW: Test OpenAI connection
+ */
+export const testOpenAIConnection = async () => {
+  try {
+    console.log('🔧 [AI SERVICE] Testing OpenAI connection');
+    
+    const response = await guestApi.get('/ai/test-openai');
+    console.log('✅ [AI SERVICE] OpenAI connection test result:', response.data);
+    return response.data;
+
+  } catch (error) {
+    console.error('❌ [AI SERVICE] OpenAI connection test error:', error);
+    throw error;
+  }
+};
+
+/**
+ * ✅ NEW: Test AI dengan message
+ */
+export const testAI = async (message) => {
+  try {
+    console.log('🤖 [AI SERVICE] Testing AI with message:', message);
+    
+    const response = await guestApi.post('/ai/test-ai', { message });
+    console.log('✅ [AI SERVICE] AI test result:', response.data);
+    return response.data;
+
+  } catch (error) {
+    console.error('❌ [AI SERVICE] AI test error:', error);
+    throw error;
+  }
+};
+
+/**
+ * ✅ NEW: Check AI service health
+ */
+export const checkAIHealth = async () => {
+  try {
+    console.log('🏥 [AI SERVICE] Checking AI service health');
+    
+    const response = await guestApi.get('/ai/health');
+    console.log('✅ [AI SERVICE] AI health check result:', response.data);
+    return response.data;
+
+  } catch (error) {
+    console.error('❌ [AI SERVICE] AI health check error:', error);
     throw error;
   }
 };
@@ -203,7 +321,13 @@ const aiService = {
   sendMessageToAI,
   getConversationHistory,
   getAllConversations,
+  deleteConversation,
   getGuestConversation,
+  analyzeAcademicPerformance,
+  getStudyRecommendations,
+  testOpenAIConnection,
+  testAI,
+  checkAIHealth,
   clearGuestSession,
   getGuestSessionId
 };
