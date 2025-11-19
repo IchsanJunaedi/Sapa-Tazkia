@@ -1,5 +1,8 @@
-// Mock Academic Service untuk development - Compatible dengan Prisma schema
+// Academic Service untuk development - Compatible dengan Prisma schema
 // Phase 1: Mock data - Phase 2: Switch ke real API
+
+// Import OpenAI Service yang baru
+const openaiService = require('./openaiService');
 
 class AcademicService {
   constructor() {
@@ -122,7 +125,7 @@ class AcademicService {
 
   // ✅ MOCK API: Validate student data (nama & tanggal lahir) - Compatible dengan backend
   async validateStudent(nim, fullName, birthDate) {
-    console.log('🔍 [MOCK ACADEMIC SERVICE] Validating student:', { nim, fullName, birthDate });
+    console.log('🔍 [ACADEMIC SERVICE] Validating student:', { nim, fullName, birthDate });
     
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -134,7 +137,7 @@ class AcademicService {
     );
 
     if (student) {
-      console.log('✅ [MOCK ACADEMIC SERVICE] Student validation SUCCESS');
+      console.log('✅ [ACADEMIC SERVICE] Student validation SUCCESS');
       return {
         success: true,
         valid: true,
@@ -151,7 +154,7 @@ class AcademicService {
         message: 'Verifikasi berhasil! Data akademik Anda telah terkonfirmasi.'
       };
     } else {
-      console.log('❌ [MOCK ACADEMIC SERVICE] Student validation FAILED');
+      console.log('❌ [ACADEMIC SERVICE] Student validation FAILED');
       return {
         success: false,
         valid: false,
@@ -162,7 +165,7 @@ class AcademicService {
 
   // ✅ MOCK API: Get academic summary - Compatible dengan Prisma function
   async getAcademicSummary(userId) {
-    console.log('🔍 [MOCK ACADEMIC SERVICE] Getting academic summary for:', userId);
+    console.log('🔍 [ACADEMIC SERVICE] Getting academic summary for:', userId);
     
     await new Promise(resolve => setTimeout(resolve, 800));
     
@@ -194,7 +197,7 @@ class AcademicService {
 
   // ✅ MOCK API: Get grades by semester - Compatible dengan Prisma function
   async getGradesBySemester(userId, semester = null) {
-    console.log('🔍 [MOCK ACADEMIC SERVICE] Getting grades for:', userId, 'Semester:', semester);
+    console.log('🔍 [ACADEMIC SERVICE] Getting grades for:', userId, 'Semester:', semester);
     
     await new Promise(resolve => setTimeout(resolve, 800));
     
@@ -238,7 +241,7 @@ class AcademicService {
 
   // ✅ MOCK API: Get full transcript - Compatible dengan Prisma function
   async getTranscript(userId) {
-    console.log('🔍 [MOCK ACADEMIC SERVICE] Getting transcript for:', userId);
+    console.log('🔍 [ACADEMIC SERVICE] Getting transcript for:', userId);
     
     await new Promise(resolve => setTimeout(resolve, 1000));
     
@@ -263,7 +266,7 @@ class AcademicService {
 
   // ✅ MOCK API: Get student by NIM (untuk keperluan chat handler)
   async getStudentByNIM(nim) {
-    console.log('🔍 [MOCK ACADEMIC SERVICE] Getting student by NIM:', nim);
+    console.log('🔍 [ACADEMIC SERVICE] Getting student by NIM:', nim);
     
     await new Promise(resolve => setTimeout(resolve, 500));
     
@@ -290,6 +293,145 @@ class AcademicService {
     };
   }
 
+  // ✅ NEW METHOD: Analyze academic performance dengan OpenAI
+  async analyzeAcademicPerformance(userId) {
+    console.log('🧠 [ACADEMIC SERVICE] Analyzing academic performance for:', userId);
+    
+    try {
+      // Dapatkan data akademik lengkap
+      const transcript = await this.getTranscript(userId);
+      
+      if (!transcript.success) {
+        return {
+          success: false,
+          message: 'Tidak dapat menganalisis performa akademik: data tidak tersedia'
+        };
+      }
+
+      // Siapkan data untuk analisis AI
+      const academicData = {
+        studentName: transcript.data.summary.fullName,
+        nim: transcript.data.summary.nim,
+        programStudi: transcript.data.summary.programStudi,
+        ipk: transcript.data.summary.ipk,
+        totalSks: transcript.data.summary.totalSks,
+        gradesBySemester: transcript.data.grades
+      };
+
+      // Buat prompt untuk analisis performa akademik
+      const analysisPrompt = `
+        ANALISIS PERFORMA AKADEMIK MAHASISWA
+
+        Data Mahasiswa:
+        - Nama: ${academicData.studentName}
+        - NIM: ${academicData.nim}
+        - Program Studi: ${academicData.programStudi}
+        - IPK: ${academicData.ipk}
+        - Total SKS: ${academicData.totalSks}
+
+        Data Nilai per Semester:
+        ${JSON.stringify(academicData.gradesBySemester, null, 2)}
+
+        Tolong berikan analisis yang mencakup:
+        1. Evaluasi performa akademik secara keseluruhan
+        2. Tren perkembangan nilai dari semester ke semester
+        3. Mata kuliah dengan performa terbaik dan yang perlu perbaikan
+        4. Rekomendasi untuk meningkatkan prestasi akademik
+        5. Prediksi kelulusan jika tren ini berlanjut
+
+        Berikan analisis dalam bahasa Indonesia yang mudah dipahami, maksimal 3 paragraf.
+      `;
+
+      // Gunakan OpenAI service untuk analisis
+      const analysisResult = await openaiService.generateAIResponse(analysisPrompt);
+
+      return {
+        success: true,
+        data: {
+          studentInfo: {
+            name: academicData.studentName,
+            nim: academicData.nim,
+            programStudi: academicData.programStudi,
+            ipk: academicData.ipk
+          },
+          analysis: analysisResult,
+          generatedAt: new Date().toISOString()
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ [ACADEMIC SERVICE] Error analyzing academic performance:', error);
+      return {
+        success: false,
+        message: 'Gagal menganalisis performa akademik: ' + error.message
+      };
+    }
+  }
+
+  // ✅ NEW METHOD: Get study recommendations berdasarkan IPK dan nilai
+  async getStudyRecommendations(userId) {
+    console.log('💡 [ACADEMIC SERVICE] Getting study recommendations for:', userId);
+    
+    try {
+      const transcript = await this.getTranscript(userId);
+      
+      if (!transcript.success) {
+        return {
+          success: false,
+          message: 'Tidak dapat memberikan rekomendasi: data akademik tidak tersedia'
+        };
+      }
+
+      const academicData = {
+        studentName: transcript.data.summary.fullName,
+        ipk: transcript.data.summary.ipk,
+        ipsLastSemester: transcript.data.summary.ipsLastSemester,
+        grades: transcript.data.grades
+      };
+
+      const recommendationPrompt = `
+        REKOMENDASI BELAJAR BERDASARKAN PERFORMA AKADEMIK
+
+        Data Mahasiswa:
+        - Nama: ${academicData.studentName}
+        - IPK: ${academicData.ipk}
+        - IPS Semester Terakhir: ${academicData.ipsLastSemester}
+
+        Data Nilai:
+        ${JSON.stringify(academicData.grades, null, 2)}
+
+        Berikan rekomendasi belajar yang spesifik dan praktis untuk mahasiswa ini:
+        1. Strategi belajar berdasarkan pola nilai
+        2. Mata kuliah yang perlu fokus lebih
+        3. Tips manajemen waktu dan studi
+        4. Sumber belajar yang direkomendasikan
+        5. Target yang realistis untuk semester berikutnya
+
+        Berikan dalam format bullet points yang mudah diikuti, maksimal 5 poin utama.
+        Gunakan bahasa Indonesia yang santai dan mendukung.
+      `;
+
+      const recommendations = await openaiService.generateAIResponse(recommendationPrompt);
+
+      return {
+        success: true,
+        data: {
+          studentName: academicData.studentName,
+          currentIPK: academicData.ipk,
+          recommendations: recommendations,
+          generatedAt: new Date().toISOString()
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ [ACADEMIC SERVICE] Error generating study recommendations:', error);
+      return {
+        success: false,
+        message: 'Gagal menghasilkan rekomendasi belajar: ' + error.message
+      };
+    }
+  }
+
   // Helper: Normalize name for comparison (case insensitive, remove extra spaces)
   normalizeName(name) {
     return name.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -312,4 +454,4 @@ class AcademicService {
 
 // Export singleton instance
 const academicService = new AcademicService();
-export default academicService;
+module.exports = academicService;

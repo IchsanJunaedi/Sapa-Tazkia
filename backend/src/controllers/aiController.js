@@ -1,7 +1,8 @@
-const { generateGeminiResponse, testGeminiConnection } = require('../services/geminiService');
+const { generateAIResponse, testOpenAIConnection } = require('../services/openaiService');
+const academicService = require('../services/academicService');
 const prisma = require('../../config/prisma');
 
-// ✅ FUNCTION TEST AI - PANGGIL GEMINI
+// ✅ FUNCTION TEST AI - PANGGIL OPENAI
 const testAI = async (req, res) => {
   try {
     const { message } = req.body;
@@ -15,8 +16,8 @@ const testAI = async (req, res) => {
 
     console.log('🔍 AI Test Request:', message);
 
-    // ✅ PANGGIL GEMINI SERVICE
-    const aiResponse = await generateGeminiResponse(message);
+    // ✅ PANGGIL OPENAI SERVICE
+    const aiResponse = await generateAIResponse(message);
 
     res.json({
       success: true,
@@ -35,40 +36,43 @@ const testAI = async (req, res) => {
   }
 };
 
-// ✅ FUNCTION TEST GEMINI CONNECTION - PERBAIKI NAMA FUNCTION
-const testGeminiConnectionHandler = async (req, res) => {
+// ✅ FUNCTION TEST OPENAI CONNECTION
+const testOpenAIConnectionHandler = async (req, res) => {
   try {
-    console.log('🔧 Testing Gemini connection...');
+    console.log('🔧 Testing OpenAI connection...');
     
     // ✅ GUNAKAN service yang sudah di-import di atas file
-    const result = await testGeminiConnection();
+    const result = await testOpenAIConnection();
 
     if (result.success) {
       res.json({
         success: true,
-        message: 'Gemini connection test successful',
-        response: result.message
+        message: 'OpenAI connection test successful',
+        response: result.message,
+        model: result.model,
+        tokens: result.tokens
       });
     } else {
       res.status(500).json({
         success: false,
-        message: 'Gemini connection test failed',
+        message: 'OpenAI connection test failed',
         error: result.error,
-        details: result.details
+        details: result.details,
+        code: result.code
       });
     }
     
   } catch (error) {
-    console.error('❌ Gemini connection test error:', error);
+    console.error('❌ OpenAI connection test error:', error);
     res.status(500).json({
       success: false,
-      message: 'Gemini connection test failed',
+      message: 'OpenAI connection test failed',
       error: error.message
     });
   }
 };
 
-// ✅ PERBAIKAN UTAMA: FUNCTION SEND CHAT - DENGAN LOGIC isNewChat YANG BENAR
+// ✅ FUNCTION SEND CHAT - DENGAN LOGIC isNewChat YANG BENAR
 const sendChat = async (req, res) => {
   try {
     const { message, conversationId, isNewChat } = req.body;
@@ -97,13 +101,37 @@ const sendChat = async (req, res) => {
       });
     }
 
-    // ✅ PANGGIL GEMINI SERVICE
-    const aiResponse = await generateGeminiResponse(message);
+    // ✅ DAPATKAN CONVERSATION HISTORY JIKA LANJUTKAN CHAT
+    let conversationHistory = [];
+    if (conversationId && !isNewChat) {
+      const existingMessages = await prisma.message.findMany({
+        where: {
+          conversationId: parseInt(conversationId),
+          conversation: {
+            userId: userId
+          }
+        },
+        select: {
+          role: true,
+          content: true
+        },
+        orderBy: {
+          createdAt: 'asc'
+        },
+        take: 10 // Ambil 10 pesan terakhir untuk context
+      });
+      
+      conversationHistory = existingMessages;
+      console.log('📚 Loaded conversation history:', conversationHistory.length, 'messages');
+    }
+
+    // ✅ PANGGIL OPENAI SERVICE DENGAN HISTORY
+    const aiResponse = await generateAIResponse(message, conversationHistory);
     
     let currentConversationId;
     const conversationTitle = message.substring(0, 50) + (message.length > 50 ? '...' : '');
 
-    // ✅ PERBAIKAN PENTING: LOGIC UNTUK MENENTUKAN APAKAH BUAT CONVERSATION BARU ATAU LANJUTKAN EXISTING
+    // ✅ LOGIC UNTUK MENENTUKAN APAKAH BUAT CONVERSATION BARU ATAU LANJUTKAN EXISTING
     const shouldCreateNewConversation = isNewChat || !conversationId;
 
     console.log('🔍 [AI CONTROLLER] Conversation decision:', {
@@ -137,7 +165,7 @@ const sendChat = async (req, res) => {
       currentConversationId = newConversation.id;
       console.log('✅ [AI CONTROLLER] New conversation created:', currentConversationId);
     } else {
-      // ✅ PERBAIKAN: LANJUTKAN CONVERSATION YANG SUDAH ADA
+      // ✅ LANJUTKAN CONVERSATION YANG SUDAH ADA
       console.log('🔄 [AI CONTROLLER] Continuing EXISTING conversation:', conversationId);
       currentConversationId = parseInt(conversationId);
       
@@ -242,7 +270,7 @@ const sendChat = async (req, res) => {
   }
 };
 
-// ✅ FUNCTION GET CONVERSATIONS - SEKARANG AMBIL DARI DATABASE
+// ✅ FUNCTION GET CONVERSATIONS - AMBIL DARI DATABASE
 const getConversations = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -304,7 +332,7 @@ const getConversations = async (req, res) => {
   }
 };
 
-// ✅ FUNCTION GET CHAT HISTORY - SEKARANG AMBIL DARI DATABASE
+// ✅ FUNCTION GET CHAT HISTORY - AMBIL DARI DATABASE
 const getChatHistory = async (req, res) => {
   try {
     const { chatId } = req.params;
@@ -361,7 +389,7 @@ const getChatHistory = async (req, res) => {
   }
 };
 
-// ✅ FUNCTION DELETE CONVERSATION - TAMBAHAN BARU
+// ✅ FUNCTION DELETE CONVERSATION
 const deleteConversation = async (req, res) => {
   try {
     const { chatId } = req.params;
@@ -411,18 +439,100 @@ const deleteConversation = async (req, res) => {
   }
 };
 
-// ✅ EXPORTS FUNCTION - PERBAIKI NAMA
-module.exports = {
+// ✅ NEW FUNCTION: ANALYZE ACADEMIC PERFORMANCE
+const analyzeAcademicPerformance = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication required"
+      });
+    }
+
+    console.log('🧠 [AI CONTROLLER] Analyzing academic performance for user:', userId);
+
+    const result = await academicService.analyzeAcademicPerformance(userId);
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: "Academic analysis generated successfully",
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ [AI CONTROLLER] Academic analysis error:', error);
+    res.status(500).json({
+      success: false,
+      message: "Error analyzing academic performance",
+      error: error.message
+    });
+  }
+};
+
+// ✅ NEW FUNCTION: GET STUDY RECOMMENDATIONS
+const getStudyRecommendations = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication required"
+      });
+    }
+
+    console.log('💡 [AI CONTROLLER] Getting study recommendations for user:', userId);
+
+    const result = await academicService.getStudyRecommendations(userId);
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: "Study recommendations generated successfully",
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ [AI CONTROLLER] Study recommendations error:', error);
+    res.status(500).json({
+      success: false,
+      message: "Error generating study recommendations",
+      error: error.message
+    });
+  }
+};
+
+// ✅ EXPORTS FUNCTION
+  module.exports = {
   testAI,
-  testGeminiConnection: testGeminiConnectionHandler,
+  testOpenAIConnection: testOpenAIConnectionHandler,
   sendChat,
   getConversations,
   getChatHistory,
-  deleteConversation
+  deleteConversation,
+  analyzeAcademicPerformance,
+  getStudyRecommendations
 };
 
 // Test di akhir file
 console.log('✅ AI Controller loaded successfully');
 console.log('- testAI is function:', typeof testAI === 'function');
-console.log('- testGeminiConnectionHandler is function:', typeof testGeminiConnectionHandler === 'function');
+console.log('- testOpenAIConnectionHandler is function:', typeof testOpenAIConnectionHandler === 'function');
 console.log('- sendChat is function:', typeof sendChat === 'function');
+console.log('- analyzeAcademicPerformance is function:', typeof analyzeAcademicPerformance === 'function');
+console.log('- getStudyRecommendations is function:', typeof getStudyRecommendations === 'function');

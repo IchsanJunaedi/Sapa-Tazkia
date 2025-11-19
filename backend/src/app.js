@@ -149,15 +149,16 @@ app.get('/', (req, res) => {
   res.json({
     success: true,
     message: '🚀 Sapa Tazkia Backend API',
-    version: '3.2.0', // ✅ UPDATE VERSION
+    version: '3.3.0', // ✅ UPDATE VERSION untuk OpenAI
     status: 'running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     features: {
       authentication: true,
-      emailVerification: true, // ✅ FEATURE BARU
+      emailVerification: true,
       googleOAuth: !!process.env.GOOGLE_CLIENT_ID,
-      aiChat: !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSy.....')
+      aiChat: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'), // ✅ UPDATE: OpenAI
+      academicAnalysis: true // ✅ FEATURE BARU
     },
     endpoints: {
       auth: '/api/auth',
@@ -184,11 +185,20 @@ app.get('/health', async (req, res) => {
     await prisma.$queryRaw`SELECT 1`;
     healthCheck.services.database = 'Connected';
     
-    // Test Gemini connection if API key exists
-    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSy.....') {
-      healthCheck.services.gemini = 'Configured';
+    // Test OpenAI connection if API key exists
+    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
+      try {
+        const { testOpenAIConnection } = require('./services/openaiService');
+        const openaiTest = await testOpenAIConnection();
+        healthCheck.services.openai = openaiTest.success ? 'Connected' : 'Error';
+        if (openaiTest.success) {
+          healthCheck.services.openaiModel = openaiTest.model;
+        }
+      } catch (error) {
+        healthCheck.services.openai = 'Connection Failed';
+      }
     } else {
-      healthCheck.services.gemini = 'Not Configured';
+      healthCheck.services.openai = 'Not Configured';
     }
 
     // Test email service configuration
@@ -218,11 +228,14 @@ app.get('/status', (req, res) => {
     memory: process.memoryUsage(),
     features: {
       authentication: !!process.env.GOOGLE_CLIENT_ID,
-      emailVerification: true, // ✅ FEATURE BARU
-      ai: !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSy.....'),
+      emailVerification: true,
+      ai: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'), // ✅ UPDATE: OpenAI
+      academicAnalysis: true, // ✅ FEATURE BARU
       database: !!process.env.DATABASE_URL,
       emailService: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD)
-    }
+    },
+    aiProvider: process.env.AI_PROVIDER || 'openai', // ✅ INFO AI PROVIDER
+    aiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini' // ✅ INFO MODEL
   });
 });
 
@@ -284,10 +297,10 @@ app.use('*', (req, res) => {
       auth: [
         'POST /api/auth/login',
         'POST /api/auth/register', 
-        'POST /api/auth/register-email', // ✅ ENDPOINT BARU
-        'POST /api/auth/verify-email', // ✅ ENDPOINT BARU
-        'POST /api/auth/resend-verification', // ✅ ENDPOINT BARU
-        'GET  /api/auth/check-verification/:email', // ✅ ENDPOINT BARU
+        'POST /api/auth/register-email',
+        'POST /api/auth/verify-email',
+        'POST /api/auth/resend-verification',
+        'GET  /api/auth/check-verification/:email',
         'GET  /api/auth/google',
         'GET  /api/auth/google/callback',
         'POST /api/auth/logout',
@@ -306,7 +319,9 @@ app.use('*', (req, res) => {
         'GET  /api/ai/conversations',
         'GET  /api/ai/history/:chatId',
         'POST /api/ai/test-ai',
-        'GET  /api/ai/test-gemini'
+        'GET  /api/ai/test-openai', // ✅ UPDATE: OpenAI test
+        'POST /api/ai/analyze-academic', // ✅ ENDPOINT BARU
+        'POST /api/ai/study-recommendations' // ✅ ENDPOINT BARU
       ],
       system: [
         'GET  /',
@@ -347,6 +362,17 @@ app.use((err, req, res, next) => {
       success: false,
       message: 'Database error occurred',
       error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+      code: err.code
+    });
+  }
+  
+  // OpenAI API error
+  if (err.code && (err.code === 'invalid_api_key' || err.code === 'rate_limit_exceeded')) {
+    console.error('🔴 [OPENAI ERROR]', err);
+    return res.status(503).json({
+      success: false,
+      message: 'AI service temporarily unavailable',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Please try again later',
       code: err.code
     });
   }
@@ -438,8 +464,9 @@ const server = app.listen(PORT, () => {
   console.log(`📍 Port: ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔐 Auth: ${process.env.GOOGLE_CLIENT_ID ? '✅ Google OAuth Ready' : '❌ Local Auth Only'}`);
-  console.log(`📧 Email Verification: ${process.env.EMAIL_USER ? '✅ Email Service Ready' : '❌ Email Disabled'}`); // ✅ BARU
-  console.log(`🤖 AI: ${process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSy.....' ? '✅ Gemini AI Ready' : '❌ AI Disabled'}`);
+  console.log(`📧 Email Verification: ${process.env.EMAIL_USER ? '✅ Email Service Ready' : '❌ Email Disabled'}`);
+  console.log(`🤖 AI: ${process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' ? '✅ OpenAI GPT-4o-mini Ready' : '❌ AI Disabled'}`); // ✅ UPDATE: OpenAI
+  console.log(`🧠 AI Provider: ${process.env.AI_PROVIDER || 'openai'}`);
   console.log(`🗄️ Database: ${process.env.DATABASE_URL ? '✅ Connected' : '❌ No DB Config'}`);
   console.log(`🔄 CORS: ✅ PATCH Method Enabled`);
   console.log('');
@@ -475,7 +502,9 @@ const server = app.listen(PORT, () => {
   console.log('   GET  /api/ai/conversations .... Get conversations');
   console.log('   GET  /api/ai/history/:chatId .. Get chat history');
   console.log('   POST /api/ai/test-ai ......... Test AI');
-  console.log('   GET  /api/ai/test-gemini ..... Test Gemini Connection');
+  console.log('   GET  /api/ai/test-openai ..... Test OpenAI Connection'); // ✅ UPDATE: OpenAI
+  console.log('   POST /api/ai/analyze-academic . Analyze Academic Performance'); // ✅ ENDPOINT BARU
+  console.log('   POST /api/ai/study-recommendations . Get Study Recommendations'); // ✅ ENDPOINT BARU
   console.log('');
   console.log('🛡️  SECURITY FEATURES:');
   console.log('   ✅ CORS Protection');
