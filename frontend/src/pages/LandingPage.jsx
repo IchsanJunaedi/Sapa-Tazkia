@@ -744,31 +744,26 @@ const LandingPage = () => {
     navigate('/chat', { 
       state: { 
         selectedChatId: chatId 
-      },
-      replace: true // ✅ DITAMBAHKAN: replace: true untuk mencegah redirect loop
+      }
     });
   };
 
-  // ✅ PERBAIKAN: Fungsi untuk handle pengiriman pesan dengan navigasi yang benar - DIPERBAIKI
+  // ✅ PERBAIKAN BESAR: Fungsi untuk handle pengiriman pesan dengan navigasi yang benar - DIPERBAIKI
   const handleSendMessage = () => {
     if (message.trim()) {
-      if (user) {
-        navigate('/chat', { 
-          state: { 
-            initialMessage: message.trim(),
-            isGuest: false 
-          },
-          replace: true // ✅ DITAMBAHKAN: replace: true untuk mencegah redirect loop
-        });
-      } else {
-        navigate('/chat', { 
-          state: { 
-            initialMessage: message.trim(),
-            isGuest: true 
-          },
-          replace: true // ✅ DITAMBAHKAN: replace: true untuk guest mode
-        });
-      }
+      console.log('🔍 [LANDING PAGE] Sending message to chat page:', message.trim());
+      
+      // Simpan state navigation dengan benar
+      const navigationState = {
+        initialMessage: message.trim(),
+        isGuest: !user,
+        timestamp: Date.now() // Untuk memastikan state selalu fresh
+      };
+
+      // Navigate ke chat page dengan state
+      navigate('/chat', { 
+        state: navigationState
+      });
     }
   };
 
@@ -785,8 +780,7 @@ const LandingPage = () => {
     navigate('/chat', { 
       state: { 
         isGuest: true 
-      },
-      replace: true // ✅ DITAMBAHKAN: replace: true untuk mencegah redirect loop
+      }
     });
   };
 
