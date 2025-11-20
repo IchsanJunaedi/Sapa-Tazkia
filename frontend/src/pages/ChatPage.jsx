@@ -139,7 +139,7 @@ const ChatInput = ({ onSend, disabled }) => {
     );
 };
 
-// --- Komponen Utama ChatPage --- (SOLUSI FINAL)
+// --- Komponen Utama ChatPage --- (DIPERBAIKI)
 const ChatPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -147,6 +147,9 @@ const ChatPage = () => {
 
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    
+    // ✅ PERBAIKAN: Tambahkan state untuk new chat loading
+    const [isStartingNewChat, setIsStartingNewChat] = useState(false);
     
     // ✅ State untuk currentChatId dengan localStorage persistence
     const [currentChatId, setCurrentChatId] = useState(() => {
@@ -180,7 +183,8 @@ const ChatPage = () => {
     // ✅ PERBAIKAN UTAMA: Ref yang lebih sederhana dan efektif
     const initializationRef = useRef({
         hasProcessedInitialState: false,
-        isSelectingChat: false
+        isSelectingChat: false,
+        isStartingNewChat: false
     });
 
     // ✅ State untuk new chat tracking
@@ -455,35 +459,53 @@ const ChatPage = () => {
         }
     };
 
-    // ✅ PERBAIKAN KRITIS: Handle New Chat yang benar-benar reset state
+    // ✅ PERBAIKAN KRITIS: Handle New Chat dengan loading state dan race condition prevention
     const handleNewChat = useCallback(() => {
-  console.log('🔄 [CHAT PAGE] Starting new chat');
-  
-  // Reset semua state ke kondisi awal
-  setMessages([]);
-  setCurrentChatId(null);
-  setIsNewChat(true);
-  setIsGuest(false);
-  
-  // ✅ PERBAIKAN PENTING: Reset flag initialization
-  initializationRef.current.hasProcessedInitialState = false;
-  
-  // ✅ PERBAIKAN KRITIS: Clear location state untuk mencegah proses ulang
-  if (window.history.replaceState) {
-    window.history.replaceState({}, document.title, window.location.pathname);
-    console.log('🧹 [CHAT PAGE] Location state cleared after new chat');
-  }
-  
-  // Clear localStorage
-  if (!isGuest) {
-    localStorage.removeItem('chatpage_state');
-  }
-  
-  console.log('✅ [CHAT PAGE] New chat state reset complete');
-}, [isGuest]);
+        console.log('🔄 [CHAT PAGE] Starting new chat');
+        
+        // ✅ PERBAIKAN: Set loading state untuk mencegah race condition
+        setIsStartingNewChat(true);
+        initializationRef.current.isStartingNewChat = true;
+        
+        // Reset semua state ke kondisi awal
+        setMessages([]);
+        setCurrentChatId(null);
+        setIsNewChat(true);
+        setIsGuest(false);
+        
+        // ✅ PERBAIKAN PENTING: Reset flag initialization
+        initializationRef.current.hasProcessedInitialState = false;
+        initializationRef.current.isSelectingChat = false;
+        
+        // ✅ PERBAIKAN KRITIS: Clear location state untuk mencegah proses ulang
+        if (window.history.replaceState) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+            console.log('🧹 [CHAT PAGE] Location state cleared after new chat');
+        }
+        
+        // Clear localStorage
+        if (!isGuest) {
+            localStorage.removeItem('chatpage_state');
+        }
+        
+        console.log('✅ [CHAT PAGE] New chat state reset complete');
+        
+        // ✅ PERBAIKAN: Reset loading state setelah delay
+        setTimeout(() => {
+            setIsStartingNewChat(false);
+            initializationRef.current.isStartingNewChat = false;
+            console.log('🔄 [CHAT PAGE] New chat loading state reset');
+        }, 300);
+    }, [isGuest]);
 
-    // ✅ Handle Select Chat dari history
+    // ✅ PERBAIKAN: Handle Select Chat dari history dengan race condition prevention
     const handleSelectChat = useCallback(async (chatId) => {
+        // ✅ PERBAIKAN: Skip jika sedang starting new chat
+        if (isStartingNewChat || initializationRef.current.isStartingNewChat) {
+            console.log('⏩ [CHAT PAGE] Select chat skipped - currently starting new chat');
+            return;
+        }
+
         if (!chatId || chatId === currentChatId || !user || isGuest) return;
 
         console.log('🔍 [CHAT PAGE] Selecting chat:', chatId);
@@ -527,7 +549,7 @@ const ChatPage = () => {
                 initializationRef.current.isSelectingChat = false;
             }, 100);
         }
-    }, [currentChatId, user, isGuest, logout, navigate]);
+    }, [currentChatId, user, isGuest, logout, navigate, isStartingNewChat]);
 
     const handleToggleSidebar = () => {
         setIsSidebarOpen(prev => !prev);
@@ -543,115 +565,122 @@ const ChatPage = () => {
 
     // ✅ PERBAIKAN UTAMA: EFFECT UNTUK PROSES INITIAL STATE DARI LANDING PAGE
     useEffect(() => {
-  // Skip jika sedang memilih chat dari sidebar
-  if (initializationRef.current.isSelectingChat) {
-    console.log('⏩ [CHAT PAGE] Skipping - currently selecting chat from sidebar');
-    return;
-  }
+        // Skip jika sedang memilih chat dari sidebar
+        if (initializationRef.current.isSelectingChat) {
+            console.log('⏩ [CHAT PAGE] Skipping - currently selecting chat from sidebar');
+            return;
+        }
 
-  // Skip jika sudah diproses
-  if (initializationRef.current.hasProcessedInitialState) {
-    console.log('⏩ [CHAT PAGE] Initial state already processed');
-    return;
-  }
+        // Skip jika sudah diproses
+        if (initializationRef.current.hasProcessedInitialState) {
+            console.log('⏩ [CHAT PAGE] Initial state already processed');
+            return;
+        }
 
-  console.log('🎯 [CHAT PAGE] Processing initial state from LandingPage');
-  
-  const processInitialState = async () => {
-    const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
-    const guestFromState = location.state?.isGuest;
-    const initialMessage = location.state?.initialMessage;
-    const selectedChatId = location.state?.selectedChatId;
+        // ✅ PERBAIKAN: Skip jika sedang starting new chat
+        if (isStartingNewChat || initializationRef.current.isStartingNewChat) {
+            console.log('⏩ [CHAT PAGE] Skipping - currently starting new chat');
+            return;
+        }
 
-    console.log('🔍 [CHAT PAGE] Initial state data:', {
-      guestFromUrl,
-      guestFromState,
-      initialMessage,
-      selectedChatId,
-      currentGuest: isGuest,
-      currentChatId,
-      isNewChat
-    });
+        console.log('🎯 [CHAT PAGE] Processing initial state from LandingPage');
+        
+        const processInitialState = async () => {
+            const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
+            const guestFromState = location.state?.isGuest;
+            const initialMessage = location.state?.initialMessage;
+            const selectedChatId = location.state?.selectedChatId;
 
-    // ✅ PERBAIKAN: Skip jika ini new chat dan tidak ada initial state yang valid
-    if (isNewChat && !initialMessage && !selectedChatId && !guestFromState && !guestFromUrl) {
-      console.log('⏩ [CHAT PAGE] New chat with no initial state - skipping processing');
-      initializationRef.current.hasProcessedInitialState = true;
-      return;
-    }
+            console.log('🔍 [CHAT PAGE] Initial state data:', {
+                guestFromUrl,
+                guestFromState,
+                initialMessage,
+                selectedChatId,
+                currentGuest: isGuest,
+                currentChatId,
+                isNewChat
+            });
 
-    // ✅ Handle guest mode
-    if ((guestFromUrl || guestFromState) && !isGuest) {
-      console.log('👤 [CHAT PAGE] Setting guest mode from LandingPage');
-      setIsGuest(true);
-      setMessages([]);
-      setCurrentChatId(null);
-      setIsNewChat(true);
-      initializationRef.current.hasProcessedInitialState = true;
-      
-      if (guestFromUrl) {
-        navigate('/chat', { replace: true });
-      }
-      return;
-    }
+            // ✅ PERBAIKAN: Skip jika ini new chat dan tidak ada initial state yang valid
+            if (isNewChat && !initialMessage && !selectedChatId && !guestFromState && !guestFromUrl) {
+                console.log('⏩ [CHAT PAGE] New chat with no initial state - skipping processing');
+                initializationRef.current.hasProcessedInitialState = true;
+                return;
+            }
 
-    // ✅ Handle selected chat dari sidebar LandingPage
-    if (selectedChatId && selectedChatId !== currentChatId && !isGuest) {
-      console.log('🔍 [CHAT PAGE] Processing selected chat from LandingPage:', selectedChatId);
-      initializationRef.current.hasProcessedInitialState = true;
-      await handleSelectChat(selectedChatId);
-      return;
-    }
+            // ✅ Handle guest mode
+            if ((guestFromUrl || guestFromState) && !isGuest) {
+                console.log('👤 [CHAT PAGE] Setting guest mode from LandingPage');
+                setIsGuest(true);
+                setMessages([]);
+                setCurrentChatId(null);
+                setIsNewChat(true);
+                initializationRef.current.hasProcessedInitialState = true;
+                
+                if (guestFromUrl) {
+                    navigate('/chat', { replace: true });
+                }
+                return;
+            }
 
-    // ✅ Handle initial message dari input landing page
-    if (initialMessage && !initializationRef.current.hasProcessedInitialState) {
-      console.log('🚨 [CHAT PAGE] Processing initial message from LandingPage:', initialMessage);
-      
-      // Reset state untuk chat baru dari LandingPage
-      setMessages([]);
-      setCurrentChatId(null);
-      setIsNewChat(true);
-      setIsGuest(!!guestFromState);
+            // ✅ Handle selected chat dari sidebar LandingPage
+            if (selectedChatId && selectedChatId !== currentChatId && !isGuest) {
+                console.log('🔍 [CHAT PAGE] Processing selected chat from LandingPage:', selectedChatId);
+                initializationRef.current.hasProcessedInitialState = true;
+                await handleSelectChat(selectedChatId);
+                return;
+            }
 
-      const userMessage = {
-        id: Date.now(),
-        content: initialMessage,
-        sender: 'user',
-        role: 'user',
-        timestamp: new Date().toISOString(),
-        isGuest: !!guestFromState
-      };
+            // ✅ Handle initial message dari input landing page
+            if (initialMessage && !initializationRef.current.hasProcessedInitialState) {
+                console.log('🚨 [CHAT PAGE] Processing initial message from LandingPage:', initialMessage);
+                
+                // Reset state untuk chat baru dari LandingPage
+                setMessages([]);
+                setCurrentChatId(null);
+                setIsNewChat(true);
+                setIsGuest(!!guestFromState);
 
-      setMessages([userMessage]);
-      
-      initializationRef.current.hasProcessedInitialState = true;
-      
-      await handleAIMessage(initialMessage, !!guestFromState);
-      
-      console.log('✅ [CHAT PAGE] Initial message processed successfully');
-      return;
-    }
+                const userMessage = {
+                    id: Date.now(),
+                    content: initialMessage,
+                    sender: 'user',
+                    role: 'user',
+                    timestamp: new Date().toISOString(),
+                    isGuest: !!guestFromState
+                };
 
-    // ✅ Default case - tandai sudah diproses
-    initializationRef.current.hasProcessedInitialState = true;
-    console.log('✅ [CHAT PAGE] Default initialization completed');
-  };
+                setMessages([userMessage]);
+                
+                initializationRef.current.hasProcessedInitialState = true;
+                
+                await handleAIMessage(initialMessage, !!guestFromState);
+                
+                console.log('✅ [CHAT PAGE] Initial message processed successfully');
+                return;
+            }
 
-  const timeoutId = setTimeout(() => {
-    processInitialState();
-  }, 50);
+            // ✅ Default case - tandai sudah diproses
+            initializationRef.current.hasProcessedInitialState = true;
+            console.log('✅ [CHAT PAGE] Default initialization completed');
+        };
 
-  return () => clearTimeout(timeoutId);
-}, [
-  location.state,
-  location.search,
-  isGuest,
-  currentChatId,
-  handleSelectChat,
-  handleAIMessage,
-  navigate,
-  isNewChat
-]);
+        const timeoutId = setTimeout(() => {
+            processInitialState();
+        }, 50);
+
+        return () => clearTimeout(timeoutId);
+    }, [
+        location.state,
+        location.search,
+        isGuest,
+        currentChatId,
+        handleSelectChat,
+        handleAIMessage,
+        navigate,
+        isNewChat,
+        isStartingNewChat // ✅ PERBAIKAN: Tambahkan dependency
+    ]);
 
     // ✅ Effect untuk load chat history saat user berubah
     useEffect(() => {
@@ -679,9 +708,10 @@ const ChatPage = () => {
             user: user ? `User ${user.id}` : 'No user',
             isSelectingChat: initializationRef.current.isSelectingChat,
             hasProcessedInitialState: initializationRef.current.hasProcessedInitialState,
+            isStartingNewChat: isStartingNewChat,
             chatHistoryCount: chatHistory.length
         });
-    }, [messages, currentChatId, isNewChat, isGuest, user, chatHistory]);
+    }, [messages, currentChatId, isNewChat, isGuest, user, chatHistory, isStartingNewChat]);
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -745,6 +775,7 @@ const ChatPage = () => {
                 onToggleSidebar={handleToggleSidebar}
                 onNewChat={handleNewChat}
                 onSettingsClick={handleSettingsClick}
+                isStartingNewChat={isStartingNewChat} // ✅ PERBAIKAN: Kirim loading state ke Sidebar
             />
 
             <div className="flex-1 flex flex-col overflow-hidden">
@@ -812,7 +843,7 @@ const ChatPage = () => {
                 </div>
 
                 <div className="flex-shrink-0">
-                    <ChatInput onSend={handleSendMessage} disabled={isLoading || isDeleting} />
+                    <ChatInput onSend={handleSendMessage} disabled={isLoading || isDeleting || isStartingNewChat} />
                 </div>
             </div>
         </div>
