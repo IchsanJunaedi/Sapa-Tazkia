@@ -139,7 +139,7 @@ const ChatInput = ({ onSend, disabled }) => {
     );
 };
 
-// --- Komponen Utama ChatPage --- (DIPERBAIKI)
+// --- Komponen Utama ChatPage --- (SOLUSI FINAL)
 const ChatPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -148,7 +148,7 @@ const ChatPage = () => {
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     
-    // ✅ PERBAIKAN: State untuk currentChatId dengan localStorage persistence
+    // ✅ State untuk currentChatId dengan localStorage persistence
     const [currentChatId, setCurrentChatId] = useState(() => {
         const saved = localStorage.getItem('chatpage_state');
         if (saved) {
@@ -177,13 +177,13 @@ const ChatPage = () => {
     const chatContainerRef = useRef(null);
     const menuButtonRef = useRef(null);
 
-    // ✅ PERBAIKAN UTAMA: SIMPLIFIKASI initialization ref
+    // ✅ PERBAIKAN UTAMA: Ref yang lebih sederhana dan efektif
     const initializationRef = useRef({
-        hasInitialized: false,
+        hasProcessedInitialState: false,
         isSelectingChat: false
     });
 
-    // ✅ PERBAIKAN: State untuk new chat tracking dengan localStorage persistence
+    // ✅ State untuk new chat tracking
     const [isNewChat, setIsNewChat] = useState(() => {
         const saved = localStorage.getItem('chatpage_state');
         if (saved) {
@@ -197,9 +197,8 @@ const ChatPage = () => {
         return true;
     });
 
-    // ✅ PERBAIKAN: Save state ke localStorage dengan debounce - DIPERBAIKI
+    // ✅ Save state ke localStorage dengan debounce
     useEffect(() => {
-        // ✅ Jangan save state jika dalam guest mode
         if (isGuest) {
             console.log('💾 [CHAT PAGE] Guest mode - skipping localStorage save');
             return;
@@ -225,25 +224,21 @@ const ChatPage = () => {
 
     // ✅ FUNCTION DEFINITIONS
 
-    // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
     const getUserName = useCallback(() => {
         const fullName = user?.name || user?.fullName || user?.username || 'User';
         const words = fullName.split(' ').slice(0, 2);
         return words.join(' ');
     }, [user]);
 
-    // ✅ FUNGSI: Toggle Menu Titik Tiga
     const handleMenuToggle = (e) => {
         e.stopPropagation();
         setShowMenu(prev => !prev);
     };
 
-    // ✅ FUNGSI: Close Menu ketika klik di luar
     const handleCloseMenu = useCallback(() => {
         setShowMenu(false);
     }, []);
 
-    // ✅ FUNGSI: Handle Delete dari Menu
     const handleDeleteFromMenu = () => {
         if (currentChatId && !isGuest) {
             setChatToDelete(currentChatId);
@@ -262,7 +257,7 @@ const ChatPage = () => {
         }
     }, [showMenu, handleCloseMenu]);
 
-    // ✅ PERBAIKAN UTAMA: Load Chat History - DIPERBAIKI
+    // ✅ Load Chat History
     const loadChatHistory = useCallback(async (forceReload = false) => {
         if (isGuest || !user || !user.id) {
             console.log('🔍 [CHAT PAGE] Guest mode or no user ID, skipping chat history load');
@@ -291,7 +286,7 @@ const ChatPage = () => {
         }
     }, [user, logout, navigate, isGuest]);
 
-    // ✅ FUNGSI: Handle Delete dengan Modal Confirmation
+    // ✅ Handle Delete dengan Modal Confirmation
     const handleDeleteClick = (chatId) => {
         setChatToDelete(chatId);
         setShowDeleteModal(true);
@@ -349,7 +344,7 @@ const ChatPage = () => {
         setChatToDelete(null);
     };
 
-    // ✅ PERBAIKAN KRITIS: Handle AI Message dengan FIXED currentChatId management
+    // ✅ Handle AI Message yang diperbaiki
     const handleAIMessage = useCallback(async (messageText, isGuestMode = false) => {
         setIsLoading(true);
 
@@ -361,7 +356,6 @@ const ChatPage = () => {
                 currentChatId 
             });
 
-            // ✅ PERBAIKAN PENTING: Tentukan apakah ini benar-benar new chat
             const shouldCreateNewChat = !currentChatId && isNewChat;
             
             console.log('🔍 [CHAT PAGE] Chat creation decision:', {
@@ -389,19 +383,16 @@ const ChatPage = () => {
 
             setMessages(prev => [...prev, botMessage]);
 
-            // ✅ PERBAIKAN KRITIS: Update currentChatId dari response dengan BENAR
             if (response.conversationId) {
                 console.log('🔄 [CHAT PAGE] Setting currentChatId from response:', response.conversationId);
                 
                 setCurrentChatId(response.conversationId);
                 
-                // ✅ HANYA set isNewChat ke false jika ini adalah new chat yang berhasil dibuat
                 if (shouldCreateNewChat) {
                     console.log('🔄 [CHAT PAGE] First message completed, setting isNewChat to false');
                     setIsNewChat(false);
                 }
                 
-                // ✅ PERBAIKAN: Reload chat history untuk menampilkan chat baru
                 setTimeout(() => {
                     console.log('🔄 [CHAT PAGE] Reloading chat history after conversation update');
                     loadChatHistory(true);
@@ -428,7 +419,7 @@ const ChatPage = () => {
         }
     }, [currentChatId, loadChatHistory, isNewChat]);
 
-    // ✅ PERBAIKAN: Handle Send Message
+    // ✅ Handle Send Message
     const handleSendMessage = async (messageText) => {
         if (!isGuest && (!isAuthenticated || !user)) {
             console.error('❌ [CHAT PAGE] Cannot send message - user not authenticated');
@@ -464,26 +455,34 @@ const ChatPage = () => {
         }
     };
 
-    // ✅ PERBAIKAN: Handle New Chat dengan reset state yang benar - DIPERBAIKI
-    const handleNewChat = useCallback((options = {}) => {
-        console.log('🔄 [CHAT PAGE] Starting new chat with options:', options);
-        
-        setMessages([]);
-        setCurrentChatId(null);
-        setIsNewChat(true);
-        setIsGuest(false);
-        
-        initializationRef.current.hasInitialized = false;
-        
-        // ✅ PERBAIKAN: Clear localStorage hanya jika bukan guest mode
-        if (!isGuest) {
-            localStorage.removeItem('chatpage_state');
-        }
-        
-        console.log('✅ [CHAT PAGE] New chat state reset complete');
-    }, [isGuest]);
+    // ✅ PERBAIKAN KRITIS: Handle New Chat yang benar-benar reset state
+    const handleNewChat = useCallback(() => {
+  console.log('🔄 [CHAT PAGE] Starting new chat');
+  
+  // Reset semua state ke kondisi awal
+  setMessages([]);
+  setCurrentChatId(null);
+  setIsNewChat(true);
+  setIsGuest(false);
+  
+  // ✅ PERBAIKAN PENTING: Reset flag initialization
+  initializationRef.current.hasProcessedInitialState = false;
+  
+  // ✅ PERBAIKAN KRITIS: Clear location state untuk mencegah proses ulang
+  if (window.history.replaceState) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    console.log('🧹 [CHAT PAGE] Location state cleared after new chat');
+  }
+  
+  // Clear localStorage
+  if (!isGuest) {
+    localStorage.removeItem('chatpage_state');
+  }
+  
+  console.log('✅ [CHAT PAGE] New chat state reset complete');
+}, [isGuest]);
 
-    // ✅ PERBAIKAN UTAMA: Handle Select Chat dari history - DIPERBAIKI
+    // ✅ Handle Select Chat dari history
     const handleSelectChat = useCallback(async (chatId) => {
         if (!chatId || chatId === currentChatId || !user || isGuest) return;
 
@@ -534,201 +533,143 @@ const ChatPage = () => {
         setIsSidebarOpen(prev => !prev);
     };
 
-    // ✅ FUNGSI: Handle login redirect
     const handleLogin = () => {
         navigate('/');
     };
 
-    // ✅ FUNGSI: Handle settings click
     const handleSettingsClick = () => {
         console.log('Settings clicked');
     };
 
-    // ✅ PERBAIKAN UTAMA: SINGLE MASTER useEffect untuk initialization - DIPERBAIKI SECARA KRITIS
+    // ✅ PERBAIKAN UTAMA: EFFECT UNTUK PROSES INITIAL STATE DARI LANDING PAGE
     useEffect(() => {
-    // ✅ PERBAIKAN PENTING: Skip jika sedang selecting chat
-    if (initializationRef.current.isSelectingChat) {
-        console.log('⏩ [CHAT PAGE] Skipping initialization - currently selecting chat from sidebar');
-        return;
+  // Skip jika sedang memilih chat dari sidebar
+  if (initializationRef.current.isSelectingChat) {
+    console.log('⏩ [CHAT PAGE] Skipping - currently selecting chat from sidebar');
+    return;
+  }
+
+  // Skip jika sudah diproses
+  if (initializationRef.current.hasProcessedInitialState) {
+    console.log('⏩ [CHAT PAGE] Initial state already processed');
+    return;
+  }
+
+  console.log('🎯 [CHAT PAGE] Processing initial state from LandingPage');
+  
+  const processInitialState = async () => {
+    const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
+    const guestFromState = location.state?.isGuest;
+    const initialMessage = location.state?.initialMessage;
+    const selectedChatId = location.state?.selectedChatId;
+
+    console.log('🔍 [CHAT PAGE] Initial state data:', {
+      guestFromUrl,
+      guestFromState,
+      initialMessage,
+      selectedChatId,
+      currentGuest: isGuest,
+      currentChatId,
+      isNewChat
+    });
+
+    // ✅ PERBAIKAN: Skip jika ini new chat dan tidak ada initial state yang valid
+    if (isNewChat && !initialMessage && !selectedChatId && !guestFromState && !guestFromUrl) {
+      console.log('⏩ [CHAT PAGE] New chat with no initial state - skipping processing');
+      initializationRef.current.hasProcessedInitialState = true;
+      return;
     }
 
-    // ✅ PERBAIKAN PENTING: Skip jika sudah diinisialisasi
-    if (initializationRef.current.hasInitialized) {
-        console.log('⏩ [CHAT PAGE] Skipping initialization - already initialized');
-        return;
+    // ✅ Handle guest mode
+    if ((guestFromUrl || guestFromState) && !isGuest) {
+      console.log('👤 [CHAT PAGE] Setting guest mode from LandingPage');
+      setIsGuest(true);
+      setMessages([]);
+      setCurrentChatId(null);
+      setIsNewChat(true);
+      initializationRef.current.hasProcessedInitialState = true;
+      
+      if (guestFromUrl) {
+        navigate('/chat', { replace: true });
+      }
+      return;
     }
 
-    console.log('🎯 [CHAT PAGE] MASTER INITIALIZATION EFFECT');
-    
-    const initializeChat = async () => {
-        const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
-        const guestFromState = location.state?.isGuest;
-        const initialMessage = location.state?.initialMessage;
-        const messageFromUrl = new URLSearchParams(location.search).get('message');
-        const selectedChatId = location.state?.selectedChatId;
+    // ✅ Handle selected chat dari sidebar LandingPage
+    if (selectedChatId && selectedChatId !== currentChatId && !isGuest) {
+      console.log('🔍 [CHAT PAGE] Processing selected chat from LandingPage:', selectedChatId);
+      initializationRef.current.hasProcessedInitialState = true;
+      await handleSelectChat(selectedChatId);
+      return;
+    }
 
-        console.log('🔍 [CHAT PAGE] Initialization data:', {
-            guestFromUrl,
-            guestFromState,
-            initialMessage,
-            messageFromUrl,
-            selectedChatId,
-            currentGuest: isGuest,
-            currentChatId,
-            isNewChat
-        });
+    // ✅ Handle initial message dari input landing page
+    if (initialMessage && !initializationRef.current.hasProcessedInitialState) {
+      console.log('🚨 [CHAT PAGE] Processing initial message from LandingPage:', initialMessage);
+      
+      // Reset state untuk chat baru dari LandingPage
+      setMessages([]);
+      setCurrentChatId(null);
+      setIsNewChat(true);
+      setIsGuest(!!guestFromState);
 
-        // ✅ PERBAIKAN KRITIS: Handle guest mode dengan reset state yang benar
-        if ((guestFromUrl || guestFromState) && !isGuest) {
-            console.log('👤 [CHAT PAGE] Setting guest mode and resetting state');
-            
-            // ✅ RESET SEMUA STATE untuk guest mode
-            setMessages([]);
-            setCurrentChatId(null);
-            setIsNewChat(true);
-            setIsGuest(true);
-            
-            // Clear localStorage untuk guest mode
-            localStorage.removeItem('chatpage_state');
-            
-            // ✅ PERBAIKAN PENTING: SET FLAG INI SEBELUM RETURN
-            initializationRef.current.hasInitialized = true;
-            
-            console.log('✅ [CHAT PAGE] Guest mode initialized with clean state');
-            
-            // Clear URL parameters setelah diproses
-            if (guestFromUrl) {
-                navigate('/chat', { replace: true });
-            }
-            
-            return; // Stop execution
-        }
+      const userMessage = {
+        id: Date.now(),
+        content: initialMessage,
+        sender: 'user',
+        role: 'user',
+        timestamp: new Date().toISOString(),
+        isGuest: !!guestFromState
+      };
 
-        // ✅ PERBAIKAN PENTING: PROSES initialMessage dari LandingPage
-        if (initialMessage) {
-            console.log('🚨 [CHAT PAGE] Processing initial message from LandingPage:', initialMessage);
-            
-            // ✅ RESET STATE untuk chat baru dari LandingPage
-            setMessages([]);
-            setCurrentChatId(null);
-            setIsNewChat(true);
-            setIsGuest(false);
+      setMessages([userMessage]);
+      
+      initializationRef.current.hasProcessedInitialState = true;
+      
+      await handleAIMessage(initialMessage, !!guestFromState);
+      
+      console.log('✅ [CHAT PAGE] Initial message processed successfully');
+      return;
+    }
 
-            const userMessage = {
-                id: Date.now(),
-                content: initialMessage,
-                sender: 'user',
-                role: 'user',
-                timestamp: new Date().toISOString(),
-                isGuest: false
-            };
+    // ✅ Default case - tandai sudah diproses
+    initializationRef.current.hasProcessedInitialState = true;
+    console.log('✅ [CHAT PAGE] Default initialization completed');
+  };
 
-            setMessages([userMessage]);
-            
-            // ✅ PERBAIKAN: SET FLAG SEBELUM memproses AI message
-            initializationRef.current.hasInitialized = true;
-            
-            await handleAIMessage(initialMessage, false);
-            
-            // Clear state setelah diproses
-            navigate('/chat', { replace: true, state: {} });
-            return;
-        }
+  const timeoutId = setTimeout(() => {
+    processInitialState();
+  }, 50);
 
-        // ✅ PERBAIKAN: Handle select chat dari sidebar LandingPage
-        if (selectedChatId && selectedChatId !== currentChatId && !isGuest) {
-            console.log('🔍 [CHAT PAGE] Processing selected chat from LandingPage:', selectedChatId);
-            
-            // ✅ PERBAIKAN: SET FLAG SEBELUM memproses select chat
-            initializationRef.current.hasInitialized = true;
-            
-            await handleSelectChat(selectedChatId);
-            
-            // Clear state setelah diproses
-            navigate('/chat', { replace: true, state: {} });
-            return;
-        }
-
-        // ✅ PERBAIKAN: Skip initialization jika dalam guest mode
-        if (isGuest) {
-            console.log('⏩ [CHAT PAGE] Guest mode detected, skipping further initialization');
-            initializationRef.current.hasInitialized = true;
-            return;
-        }
-
-        // ✅ PERBAIKAN: Auth check untuk non-guest
-        if (!isGuest && !loading && !isAuthenticated) {
-            console.log('❌ [CHAT PAGE] User not authenticated, redirecting');
-            navigate('/', { replace: true });
-            return;
-        }
-
-        // ✅ PERBAIKAN: Load chat history untuk authenticated user
-        if (!isGuest && isAuthenticated && user) {
-            console.log('📚 [CHAT PAGE] Loading chat history for authenticated user');
-            await loadChatHistory();
-        }
-
-        // ✅ PERBAIKAN: Handle message dari URL (guest mode)
-        if (messageFromUrl && isNewChat && !currentChatId) {
-            console.log('🚨 [CHAT PAGE] Processing message from URL:', messageFromUrl);
-            
-            const userMessage = {
-                id: Date.now(),
-                content: decodeURIComponent(messageFromUrl),
-                sender: 'user',
-                role: 'user',
-                timestamp: new Date().toISOString(),
-                isGuest: true
-            };
-
-            setMessages([userMessage]);
-            
-            // ✅ PERBAIKAN: SET FLAG SEBELUM memproses AI message
-            initializationRef.current.hasInitialized = true;
-            
-            await handleAIMessage(decodeURIComponent(messageFromUrl), true);
-            
-            navigate('/chat', { replace: true });
-            return;
-        }
-
-        // ✅ PERBAIKAN: Default case - set flag untuk menandai sudah diinisialisasi
-        initializationRef.current.hasInitialized = true;
-        console.log('✅ [CHAT PAGE] Default initialization completed');
-    };
-
-    const timeoutId = setTimeout(() => {
-        initializeChat();
-    }, 50);
-
-    return () => clearTimeout(timeoutId);
+  return () => clearTimeout(timeoutId);
 }, [
-    location.state,
-    location.search,
-    isGuest,
-    loading,
-    isAuthenticated,
-    user,
-    navigate,
-    currentChatId,
-    handleAIMessage,
-    handleSelectChat,
-    isNewChat,
-    loadChatHistory
+  location.state,
+  location.search,
+  isGuest,
+  currentChatId,
+  handleSelectChat,
+  handleAIMessage,
+  navigate,
+  isNewChat
 ]);
 
-    // ✅ PERBAIKAN: Effect untuk load chat history saat user berubah
+    // ✅ Effect untuk load chat history saat user berubah
     useEffect(() => {
-    if (!isGuest && isAuthenticated && user && user.id && 
-        !initializationRef.current.isSelectingChat && 
-        !initializationRef.current.hasInitialized) {
-        console.log('👤 [CHAT PAGE] User authenticated, loading chat history');
-        loadChatHistory();
-    }
-}, [isAuthenticated, user, isGuest, loadChatHistory]);
+        if (!isGuest && isAuthenticated && user && user.id) {
+            console.log('👤 [CHAT PAGE] User authenticated, loading chat history');
+            loadChatHistory();
+        }
+    }, [isAuthenticated, user, isGuest, loadChatHistory]);
 
-    // ✅ PERBAIKAN: Debug effect untuk melacak state changes
+    // ✅ Effect untuk clear location state setelah diproses
+    useEffect(() => {
+        if (initializationRef.current.hasProcessedInitialState && location.state) {
+            console.log('🧹 [CHAT PAGE] Clearing location state after processing');
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+        }
+    }, [initializationRef.current.hasProcessedInitialState, location.state]);
+
+    // ✅ Debug effect untuk melacak state changes
     useEffect(() => {
         console.log('🔍 [CHAT PAGE] STATE UPDATE', {
             messagesCount: messages.length,
@@ -737,6 +678,7 @@ const ChatPage = () => {
             isGuest,
             user: user ? `User ${user.id}` : 'No user',
             isSelectingChat: initializationRef.current.isSelectingChat,
+            hasProcessedInitialState: initializationRef.current.hasProcessedInitialState,
             chatHistoryCount: chatHistory.length
         });
     }, [messages, currentChatId, isNewChat, isGuest, user, chatHistory]);
