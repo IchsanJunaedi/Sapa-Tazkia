@@ -151,20 +151,36 @@ const Sidebar = ({
     setIsChatsSectionOpen(!isChatsSectionOpen);
   };
 
-  // ✅ PERBAIKAN: Handle new chat dengan reset state yang benar
-  const handleNewChat = () => {
-    console.log('🔄 New chat clicked - resetting conversation state');
+  // ✅ PERBAIKAN KRITIS: Handle new chat dengan event prevention yang benar
+  const handleNewChat = (e) => {
+    // ✅ PERBAIKAN: Prevent default behavior untuk menghindari refresh
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     
-    // Panggil onNewChat dengan parameter yang jelas
+    console.log('🔄 [SIDEBAR] New chat button clicked');
+    
+    // ✅ PERBAIKAN: Panggil onNewChat tanpa parameter yang kompleks
     if (onNewChat) {
-      onNewChat({
-        resetHistory: true,
-        isNewChat: true
-      });
+      onNewChat();
     }
     
     // Tutup popup jika ada yang terbuka
     handleCloseAllPopups();
+  };
+
+  // ✅ PERBAIKAN: Handle select chat dengan event prevention
+  const handleSelectChat = (chatId, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    console.log('🔍 [SIDEBAR] Chat selected:', chatId);
+    if (onSelectChat) {
+      onSelectChat(chatId);
+    }
   };
 
   const ToggleIcon = ({ open }) => (
@@ -258,7 +274,7 @@ const Sidebar = ({
                       key={chat.id}
                       chat={chat}
                       currentChatId={currentChatId}
-                      onSelectChat={onSelectChat}
+                      onSelectChat={handleSelectChat} // ✅ Gunakan handler yang diperbaiki
                       onDeleteChat={onDeleteChat}
                       isDeleting={isDeleting}
                       handleMoreClick={handleMoreClick}
@@ -277,7 +293,7 @@ const Sidebar = ({
                       key={chat.id}
                       chat={chat}
                       currentChatId={currentChatId}
-                      onSelectChat={onSelectChat}
+                      onSelectChat={handleSelectChat} // ✅ Gunakan handler yang diperbaiki
                       onDeleteChat={onDeleteChat}
                       isDeleting={isDeleting}
                       handleMoreClick={handleMoreClick}
@@ -296,7 +312,7 @@ const Sidebar = ({
                       key={chat.id}
                       chat={chat}
                       currentChatId={currentChatId}
-                      onSelectChat={onSelectChat}
+                      onSelectChat={handleSelectChat} // ✅ Gunakan handler yang diperbaiki
                       onDeleteChat={onDeleteChat}
                       isDeleting={isDeleting}
                       handleMoreClick={handleMoreClick}
@@ -315,7 +331,7 @@ const Sidebar = ({
                       key={chat.id}
                       chat={chat}
                       currentChatId={currentChatId}
-                      onSelectChat={onSelectChat}
+                      onSelectChat={handleSelectChat} // ✅ Gunakan handler yang diperbaiki
                       onDeleteChat={onDeleteChat}
                       isDeleting={isDeleting}
                       handleMoreClick={handleMoreClick}
@@ -336,7 +352,7 @@ const Sidebar = ({
                       key={chat.id}
                       chat={chat}
                       currentChatId={currentChatId}
-                      onSelectChat={onSelectChat}
+                      onSelectChat={handleSelectChat} // ✅ Gunakan handler yang diperbaiki
                       onDeleteChat={onDeleteChat}
                       isDeleting={isDeleting}
                       handleMoreClick={handleMoreClick}
@@ -502,7 +518,7 @@ const Sidebar = ({
   );
 };
 
-// Komponen terpisah untuk Chat Item
+// ✅ PERBAIKAN: Komponen Chat Item dengan event prevention yang benar
 const ChatItem = ({ 
   chat, 
   currentChatId, 
@@ -511,29 +527,52 @@ const ChatItem = ({
   isDeleting, 
   handleMoreClick, 
   isSidebarOpen 
-}) => (
-  <div className="flex items-center group">
-    <button
-      onClick={() => onSelectChat?.(chat.id)}
-      className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
-        currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
-      }`}
-      title={chat.title}
-      disabled={isDeleting}
-    >
-      {chat.title}
-    </button>
-    {onDeleteChat && isSidebarOpen && (
+}) => {
+  
+  // ✅ PERBAIKAN: Handle click dengan event prevention
+  const handleChatClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🔍 [CHAT ITEM] Chat clicked:', chat.id);
+    if (onSelectChat) {
+      onSelectChat(chat.id, e);
+    }
+  };
+
+  // ✅ PERBAIKAN: Handle more click dengan event prevention
+  const handleMoreButtonClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('⚙️ [CHAT ITEM] More button clicked:', chat.id);
+    if (handleMoreClick) {
+      handleMoreClick(chat.id, e);
+    }
+  };
+
+  return (
+    <div className="flex items-center group">
       <button
-        onClick={(e) => handleMoreClick(chat.id, e)}
-        className="p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100 ml-1 disabled:opacity-30 disabled:cursor-not-allowed"
-        title="More options"
+        onClick={handleChatClick} // ✅ Gunakan handler yang diperbaiki
+        className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
+          currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
+        }`}
+        title={chat.title}
         disabled={isDeleting}
       >
-        <MoreHorizontal size={14} />
+        {chat.title}
       </button>
-    )}
-  </div>
-);
+      {onDeleteChat && isSidebarOpen && (
+        <button
+          onClick={handleMoreButtonClick} // ✅ Gunakan handler yang diperbaiki
+          className="p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100 ml-1 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="More options"
+          disabled={isDeleting}
+        >
+          <MoreHorizontal size={14} />
+        </button>
+      )}
+    </div>
+  );
+};
 
 export default Sidebar;
