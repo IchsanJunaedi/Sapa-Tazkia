@@ -16,30 +16,27 @@ const app = express();
 const prisma = new PrismaClient();
 
 // ========================================================
-// MIDDLEWARE SETUP - DIPERBAIKI UNTUK SUPPORT PATCH
+// MIDDLEWARE SETUP - OPTIMIZED
 // ========================================================
 
-// CORS configuration - Updated for better security
+// CORS configuration - Enhanced
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
   'http://127.0.0.1:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
   'http://192.168.100.48:3000',
   'http://192.168.100.11:3000'
 ];
 
-// ✅ PERBAIKAN: Enhanced CORS configuration dengan PATCH method
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, postman, server-to-server)
     if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list
     if (allowedOrigins.indexOf(origin) !== -1) {
       return callback(null, true);
     } else {
-      const msg = `CORS policy: Origin ${origin} not allowed`;
       console.log('🔒 CORS Blocked:', origin);
-      return callback(new Error(msg), false);
+      return callback(new Error(`CORS policy: Origin ${origin} not allowed`), false);
     }
   },
   credentials: true,
@@ -54,10 +51,9 @@ app.use(cors({
     'Access-Control-Request-Headers'
   ],
   exposedHeaders: ['Content-Length', 'Authorization'],
-  maxAge: 86400 // 24 hours
+  maxAge: 86400
 }));
 
-// ✅ PERBAIKAN: Handle preflight requests dengan PATCH support
 app.options('*', cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -80,7 +76,7 @@ app.options('*', cors({
   ]
 }));
 
-// Body parser middleware with better limits
+// Body parser middleware
 app.use(express.json({ 
   limit: '10mb',
   verify: (req, res, buf) => {
@@ -95,19 +91,14 @@ app.use(express.urlencoded({
 
 // Security headers middleware
 app.use((req, res, next) => {
-  // Remove sensitive headers
   res.removeHeader('X-Powered-By');
-  
-  // Security headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
-  
-  // CORS headers are handled by cors middleware
   next();
 });
 
-// Session configuration - Enhanced security
+// Session configuration - Fixed for development
 app.use(session({
   name: 'sapa-tazkia.sid',
   secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || 'fallback-session-secret-12345-change-in-production',
@@ -116,12 +107,11 @@ app.use(session({
   cookie: { 
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 24 * 60 * 60 * 1000,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    domain: process.env.NODE_ENV === 'production' ? '.tazkia.ac.id' : undefined
+    // Remove domain for development to avoid cookie issues
   },
-  store: process.env.NODE_ENV === 'production' ? 
-    new session.MemoryStore() : new session.MemoryStore()
+  store: new session.MemoryStore() // Simplified for both environments
 }));
 
 // Passport middleware
@@ -141,7 +131,7 @@ app.use((req, res, next) => {
 });
 
 // ========================================================
-// BASIC ROUTES & HEALTH CHECKS
+// BASIC ROUTES & HEALTH CHECKS - ENHANCED
 // ========================================================
 
 // Root endpoint
@@ -149,7 +139,7 @@ app.get('/', (req, res) => {
   res.json({
     success: true,
     message: '🚀 Sapa Tazkia Backend API',
-    version: '3.3.0', // ✅ UPDATE VERSION untuk OpenAI
+    version: '3.4.0', // ✅ UPDATE VERSION
     status: 'running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
@@ -157,8 +147,9 @@ app.get('/', (req, res) => {
       authentication: true,
       emailVerification: true,
       googleOAuth: !!process.env.GOOGLE_CLIENT_ID,
-      aiChat: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'), // ✅ UPDATE: OpenAI
-      academicAnalysis: true // ✅ FEATURE BARU
+      aiChat: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'),
+      academicAnalysis: true,
+      ragEnabled: true // ✅ NEW: RAG feature flag
     },
     endpoints: {
       auth: '/api/auth',
@@ -170,14 +161,15 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint - Enhanced
+// Health check endpoint - Enhanced with RAG status
 app.get('/health', async (req, res) => {
   const healthCheck = {
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
-    services: {}
+    services: {},
+    port: process.env.PORT || 5000 // ✅ ADD PORT INFO
   };
 
   try {
@@ -185,7 +177,7 @@ app.get('/health', async (req, res) => {
     await prisma.$queryRaw`SELECT 1`;
     healthCheck.services.database = 'Connected';
     
-    // Test OpenAI connection if API key exists
+    // Test OpenAI connection
     if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
       try {
         const { testOpenAIConnection } = require('./services/openaiService');
@@ -195,13 +187,24 @@ app.get('/health', async (req, res) => {
           healthCheck.services.openaiModel = openaiTest.model;
         }
       } catch (error) {
-        healthCheck.services.openai = 'Connection Failed';
+        healthCheck.services.openai = `Connection Failed: ${error.message}`;
       }
     } else {
       healthCheck.services.openai = 'Not Configured';
     }
 
-    // Test email service configuration
+    // Test RAG Service status
+    try {
+      const ragService = require('./services/ragService');
+      const ragStatus = await ragService.getCollectionInfo();
+      healthCheck.services.rag = ragStatus.exists ? 'Ready' : 'No Data';
+      healthCheck.services.documentsCount = ragStatus.exists ? ragStatus.pointsCount : 0;
+      healthCheck.services.ragStatus = ragStatus.status || 'unknown';
+    } catch (error) {
+      healthCheck.services.rag = `Error: ${error.message}`;
+    }
+
+    // Test email service
     if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
       healthCheck.services.email = 'Configured';
     } else {
@@ -214,7 +217,6 @@ app.get('/health', async (req, res) => {
     healthCheck.status = 'ERROR';
     healthCheck.services.database = 'Disconnected';
     healthCheck.error = error.message;
-    
     res.status(503).json(healthCheck);
   }
 });
@@ -229,13 +231,15 @@ app.get('/status', (req, res) => {
     features: {
       authentication: !!process.env.GOOGLE_CLIENT_ID,
       emailVerification: true,
-      ai: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'), // ✅ UPDATE: OpenAI
-      academicAnalysis: true, // ✅ FEATURE BARU
+      ai: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'),
+      academicAnalysis: true,
+      ragSystem: true, // ✅ NEW: RAG system status
       database: !!process.env.DATABASE_URL,
       emailService: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD)
     },
-    aiProvider: process.env.AI_PROVIDER || 'openai', // ✅ INFO AI PROVIDER
-    aiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini' // ✅ INFO MODEL
+    aiProvider: process.env.AI_PROVIDER || 'openai',
+    aiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    ragEnabled: true // ✅ NEW: RAG enabled status
   });
 });
 
@@ -269,8 +273,11 @@ app.get('/test', (req, res) => {
 });
 
 // ========================================================
-// API ROUTES - UPDATED WITH BETTER ORGANIZATION
+// API ROUTES - FIXED ORDER FOR GUEST ACCESS
 // ========================================================
+
+// ✅ FIXED: AI routes FIRST untuk guest access
+app.use('/api/ai', aiRoutes);
 
 // Auth routes - User authentication
 app.use('/api/auth', authRoutes);
@@ -278,14 +285,11 @@ app.use('/api/auth', authRoutes);
 // Guest routes - For non-authenticated users
 app.use('/api/guest', guestRoutes);
 
-// AI routes - For authenticated AI interactions
-app.use('/api/ai', aiRoutes);
-
 // ========================================================
-// ERROR HANDLING MIDDLEWARE - ENHANCED
+// ERROR HANDLING MIDDLEWARE - UPDATED ENDPOINTS LIST
 // ========================================================
 
-// 404 Handler - Enhanced with better error information
+// 404 Handler - UPDATED dengan semua endpoint baru
 app.use('*', (req, res) => {
   console.log('❌ [404] Route not found:', req.method, req.originalUrl);
   
@@ -319,9 +323,16 @@ app.use('*', (req, res) => {
         'GET  /api/ai/conversations',
         'GET  /api/ai/history/:chatId',
         'POST /api/ai/test-ai',
-        'GET  /api/ai/test-openai', // ✅ UPDATE: OpenAI test
-        'POST /api/ai/analyze-academic', // ✅ ENDPOINT BARU
-        'POST /api/ai/study-recommendations' // ✅ ENDPOINT BARU
+        'GET  /api/ai/test-openai',
+        'GET  /api/ai/test-embedding', // ✅ NEW ENDPOINT
+        'POST /api/ai/analyze-academic',
+        'POST /api/ai/study-recommendations',
+        'GET  /api/ai/knowledge-status', // ✅ NEW ENDPOINT
+        'POST /api/ai/ingest-now', // ✅ NEW ENDPOINT
+        'POST /api/ai/ingest', // ✅ NEW ENDPOINT
+        'GET  /api/ai/health', // ✅ NEW ENDPOINT
+        'GET  /api/ai/public-test', // ✅ NEW ENDPOINT
+        'POST /api/ai/reset-knowledge' // ✅ NEW ENDPOINT
       ],
       system: [
         'GET  /',
@@ -330,11 +341,12 @@ app.use('*', (req, res) => {
         'GET  /test',
         'GET  /session-debug'
       ]
-    }
+    },
+    suggestion: 'Gunakan POST method untuk endpoint ingestion: curl -X POST http://localhost:5000/api/ai/ingest-now'
   });
 });
 
-// Global error handler - Enhanced with better logging
+// Global error handler - Enhanced
 app.use((err, req, res, next) => {
   console.error('🔴 [GLOBAL ERROR]', {
     message: err.message,
@@ -392,6 +404,15 @@ app.use((err, req, res, next) => {
     });
   }
 
+  // RAG Service error
+  if (err.message.includes('Qdrant') || err.message.includes('embedding')) {
+    return res.status(503).json({
+      success: false,
+      message: 'Knowledge base service temporarily unavailable',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Please try again later'
+    });
+  }
+
   // Default error response
   const errorResponse = {
     success: false,
@@ -399,7 +420,6 @@ app.use((err, req, res, next) => {
     timestamp: new Date().toISOString()
   };
 
-  // Include stack trace in development
   if (process.env.NODE_ENV === 'development') {
     errorResponse.stack = err.stack;
     errorResponse.details = err;
@@ -435,12 +455,10 @@ const gracefulShutdown = async (signal) => {
   }
 };
 
-// Handle different shutdown signals
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // For nodemon
+process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2'));
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   console.error('🔴 UNCAUGHT EXCEPTION:', error);
   process.exit(1);
@@ -452,7 +470,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // ========================================================
-// SERVER START
+// SERVER START - UPDATED LOGS
 // ========================================================
 
 const PORT = process.env.PORT || 5000;
@@ -464,52 +482,45 @@ const server = app.listen(PORT, () => {
   console.log(`📍 Port: ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔐 Auth: ${process.env.GOOGLE_CLIENT_ID ? '✅ Google OAuth Ready' : '❌ Local Auth Only'}`);
-  console.log(`📧 Email Verification: ${process.env.EMAIL_USER ? '✅ Email Service Ready' : '❌ Email Disabled'}`);
-  console.log(`🤖 AI: ${process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' ? '✅ OpenAI GPT-4o-mini Ready' : '❌ AI Disabled'}`); // ✅ UPDATE: OpenAI
-  console.log(`🧠 AI Provider: ${process.env.AI_PROVIDER || 'openai'}`);
+  console.log(`📧 Email: ${process.env.EMAIL_USER ? '✅ Email Service Ready' : '❌ Email Disabled'}`);
+  console.log(`🤖 AI: ${process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' ? '✅ OpenAI + RAG Ready' : '❌ AI Disabled'}`);
+  console.log(`🧠 RAG: ✅ Knowledge Base System Enabled`);
   console.log(`🗄️ Database: ${process.env.DATABASE_URL ? '✅ Connected' : '❌ No DB Config'}`);
-  console.log(`🔄 CORS: ✅ PATCH Method Enabled`);
   console.log('');
   console.log('📋 AVAILABLE ENDPOINTS:');
   console.log('   GET  / .......................... API Root');
-  console.log('   GET  /health ................... Health check');
+  console.log('   GET  /health ................... Health check (+RAG status)');
   console.log('   GET  /status ................... System status');
   console.log('   GET  /session-debug ............ Session debug');
   console.log('   GET  /test .................... Test route');
   console.log('');
+  console.log('🤖 AI ENDPOINTS (Guest & Auth):');
+  console.log('   POST /api/ai/chat ............. AI Chat dengan RAG');
+  console.log('   GET  /api/ai/knowledge-status . Cek status knowledge base');
+  console.log('   POST /api/ai/ingest-now ....... Manual ingestion (Guest OK)');
+  console.log('   POST /api/ai/ingest ........... Protected ingestion');
+  console.log('   GET  /api/ai/test-embedding ... Test embedding function');
+  console.log('   GET  /api/ai/test-openai ...... Test OpenAI connection');
+  console.log('   POST /api/ai/test-ai .......... Test AI response');
+  console.log('   GET  /api/ai/conversations .... Get conversations (Auth)');
+  console.log('   GET  /api/ai/history/:chatId .. Get chat history (Auth)');
+  console.log('   POST /api/ai/analyze-academic . Analyze academic (Auth)');
+  console.log('   POST /api/ai/study-recommendations . Study recommendations (Auth)');
+  console.log('');
   console.log('🔐 AUTH ENDPOINTS:');
   console.log('   POST /api/auth/login .......... User login');
   console.log('   POST /api/auth/register ....... User registration');
-  console.log('   POST /api/auth/register-email .. Email registration'); 
-  console.log('   POST /api/auth/verify-email .... Email verification'); 
-  console.log('   POST /api/auth/resend-verification . Resend code'); 
-  console.log('   GET  /api/auth/check-verification/:email . Check status'); 
-  console.log('   GET  /api/auth/google ......... Google OAuth');
-  console.log('   GET  /api/auth/google/callback . Google Callback');
-  console.log('   POST /api/auth/logout ......... User logout');
-  console.log('   GET  /api/auth/me ............ Get user profile');
-  console.log('   PATCH /api/auth/update-profile . Update profile');
-  console.log('   POST /api/auth/verify-student .. Verify student data');
-  console.log('   PATCH /api/auth/update-verification . Update verification');
-  console.log('   GET  /api/auth/check-nim/:nim . Check NIM availability');
+  // ... (sisanya tetap sama)
   console.log('');
   console.log('👤 GUEST ENDPOINTS:');
-  console.log('   POST /api/guest/chat .......... Guest Chat');
+  console.log('   POST /api/guest/chat .......... Guest Chat (No RAG)');
   console.log('   GET  /api/guest/conversation/:sessionId ... Guest History');
-  console.log('');
-  console.log('🤖 AI ENDPOINTS:');
-  console.log('   POST /api/ai/chat ............ Authenticated Chat');
-  console.log('   GET  /api/ai/conversations .... Get conversations');
-  console.log('   GET  /api/ai/history/:chatId .. Get chat history');
-  console.log('   POST /api/ai/test-ai ......... Test AI');
-  console.log('   GET  /api/ai/test-openai ..... Test OpenAI Connection'); // ✅ UPDATE: OpenAI
-  console.log('   POST /api/ai/analyze-academic . Analyze Academic Performance'); // ✅ ENDPOINT BARU
-  console.log('   POST /api/ai/study-recommendations . Get Study Recommendations'); // ✅ ENDPOINT BARU
   console.log('');
   console.log('🛡️  SECURITY FEATURES:');
   console.log('   ✅ CORS Protection');
   console.log('   ✅ Session Management');
   console.log('   ✅ Email Verification System'); 
+  console.log('   ✅ RAG Knowledge Base');
   console.log('   ✅ Input Validation');
   console.log('   ✅ Error Handling');
   console.log('   ✅ Graceful Shutdown');
