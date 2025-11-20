@@ -99,22 +99,23 @@ const requireAuth = async (req, res, next) => {
 };
 
 /**
- * Middleware untuk optional authentication
- * Jika ada token yang valid, attach user data, jika tidak lanjutkan saja
+ * ✅ PERBAIKAN BESAR: Middleware untuk optional authentication - FIXED TOKEN EXPIRY HANDLING
  */
 const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
     
     if (!authHeader) {
-      console.log('[DEBUG] Optional auth - No authorization header, continuing...');
+      console.log('[DEBUG] Optional auth - No authorization header, continuing as guest...');
+      req.user = null;
       return next();
     }
 
     // Format: "Bearer <token>"
     const parts = authHeader.split(' ');
     if (parts.length !== 2 || parts[0] !== 'Bearer') {
-      console.log('[DEBUG] Optional auth - Invalid authorization header format, continuing...');
+      console.log('[DEBUG] Optional auth - Invalid authorization header format, continuing as guest...');
+      req.user = null;
       return next();
     }
 
@@ -122,39 +123,53 @@ const optionalAuth = async (req, res, next) => {
     
     // Validasi token dasar
     if (!token || token === 'null' || token === 'undefined' || token === 'Bearer' || token.length < 10) {
-      console.log('[DEBUG] Optional auth - Invalid token format, continuing...');
+      console.log('[DEBUG] Optional auth - Invalid token format, continuing as guest...');
+      req.user = null;
       return next();
     }
 
     console.log(`[DEBUG] Optional auth - Token preview: ${token.substring(0, 20)}...`);
 
-    // Basic JWT verification
-    const decoded = authService.verifyToken(token);
+    // ✅ PERBAIKAN: Basic JWT verification dengan error handling yang better
+    let decoded;
+    try {
+      decoded = authService.verifyToken(token);
+    } catch (jwtError) {
+      console.log(`[DEBUG] Optional auth - JWT verification failed: ${jwtError.message}`);
+      req.user = null;
+      return next();
+    }
+
     if (!decoded) {
-      console.log('[DEBUG] Optional auth - Invalid token, continuing without user');
+      console.log('[DEBUG] Optional auth - Invalid token, continuing as guest...');
+      req.user = null;
       return next();
     }
 
     console.log(`[DEBUG] Optional auth - Basic JWT verified for user ID: ${decoded.id}`);
 
-    // Coba verifikasi session dengan database
+    // ✅ PERBAIKAN: Coba verifikasi session dengan database, tapi JANGAN gagal jika expired
     try {
       const verification = await authService.verifySession(token);
       
-      if (verification.valid) {
+      if (verification.valid && verification.user) {
         req.user = verification.user;
-        console.log(`[DEBUG] Optional auth - User authenticated: ${verification.user.email}`);
+        console.log(`[DEBUG] Optional auth - User fully authenticated: ${verification.user.email}`);
       } else {
-        console.log(`[DEBUG] Optional auth - Session verification failed: ${verification.message}`);
-        // Untuk optional auth, kita tetap set user basic info
+        console.log(`[DEBUG] Optional auth - Session verification failed, using basic user info`);
+        // Untuk optional auth, kita tetap set user basic info meskipun session expired
         req.user = { 
-          id: decoded.id
+          id: decoded.id,
+          // Tambah flag bahwa ini basic auth saja (bukan full session)
+          _basicAuth: true
         };
       }
     } catch (dbError) {
       console.warn('[WARNING] Optional auth - Database error, using basic JWT verification');
+      // Jika database error, tetap lanjut dengan basic user info
       req.user = { 
-        id: decoded.id
+        id: decoded.id,
+        _basicAuth: true
       };
     }
 
@@ -162,7 +177,82 @@ const optionalAuth = async (req, res, next) => {
 
   } catch (error) {
     console.error('[ERROR] Optional auth middleware error:', error);
-    // Untuk optional auth, kita lanjutkan meskipun ada error
+    // Untuk optional auth, kita lanjutkan sebagai guest meskipun ada error
+    req.user = null;
+    next();
+  }
+};
+
+/**
+ * ✅ NEW: Guest-friendly optional auth untuk public endpoints seperti ingestion
+ */
+const guestFriendlyAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    
+    if (!authHeader) {
+      console.log('👤 [AUTH] Guest access detected - no token');
+      req.user = null;
+      return next();
+    }
+
+    // Format: "Bearer <token>"
+    const parts = authHeader.split(' ');
+    if (parts.length !== 2 || parts[0] !== 'Bearer') {
+      console.log('👤 [AUTH] Guest access detected - invalid header format');
+      req.user = null;
+      return next();
+    }
+
+    const token = parts[1].trim();
+    
+    // Validasi token dasar
+    if (!token || token === 'null' || token === 'undefined' || token === 'Bearer' || token.length < 10) {
+      console.log('👤 [AUTH] Guest access detected - invalid token');
+      req.user = null;
+      return next();
+    }
+
+    console.log(`🔐 [AUTH] Token detected, attempting verification...`);
+
+    // Coba verifikasi token
+    let decoded;
+    try {
+      decoded = authService.verifyToken(token);
+    } catch (jwtError) {
+      console.log(`👤 [AUTH] Guest access - JWT expired/invalid: ${jwtError.message}`);
+      req.user = null;
+      return next();
+    }
+
+    if (!decoded) {
+      console.log('👤 [AUTH] Guest access - token verification failed');
+      req.user = null;
+      return next();
+    }
+
+    // Coba verifikasi session dengan database
+    try {
+      const verification = await authService.verifySession(token);
+      
+      if (verification.valid && verification.user) {
+        req.user = verification.user;
+        console.log(`✅ [AUTH] User authenticated: ${verification.user.email}`);
+      } else {
+        console.log(`👤 [AUTH] Guest access - session expired/invalid`);
+        req.user = null;
+      }
+    } catch (dbError) {
+      console.warn('⚠️ [AUTH] Database error during verification, allowing guest access');
+      req.user = null;
+    }
+
+    next();
+
+  } catch (error) {
+    console.error('❌ [AUTH] Guest-friendly auth error:', error);
+    // Selalu lanjut sebagai guest pada error
+    req.user = null;
     next();
   }
 };
@@ -260,6 +350,7 @@ const requireAdmin = async (req, res, next) => {
 module.exports = {
   requireAuth,
   optionalAuth,
+  guestFriendlyAuth, // ✅ NEW: Guest-friendly auth
   simpleAuthMiddleware,
   requireAdmin
 };
