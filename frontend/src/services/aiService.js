@@ -1,21 +1,20 @@
 import api from './api';
 
 export const aiService = {
-  // ✅ PERBAIKAN: Send message ke AI dengan parameter lengkap
+  // ✅ PERBAIKAN: Send message ke AI dengan parameter yang KONSISTEN
   async sendMessage(message, isGuestMode = false, isNewChat = false, conversationId = null) {
     try {
       console.log('📤 [AI SERVICE] Sending message to backend:', {
-        message: message.substring(0, 50) + '...', // Log sebagian pesan saja
+        message: message.substring(0, 50) + '...',
         isGuestMode,
         isNewChat,
         conversationId,
         timestamp: new Date().toISOString()
       });
 
-      // Siapkan payload berdasarkan mode
+      // ✅ PERBAIKAN: Siapkan payload yang KONSISTEN antara guest dan user
       const payload = {
         message: message,
-        isGuestMode: isGuestMode,
         isNewChat: isNewChat
       };
 
@@ -24,13 +23,23 @@ export const aiService = {
         payload.conversationId = conversationId;
       }
 
-      const response = await api.post('/ai/chat', payload);
+      // ✅ PERBAIKAN: Pilih endpoint berdasarkan mode
+      let response;
+      if (isGuestMode) {
+        // Untuk guest, tambahkan sessionId
+        payload.sessionId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        response = await api.post('/guest/chat', payload);
+      } else {
+        // Untuk user login
+        response = await api.post('/ai/chat', payload);
+      }
       
       console.log('✅ [AI SERVICE] Response received:', {
         success: response.data.success,
         hasReply: !!response.data.reply,
         conversationId: response.data.conversationId,
-        isNewChat: response.data.isNewChat
+        isNewConversation: response.data.isNewConversation,
+        sessionId: response.data.sessionId // ✅ TAMBAH INI UNTUK GUEST
       });
 
       return response.data;
@@ -50,13 +59,13 @@ export const aiService = {
     }
   },
 
-  // ✅ FUNGSI BARU: Send message untuk guest (legacy support)
+  // ✅ FUNGSI BARU: Send message untuk guest (legacy support - OPTIMIZED)
   async sendGuestMessage(message) {
     try {
-      console.log('👤 [AI SERVICE] Sending guest message');
+      console.log('👤 [AI SERVICE] Sending guest message WITH RAG');
       const response = await api.post('/guest/chat', {
         message: message,
-        sessionId: `guest-${Date.now()}` // Generate session ID untuk guest
+        sessionId: `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       });
       return response.data;
     } catch (error) {
@@ -68,16 +77,18 @@ export const aiService = {
     }
   },
 
-  // ✅ PERBAIKAN: Unified function untuk semua jenis chat
+  // ✅ PERBAIKAN: Unified function untuk semua jenis chat - OPTIMIZED
   async sendMessageToAI(message, isGuestMode = false, isNewChat = true, conversationId = null) {
     try {
-      if (isGuestMode) {
-        console.log('👤 [AI SERVICE] Using guest mode');
-        return await this.sendGuestMessage(message);
-      } else {
-        console.log('🔐 [AI SERVICE] Using authenticated mode');
-        return await this.sendMessage(message, false, isNewChat, conversationId);
-      }
+      console.log('🔄 [AI SERVICE] sendMessageToAI called with:', {
+        message: message.substring(0, 50) + '...',
+        isGuestMode,
+        isNewChat,
+        conversationId
+      });
+
+      // ✅ PERBAIKAN: Gunakan fungsi utama yang sudah diperbaiki
+      return await this.sendMessage(message, isGuestMode, isNewChat, conversationId);
     } catch (error) {
       console.error('❌ [AI SERVICE] Unified send error:', error);
       throw error;
