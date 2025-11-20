@@ -1,11 +1,13 @@
 **/node_modules/
 
-
-.env 
-
-_env.bakk
-apikeytest.txt
-chatpage.txt
-dump.txt
-landingpage.txt2
-geminiService.js
+.gitignore
+docker-compose.yml
+qdrant_storage/
+mysql_data
+openaiService.js
+geminiService.js  
+ragService.js
+data
+.env
+build
+public
