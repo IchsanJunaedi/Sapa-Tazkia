@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PenSquare, User, Settings, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight } from 'lucide-react';
+import { PenSquare, User, Settings, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 
 const Sidebar = ({ 
   // Props untuk user dan auth
@@ -21,6 +21,9 @@ const Sidebar = ({
   // Props untuk actions
   onNewChat,
   onSettingsClick,
+  
+  // ✅ PERBAIKAN: Tambah prop untuk loading state
+  isStartingNewChat = false,
   
   // Custom styling
   className = ''
@@ -151,12 +154,18 @@ const Sidebar = ({
     setIsChatsSectionOpen(!isChatsSectionOpen);
   };
 
-  // ✅ PERBAIKAN KRITIS: Handle new chat dengan event prevention yang benar
+  // ✅ PERBAIKAN KRITIS: Handle new chat dengan event prevention dan loading state
   const handleNewChat = (e) => {
     // ✅ PERBAIKAN: Prevent default behavior untuk menghindari refresh
     if (e) {
       e.preventDefault();
       e.stopPropagation();
+    }
+    
+    // ✅ PERBAIKAN: Skip jika sedang loading
+    if (isDeleting || isStartingNewChat) {
+      console.log('⏳ [SIDEBAR] New chat skipped - already loading');
+      return;
     }
     
     console.log('🔄 [SIDEBAR] New chat button clicked');
@@ -170,11 +179,17 @@ const Sidebar = ({
     handleCloseAllPopups();
   };
 
-  // ✅ PERBAIKAN: Handle select chat dengan event prevention
+  // ✅ PERBAIKAN: Handle select chat dengan event prevention dan loading state
   const handleSelectChat = (chatId, e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
+    }
+    
+    // ✅ PERBAIKAN: Skip jika sedang loading
+    if (isDeleting || isStartingNewChat) {
+      console.log('⏳ [SIDEBAR] Select chat skipped - currently loading');
+      return;
     }
     
     console.log('🔍 [SIDEBAR] Chat selected:', chatId);
@@ -227,17 +242,24 @@ const Sidebar = ({
           </div>
         )}
 
-        {/* ✅ PERBAIKAN: New Chat Section dengan handler yang benar */}
+        {/* ✅ PERBAIKAN: New Chat Section dengan loading state */}
         <div className="flex flex-col flex-shrink-0">
           <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
             <button
-              className={`${isSidebarOpen ? 'w-full justify-center p-3' : 'w-12 h-12 justify-center'} h-12 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full transition-colors flex items-center group relative gap-3 shadow-sm`}
-              title="New Chat"
-              onClick={handleNewChat} // ✅ Gunakan handleNewChat yang sudah diperbaiki
+              className={`${isSidebarOpen ? 'w-full justify-center p-3' : 'w-12 h-12 justify-center'} h-12 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full transition-colors flex items-center group relative gap-3 shadow-sm ${
+                (isDeleting || isStartingNewChat) ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              title={isStartingNewChat ? "Starting new chat..." : "New Chat"}
+              onClick={handleNewChat}
+              disabled={isDeleting || isStartingNewChat}
             >
-              <PenSquare size={20} />
+              {isStartingNewChat ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <PenSquare size={20} />
+              )}
               <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap font-medium`}>
-                New chat
+                {isStartingNewChat ? 'Starting...' : 'New chat'}
               </span>
             </button>
           </div>
@@ -250,6 +272,7 @@ const Sidebar = ({
               onClick={toggleChatsSection}
               className="w-full flex items-center justify-between p-2 text-gray-700 hover:text-gray-900 rounded-lg transition-colors"
               title={isChatsSectionOpen ? "Sembunyikan Chats" : "Tampilkan Chats"}
+              disabled={isStartingNewChat}
             >
               <span className="text-sm font-semibold">Chats</span>
               {isChatsSectionOpen ? (
@@ -274,9 +297,10 @@ const Sidebar = ({
                       key={chat.id}
                       chat={chat}
                       currentChatId={currentChatId}
-                      onSelectChat={handleSelectChat} // ✅ Gunakan handler yang diperbaiki
+                      onSelectChat={handleSelectChat}
                       onDeleteChat={onDeleteChat}
                       isDeleting={isDeleting}
+                      isStartingNewChat={isStartingNewChat}
                       handleMoreClick={handleMoreClick}
                       isSidebarOpen={isSidebarOpen}
                     />
@@ -293,9 +317,10 @@ const Sidebar = ({
                       key={chat.id}
                       chat={chat}
                       currentChatId={currentChatId}
-                      onSelectChat={handleSelectChat} // ✅ Gunakan handler yang diperbaiki
+                      onSelectChat={handleSelectChat}
                       onDeleteChat={onDeleteChat}
                       isDeleting={isDeleting}
+                      isStartingNewChat={isStartingNewChat}
                       handleMoreClick={handleMoreClick}
                       isSidebarOpen={isSidebarOpen}
                     />
@@ -312,9 +337,10 @@ const Sidebar = ({
                       key={chat.id}
                       chat={chat}
                       currentChatId={currentChatId}
-                      onSelectChat={handleSelectChat} // ✅ Gunakan handler yang diperbaiki
+                      onSelectChat={handleSelectChat}
                       onDeleteChat={onDeleteChat}
                       isDeleting={isDeleting}
+                      isStartingNewChat={isStartingNewChat}
                       handleMoreClick={handleMoreClick}
                       isSidebarOpen={isSidebarOpen}
                     />
@@ -331,9 +357,10 @@ const Sidebar = ({
                       key={chat.id}
                       chat={chat}
                       currentChatId={currentChatId}
-                      onSelectChat={handleSelectChat} // ✅ Gunakan handler yang diperbaiki
+                      onSelectChat={handleSelectChat}
                       onDeleteChat={onDeleteChat}
                       isDeleting={isDeleting}
+                      isStartingNewChat={isStartingNewChat}
                       handleMoreClick={handleMoreClick}
                       isSidebarOpen={isSidebarOpen}
                     />
@@ -352,9 +379,10 @@ const Sidebar = ({
                       key={chat.id}
                       chat={chat}
                       currentChatId={currentChatId}
-                      onSelectChat={handleSelectChat} // ✅ Gunakan handler yang diperbaiki
+                      onSelectChat={handleSelectChat}
                       onDeleteChat={onDeleteChat}
                       isDeleting={isDeleting}
+                      isStartingNewChat={isStartingNewChat}
                       handleMoreClick={handleMoreClick}
                       isSidebarOpen={isSidebarOpen}
                     />
@@ -373,6 +401,18 @@ const Sidebar = ({
                   Login untuk melihat riwayat chat Anda.
                 </p>
               )}
+
+              {/* Loading State */}
+              {(isDeleting || isStartingNewChat) && (
+                <div className="p-2 text-center">
+                  <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span>
+                      {isStartingNewChat ? 'Starting new chat...' : 'Deleting...'}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             // Empty space ketika chat history tidak ditampilkan
@@ -386,9 +426,12 @@ const Sidebar = ({
             <button
               className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${
                 user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c80]'
-              } text-white rounded-xl shadow-lg transition-all flex items-center`}
+              } text-white rounded-xl shadow-lg transition-all flex items-center ${
+                isStartingNewChat ? 'opacity-70 cursor-not-allowed' : ''
+              }`}
               title={user ? `Logged in as ${getUserName()}. NIM: ${getUserNIM()}` : 'Login as Mahasiswa'}
               onClick={handleProfileClick}
+              disabled={isStartingNewChat}
             >
               <div className={`flex items-center ${isSidebarOpen ? 'gap-3 w-full' : 'justify-center w-full'}`}>
                 <User size={20} />
@@ -456,10 +499,14 @@ const Sidebar = ({
             </div>
             <button
               onClick={handleDeleteFromPopup}
-              disabled={isDeleting}
+              disabled={isDeleting || isStartingNewChat}
               className="w-full py-2 px-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
             >
-              <Trash2 size={14} />
+              {isDeleting ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Trash2 size={14} />
+              )}
               {isDeleting ? 'Menghapus...' : 'Hapus Chat'}
             </button>
           </div>
@@ -501,7 +548,12 @@ const Sidebar = ({
             <div className="p-2">
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                disabled={isStartingNewChat}
+                className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                  isStartingNewChat 
+                    ? 'text-gray-400 cursor-not-allowed' 
+                    : 'text-red-600 hover:bg-red-50'
+                }`}
               >
                 <LogOut size={16} />
                 <span>Log out</span>
@@ -518,55 +570,75 @@ const Sidebar = ({
   );
 };
 
-// ✅ PERBAIKAN: Komponen Chat Item dengan event prevention yang benar
+// ✅ PERBAIKAN: Komponen Chat Item dengan loading state prevention
 const ChatItem = ({ 
   chat, 
   currentChatId, 
   onSelectChat, 
   onDeleteChat, 
   isDeleting, 
+  isStartingNewChat,
   handleMoreClick, 
   isSidebarOpen 
 }) => {
   
-  // ✅ PERBAIKAN: Handle click dengan event prevention
+  // ✅ PERBAIKAN: Handle click dengan event prevention dan loading check
   const handleChatClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // ✅ PERBAIKAN: Skip jika sedang loading
+    if (isDeleting || isStartingNewChat) {
+      console.log('⏳ [CHAT ITEM] Chat click skipped - currently loading');
+      return;
+    }
+    
     console.log('🔍 [CHAT ITEM] Chat clicked:', chat.id);
     if (onSelectChat) {
       onSelectChat(chat.id, e);
     }
   };
 
-  // ✅ PERBAIKAN: Handle more click dengan event prevention
+  // ✅ PERBAIKAN: Handle more click dengan event prevention dan loading check
   const handleMoreButtonClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // ✅ PERBAIKAN: Skip jika sedang loading
+    if (isDeleting || isStartingNewChat) {
+      console.log('⏳ [CHAT ITEM] More button click skipped - currently loading');
+      return;
+    }
+    
     console.log('⚙️ [CHAT ITEM] More button clicked:', chat.id);
     if (handleMoreClick) {
       handleMoreClick(chat.id, e);
     }
   };
 
+  // ✅ PERBAIKAN: Tentukan apakah item sedang loading
+  const isLoading = isDeleting || isStartingNewChat;
+
   return (
     <div className="flex items-center group">
       <button
-        onClick={handleChatClick} // ✅ Gunakan handler yang diperbaiki
+        onClick={handleChatClick}
         className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
           currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
-        }`}
+        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         title={chat.title}
-        disabled={isDeleting}
+        disabled={isLoading}
       >
         {chat.title}
       </button>
       {onDeleteChat && isSidebarOpen && (
         <button
-          onClick={handleMoreButtonClick} // ✅ Gunakan handler yang diperbaiki
-          className="p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100 ml-1 disabled:opacity-30 disabled:cursor-not-allowed"
+          onClick={handleMoreButtonClick}
+          className={`p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100 ml-1 ${
+            isLoading ? 'opacity-30 cursor-not-allowed' : ''
+          }`}
           title="More options"
-          disabled={isDeleting}
+          disabled={isLoading}
         >
           <MoreHorizontal size={14} />
         </button>
