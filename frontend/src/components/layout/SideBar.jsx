@@ -154,15 +154,14 @@ const Sidebar = ({
     setIsChatsSectionOpen(!isChatsSectionOpen);
   };
 
-  // ✅ PERBAIKAN KRITIS: Handle new chat dengan event prevention dan loading state
+  // ✅ PERBAIKAN SEDERHANA: Handle new chat tanpa complexity
   const handleNewChat = (e) => {
-    // ✅ PERBAIKAN: Prevent default behavior untuk menghindari refresh
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
     
-    // ✅ PERBAIKAN: Skip jika sedang loading
+    // ✅ SEDERHANA: Skip hanya berdasarkan loading state dari parent
     if (isDeleting || isStartingNewChat) {
       console.log('⏳ [SIDEBAR] New chat skipped - already loading');
       return;
@@ -170,25 +169,28 @@ const Sidebar = ({
     
     console.log('🔄 [SIDEBAR] New chat button clicked');
     
-    // ✅ PERBAIKAN: Panggil onNewChat tanpa parameter yang kompleks
     if (onNewChat) {
       onNewChat();
     }
     
-    // Tutup popup jika ada yang terbuka
     handleCloseAllPopups();
   };
 
-  // ✅ PERBAIKAN: Handle select chat dengan event prevention dan loading state
+  // ✅ PERBAIKAN SEDERHANA: Handle select chat tanpa complexity
   const handleSelectChat = (chatId, e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
     
-    // ✅ PERBAIKAN: Skip jika sedang loading
+    // ✅ SEDERHANA: Skip hanya berdasarkan loading state dari parent
     if (isDeleting || isStartingNewChat) {
       console.log('⏳ [SIDEBAR] Select chat skipped - currently loading');
+      return;
+    }
+    
+    if (chatId === currentChatId) {
+      console.log('⏩ [SIDEBAR] Select chat skipped - already active chat');
       return;
     }
     
@@ -219,6 +221,7 @@ const Sidebar = ({
               className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3" 
               title="Settings"
               onClick={onSettingsClick}
+              disabled={isStartingNewChat || isDeleting}
             >
               <Settings size={24} />
             </button>
@@ -226,6 +229,7 @@ const Sidebar = ({
               onClick={onToggleSidebar}
               className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
               title="Tutup Sidebar"
+              disabled={isStartingNewChat || isDeleting}
             >
               <ToggleIcon open={true} />
             </button>
@@ -236,20 +240,23 @@ const Sidebar = ({
               onClick={onToggleSidebar}
               className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
               title="Buka Sidebar"
+              disabled={isStartingNewChat || isDeleting}
             >
               <ToggleIcon open={false} />
             </button>
           </div>
         )}
 
-        {/* ✅ PERBAIKAN: New Chat Section dengan loading state */}
+        {/* ✅ PERBAIKAN: New Chat Section yang lebih sederhana */}
         <div className="flex flex-col flex-shrink-0">
           <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
             <button
-              className={`${isSidebarOpen ? 'w-full justify-center p-3' : 'w-12 h-12 justify-center'} h-12 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full transition-colors flex items-center group relative gap-3 shadow-sm ${
-                (isDeleting || isStartingNewChat) ? 'opacity-50 cursor-not-allowed' : ''
+              className={`${isSidebarOpen ? 'w-full justify-center p-3' : 'w-12 h-12 justify-center'} h-12 bg-white border border-gray-300 text-gray-700 rounded-full transition-all flex items-center group relative gap-3 shadow-sm ${
+                (isDeleting || isStartingNewChat) 
+                  ? 'opacity-50 cursor-not-allowed' 
+                  : 'hover:bg-gray-50 hover:shadow-md'
               }`}
-              title={isStartingNewChat ? "Starting new chat..." : "New Chat"}
+              title={isStartingNewChat ? "Memulai chat baru..." : "New Chat"}
               onClick={handleNewChat}
               disabled={isDeleting || isStartingNewChat}
             >
@@ -259,7 +266,7 @@ const Sidebar = ({
                 <PenSquare size={20} />
               )}
               <span className={`${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'} transition-opacity whitespace-nowrap font-medium`}>
-                {isStartingNewChat ? 'Starting...' : 'New chat'}
+                {isStartingNewChat ? 'Memulai...' : 'New chat'}
               </span>
             </button>
           </div>
@@ -270,9 +277,9 @@ const Sidebar = ({
           {isSidebarOpen && (
             <button
               onClick={toggleChatsSection}
-              className="w-full flex items-center justify-between p-2 text-gray-700 hover:text-gray-900 rounded-lg transition-colors"
+              className="w-full flex items-center justify-between p-2 text-gray-700 hover:text-gray-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title={isChatsSectionOpen ? "Sembunyikan Chats" : "Tampilkan Chats"}
-              disabled={isStartingNewChat}
+              disabled={isStartingNewChat || isDeleting}
             >
               <span className="text-sm font-semibold">Chats</span>
               {isChatsSectionOpen ? (
@@ -284,7 +291,7 @@ const Sidebar = ({
           )}
         </div>
 
-        {/* Area Chat History dengan struktur yang benar */}
+        {/* Area Chat History */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {isChatsSectionOpen && isSidebarOpen ? (
             <div className="flex-1 overflow-y-auto mt-4 space-y-4 custom-scrollbar">
@@ -408,30 +415,29 @@ const Sidebar = ({
                   <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
                     <Loader2 size={12} className="animate-spin" />
                     <span>
-                      {isStartingNewChat ? 'Starting new chat...' : 'Deleting...'}
+                      {isStartingNewChat ? 'Memulai chat...' : 'Menghapus...'}
                     </span>
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            // Empty space ketika chat history tidak ditampilkan
             <div className="flex-1"></div>
           )}
         </div>
 
-        {/* Profile Section dengan margin top yang cukup */}
+        {/* Profile Section */}
         <div className="mt-8 flex-shrink-0">
           <div className="flex justify-center">
             <button
               className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${
                 user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c80]'
               } text-white rounded-xl shadow-lg transition-all flex items-center ${
-                isStartingNewChat ? 'opacity-70 cursor-not-allowed' : ''
+                (isStartingNewChat || isDeleting) ? 'opacity-70 cursor-not-allowed' : ''
               }`}
               title={user ? `Logged in as ${getUserName()}. NIM: ${getUserNIM()}` : 'Login as Mahasiswa'}
               onClick={handleProfileClick}
-              disabled={isStartingNewChat}
+              disabled={isStartingNewChat || isDeleting}
             >
               <div className={`flex items-center ${isSidebarOpen ? 'gap-3 w-full' : 'justify-center w-full'}`}>
                 <User size={20} />
@@ -548,9 +554,9 @@ const Sidebar = ({
             <div className="p-2">
               <button
                 onClick={handleLogout}
-                disabled={isStartingNewChat}
+                disabled={isStartingNewChat || isDeleting}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
-                  isStartingNewChat 
+                  (isStartingNewChat || isDeleting)
                     ? 'text-gray-400 cursor-not-allowed' 
                     : 'text-red-600 hover:bg-red-50'
                 }`}
@@ -570,7 +576,7 @@ const Sidebar = ({
   );
 };
 
-// ✅ PERBAIKAN: Komponen Chat Item dengan loading state prevention
+// ✅ PERBAIKAN SEDERHANA: Komponen Chat Item
 const ChatItem = ({ 
   chat, 
   currentChatId, 
@@ -582,14 +588,17 @@ const ChatItem = ({
   isSidebarOpen 
 }) => {
   
-  // ✅ PERBAIKAN: Handle click dengan event prevention dan loading check
   const handleChatClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // ✅ PERBAIKAN: Skip jika sedang loading
     if (isDeleting || isStartingNewChat) {
       console.log('⏳ [CHAT ITEM] Chat click skipped - currently loading');
+      return;
+    }
+    
+    if (chat.id === currentChatId) {
+      console.log('⏩ [CHAT ITEM] Chat click skipped - already active chat');
       return;
     }
     
@@ -599,12 +608,10 @@ const ChatItem = ({
     }
   };
 
-  // ✅ PERBAIKAN: Handle more click dengan event prevention dan loading check
   const handleMoreButtonClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // ✅ PERBAIKAN: Skip jika sedang loading
     if (isDeleting || isStartingNewChat) {
       console.log('⏳ [CHAT ITEM] More button click skipped - currently loading');
       return;
@@ -616,16 +623,20 @@ const ChatItem = ({
     }
   };
 
-  // ✅ PERBAIKAN: Tentukan apakah item sedang loading
   const isLoading = isDeleting || isStartingNewChat;
+  const isActive = currentChatId === chat.id;
 
   return (
     <div className="flex items-center group">
       <button
         onClick={handleChatClick}
-        className={`flex-1 text-left p-2 rounded-lg truncate text-sm ${
-          currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
-        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`flex-1 text-left p-2 rounded-lg truncate text-sm transition-colors ${
+          isActive 
+            ? 'bg-gray-200 font-semibold text-gray-800' 
+            : 'hover:bg-gray-100 text-gray-700'
+        } ${
+          isLoading ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
         title={chat.title}
         disabled={isLoading}
       >
