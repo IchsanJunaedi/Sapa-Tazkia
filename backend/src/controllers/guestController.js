@@ -1,5 +1,5 @@
 // controllers/guestController.js
-const { generateAIResponse } = require('../services/openaiService');
+const ragService = require('../services/ragService'); // ✅ IMPORT RAG SERVICE
 
 // Simpan session guest di memory (bukan database)
 const guestSessions = new Map();
@@ -23,8 +23,8 @@ const guestChat = async (req, res) => {
       messageLength: message.length
     });
 
-    // ✅ PANGGIL OPENAI SERVICE (PERBAIKAN UTAMA)
-    const aiResponse = await generateAIResponse(message);
+    // ✅ PERBAIKAN UTAMA: GUNAKAN RAG SERVICE SAMA SEPERTI USER LOGIN
+    const aiResponse = await ragService.answerQuestion(message, []);
 
     // Simpan di memory (bukan database)
     if (!guestSessions.has(currentSessionId)) {
@@ -48,7 +48,8 @@ const guestChat = async (req, res) => {
     console.log('✅ [GUEST CONTROLLER] Guest response sent:', {
       sessionId: currentSessionId,
       responseLength: aiResponse.length,
-      totalMessages: session.messages.length
+      totalMessages: session.messages.length,
+      usedRAG: true // ✅ INDIKATOR RAG DIGUNAKAN
     });
 
     res.json({
@@ -61,7 +62,7 @@ const guestChat = async (req, res) => {
   } catch (error) {
     console.error('❌ [GUEST CONTROLLER] Guest Chat Error:', error);
     
-    // Error handling untuk OpenAI
+    // Error handling untuk RAG Service
     if (error.message.includes('OPENAI_API_KEY')) {
       return res.status(500).json({
         success: false,
@@ -72,13 +73,31 @@ const guestChat = async (req, res) => {
         success: false,
         message: "Terlalu banyak permintaan. Silakan tunggu sebentar."
       });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: "Chat service error",
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Terjadi kesalahan, silakan coba lagi.'
-      });
+    } else if (error.message.includes('Qdrant')) {
+      // Fallback ke OpenAI langsung jika RAG error
+      console.log('🔄 [GUEST CONTROLLER] RAG error, falling back to direct OpenAI');
+      try {
+        const { generateAIResponse } = require('../services/openaiService');
+        const fallbackResponse = await generateAIResponse(message);
+        
+        return res.json({
+          success: true,
+          reply: fallbackResponse,
+          sessionId: currentSessionId,
+          timestamp: new Date().toISOString(),
+          fallback: true // ✅ INDIKATOR FALLBACK MODE
+        });
+      } catch (fallbackError) {
+        console.error('❌ [GUEST CONTROLLER] Fallback also failed:', fallbackError);
+      }
     }
+    
+    // Generic error response
+    res.status(500).json({
+      success: false,
+      message: "Chat service error",
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Terjadi kesalahan, silakan coba lagi.'
+    });
   }
 };
 
@@ -213,4 +232,4 @@ module.exports = {
   getGuestConversation,
   getGuestSessionInfo,
   clearGuestSession
-};  
+};
