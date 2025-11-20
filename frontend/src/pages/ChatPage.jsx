@@ -6,64 +6,55 @@ import { sendMessageToAI } from '../api/aiService';
 import { Plus, ArrowUp, MoreHorizontal, Trash2 } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Sidebar from '../components/layout/SideBar';
+import ChatMessage from '../components/chat/ChatMessage';
 
 // --- Komponen ChatWindow --- (TIDAK BERUBAH)
 const ChatWindow = ({ messages, isLoading, userName, isGuest = false }) => {
-    if (messages.length === 0 && !isLoading) {
-        return (
-            <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500">
-                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center m-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><path d="M4 14s1.5-1 4-1 4 1 4 1v3H4z" /><path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /><path d="M10 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /></svg>
-                </div>
-                <h2 className="text-lg font-semibold text-gray-700">
-                    {isGuest ? 'Selamat datang di Mode Tamu!' : (userName ? `Selamat datang, ${userName}!` : 'Mulai percakapan')}
-                </h2>
-                <p className="text-sm">Tanyakan apa saja tentang STMIK Tazkia</p>
-                {isGuest && (
-                    <p className="text-xs text-blue-500 mt-2">Login untuk menyimpan riwayat chat</p>
-                )}
-            </div>
-        );
-    }
-
+  if (messages.length === 0 && !isLoading) {
     return (
-        <div className="flex-1 p-4 md:p-8 space-y-4">
-            {messages.map((msg, index) => {
-                const isUser = msg.sender === 'user' || msg.role === 'user';
-                
-                return (
-                    <div
-                        key={index}
-                        className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
-                    >
-                        <div className={`max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl ${isUser ? 'ml-auto' : 'mr-auto'}`}>
-                            <div className={`p-3 md:p-4 rounded-3xl text-sm break-words ${
-                                isUser
-                                    ? 'bg-blue-500 text-white'
-                                    : 'text-gray-800'
-                                }`}>
-                                <p className="whitespace-pre-wrap">{msg.content}</p>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })}
-
-            {isLoading && (
-                <div className="flex justify-start">
-                    <div className="max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl mr-auto">
-                        <div className="p-3 text-gray-800 rounded-3xl">
-                            <div className="flex space-x-1">
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+      <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500">
+        <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center m-4">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500">
+            <path d="M4 14s1.5-1 4-1 4 1 4 1v3H4z" />
+            <path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+            <path d="M10 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+          </svg>
         </div>
+        <h2 className="text-lg font-semibold text-gray-700">
+          {isGuest ? 'Selamat datang di Mode Tamu!' : (userName ? `Selamat datang, ${userName}!` : 'Mulai percakapan')}
+        </h2>
+        <p className="text-sm">Tanyakan apa saja tentang STMIK Tazkia</p>
+        {isGuest && (
+          <p className="text-xs text-blue-500 mt-2">Login untuk menyimpan riwayat chat</p>
+        )}
+      </div>
     );
+  }
+
+  return (
+    <div className="flex-1 p-4 md:p-8 space-y-4">
+      {messages.map((msg, index) => (
+        <ChatMessage 
+          key={msg.id || index} 
+          message={msg}
+        />
+      ))}
+
+      {isLoading && (
+        <div className="flex justify-start">
+          <div className="max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl mr-auto">
+            <div className="p-3 text-gray-800 rounded-3xl">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // --- Komponen ChatInput --- (TIDAK BERUBAH)
@@ -459,44 +450,52 @@ const ChatPage = () => {
         }
     };
 
-    // ✅ PERBAIKAN KRITIS: Handle New Chat dengan loading state dan race condition prevention
+    // ✅ PERBAIKAN KRITIS: Handle New Chat dengan loading state dan race condition prevention - VERSI DIPERBAIKI
     const handleNewChat = useCallback(() => {
-        console.log('🔄 [CHAT PAGE] Starting new chat');
-        
-        // ✅ PERBAIKAN: Set loading state untuk mencegah race condition
-        setIsStartingNewChat(true);
-        initializationRef.current.isStartingNewChat = true;
-        
-        // Reset semua state ke kondisi awal
-        setMessages([]);
-        setCurrentChatId(null);
-        setIsNewChat(true);
-        setIsGuest(false);
-        
-        // ✅ PERBAIKAN PENTING: Reset flag initialization
-        initializationRef.current.hasProcessedInitialState = false;
-        initializationRef.current.isSelectingChat = false;
-        
-        // ✅ PERBAIKAN KRITIS: Clear location state untuk mencegah proses ulang
-        if (window.history.replaceState) {
-            window.history.replaceState({}, document.title, window.location.pathname);
-            console.log('🧹 [CHAT PAGE] Location state cleared after new chat');
-        }
-        
-        // Clear localStorage
+    console.log('🔄 [CHAT PAGE] Starting new chat');
+    
+    // ✅ PERBAIKAN 1: Set loading state dengan benar
+    setIsStartingNewChat(true);
+    initializationRef.current.isStartingNewChat = true;
+    
+    // ✅ PERBAIKAN 2: Reset SEMUA state dengan benar
+    setMessages([]);
+    setCurrentChatId(null);
+    setIsNewChat(true);
+    setIsGuest(false);
+    
+    // ✅ PERBAIKAN 3: Reset SEMUA flag initialization
+    initializationRef.current.hasProcessedInitialState = false;
+    initializationRef.current.isSelectingChat = false;
+    initializationRef.current.isStartingNewChat = true;
+    
+    // ✅ PERBAIKAN 4: Clear location state dengan metode yang lebih agresif
+    if (window.history.replaceState) {
+        const newState = { ...location.state };
+        delete newState.initialMessage;
+        delete newState.selectedChatId;
+        delete newState.isGuest;
+        window.history.replaceState(newState, document.title, window.location.pathname);
+        console.log('🧹 [CHAT PAGE] Location state aggressively cleared');
+    }
+    
+    // ✅ PERBAIKAN 5: Clear localStorage dengan timeout
+    setTimeout(() => {
         if (!isGuest) {
             localStorage.removeItem('chatpage_state');
         }
-        
-        console.log('✅ [CHAT PAGE] New chat state reset complete');
-        
-        // ✅ PERBAIKAN: Reset loading state setelah delay
-        setTimeout(() => {
-            setIsStartingNewChat(false);
-            initializationRef.current.isStartingNewChat = false;
-            console.log('🔄 [CHAT PAGE] New chat loading state reset');
-        }, 300);
-    }, [isGuest]);
+    }, 100);
+    
+    console.log('✅ [CHAT PAGE] New chat state reset complete');
+    
+    // ✅ PERBAIKAN 6: Reset loading state dengan timing yang LEBIH CEPAT
+    // Karena new chat sebenarnya hanya butuh reset state, tidak perlu loading lama
+    setTimeout(() => {
+        setIsStartingNewChat(false);
+        initializationRef.current.isStartingNewChat = false;
+        console.log('🔄 [CHAT PAGE] New chat loading state reset - IMMEDIATE');
+    }, 300); // ✅ PERBAIKAN: Kurangi dari 500ms ke 300ms
+}, [isGuest, location.state]);
 
     // ✅ PERBAIKAN: Handle Select Chat dari history dengan race condition prevention
     const handleSelectChat = useCallback(async (chatId) => {
@@ -563,8 +562,14 @@ const ChatPage = () => {
         console.log('Settings clicked');
     };
 
-    // ✅ PERBAIKAN UTAMA: EFFECT UNTUK PROSES INITIAL STATE DARI LANDING PAGE
+    // ✅ PERBAIKAN UTAMA: EFFECT UNTUK PROSES INITIAL STATE DARI LANDING PAGE - VERSI DIPERBAIKI
     useEffect(() => {
+        // ✅ PERBAIKAN: Skip jika sedang starting new chat
+        if (isStartingNewChat || initializationRef.current.isStartingNewChat) {
+            console.log('⏩ [CHAT PAGE] SKIPPING - Currently starting new chat');
+            return;
+        }
+
         // Skip jika sedang memilih chat dari sidebar
         if (initializationRef.current.isSelectingChat) {
             console.log('⏩ [CHAT PAGE] Skipping - currently selecting chat from sidebar');
@@ -574,12 +579,6 @@ const ChatPage = () => {
         // Skip jika sudah diproses
         if (initializationRef.current.hasProcessedInitialState) {
             console.log('⏩ [CHAT PAGE] Initial state already processed');
-            return;
-        }
-
-        // ✅ PERBAIKAN: Skip jika sedang starting new chat
-        if (isStartingNewChat || initializationRef.current.isStartingNewChat) {
-            console.log('⏩ [CHAT PAGE] Skipping - currently starting new chat');
             return;
         }
 
@@ -601,9 +600,9 @@ const ChatPage = () => {
                 isNewChat
             });
 
-            // ✅ PERBAIKAN: Skip jika ini new chat dan tidak ada initial state yang valid
-            if (isNewChat && !initialMessage && !selectedChatId && !guestFromState && !guestFromUrl) {
-                console.log('⏩ [CHAT PAGE] New chat with no initial state - skipping processing');
+            // ✅ PERBAIKAN PENTING: Jika ini new chat DAN tidak ada initial message, skip processing
+            if (isNewChat && !initialMessage && !selectedChatId) {
+                console.log('✅ [CHAT PAGE] New chat with no initial state - READY FOR NEW CHAT');
                 initializationRef.current.hasProcessedInitialState = true;
                 return;
             }
@@ -667,7 +666,7 @@ const ChatPage = () => {
 
         const timeoutId = setTimeout(() => {
             processInitialState();
-        }, 50);
+        }, 100); // ✅ PERBAIKAN: Increase delay sedikit
 
         return () => clearTimeout(timeoutId);
     }, [
@@ -694,7 +693,10 @@ const ChatPage = () => {
     useEffect(() => {
         if (initializationRef.current.hasProcessedInitialState && location.state) {
             console.log('🧹 [CHAT PAGE] Clearing location state after processing');
-            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+            // ✅ PERBAIKAN: Clear state lebih agresif
+            const newState = { ...location.state };
+            delete newState.initialMessage;
+            window.history.replaceState(newState, document.title, window.location.pathname + window.location.search);
         }
     }, [initializationRef.current.hasProcessedInitialState, location.state]);
 
