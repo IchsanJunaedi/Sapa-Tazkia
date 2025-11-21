@@ -753,16 +753,22 @@ const LandingPage = () => {
     if (message.trim()) {
       console.log('🔍 [LANDING PAGE] Sending message to chat page:', message.trim());
       
+      // ✅ PERBAIKAN: Clear input field immediately
+      const messageToSend = message.trim();
+      setMessage('');
+      
       // Simpan state navigation dengan benar
       const navigationState = {
-        initialMessage: message.trim(),
+        initialMessage: messageToSend,
         isGuest: !user,
-        timestamp: Date.now() // Untuk memastikan state selalu fresh
+        timestamp: Date.now(), // Untuk memastikan state selalu fresh
+        fromLandingPage: true // ✅ TAMBAHAN: Flag khusus untuk identifikasi dari landing page
       };
 
       // Navigate ke chat page dengan state
       navigate('/chat', { 
-        state: navigationState
+        state: navigationState,
+        replace: false // Biarkan replace: false agar user bisa kembali ke landing page
       });
     }
   };
