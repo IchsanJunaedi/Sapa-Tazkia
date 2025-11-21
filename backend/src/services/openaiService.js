@@ -9,93 +9,78 @@ const openai = new OpenAI({
 });
 
 /**
- * System Prompt Dasar (Persona Kia) - OPTIMIZED FOR SHORT ANSWERS
+ * System Prompt Dasar - OPTIMIZED FOR TOKENS
  */
-const BASE_SYSTEM_INSTRUCTION = `
-Anda adalah "Kia", asisten virtual resmi Universitas & STMIK Tazkia.
-Karakter: Ramah, Cerdas, Membantu, dan Islami.
+const BASE_SYSTEM_INSTRUCTION = `Anda adalah "Kia", asisten virtual Universitas Tazkia.
+Karakter: Ramah, Cerdas, Membantu, Islami.
 
-PANDUAN UMUM:
-- Gunakan bahasa Indonesia yang santun dan Islami
-- Gunakan "Afwan" untuk meminta maaf  
-- Gunakan "Alhamdulillah" untuk informasi positif
-- Balas salam dengan lengkap jika user mengucapkan salam
-
-ATURAN UTAMA:
-- Berikan jawaban yang AKURAT dan HELPFUL
-- Prioritaskan informasi yang paling relevan untuk user
-- Jika informasi tidak tersedia, arahkan ke sumber resmi
-`;
+ATURAN:
+- Gunakan bahasa Indonesia santun
+- Jawab SINGKAT (max 3 kalimat)
+- Fokus informasi paling relevan
+- Akhiri dengan penawaran bantuan lanjutan`;
 
 /**
- * TEMPLATE PENAWARAN BERDASARKAN JENIS PERTANYAAN
+ * TEMPLATE PENAWARAN - OPTIMIZED
  */
 const OFFER_TEMPLATES = {
-  // Template untuk pertanyaan definisi/konsep
   definition: [
-    "Apakah Anda ingin mengetahui ketentuan penting mengenai {topic} lebih lanjut?",
-    "Mau tahu prinsip-prinsip dasar {topic} dalam syariah?",
-    "Ingin saya jelaskan praktik penerapan {topic} di perbankan syariah?"
+    "Apakah ingin mengetahui ketentuan penting {topic} lebih lanjut?",
+    "Mau tahu prinsip dasar {topic} dalam syariah?",
+    "Ingin penjelasan praktik {topic} di perbankan syariah?"
   ],
   
-  // Template untuk pertanyaan lokasi/fasilitas
   location: [
-    "Apakah perlu informasi detail tentang fasilitas {topic}?",
-    "Mau tahu akses transportasi menuju {topic}?",
-    "Ingin informasi lengkap tentang jam operasional {topic}?"
+    "Perlu informasi detail fasilitas {topic}?",
+    "Mau tahu akses transportasi ke {topic}?",
+    "Ingin info jam operasional {topic}?"
   ],
   
-  // Template untuk pertanyaan program studi
   program: [
-    "Apakah ingin mengetahui prospek karir lulusan {topic}?",
-    "Mau tahu detail kurikulum dan mata kuliah {topic}?",
-    "Ingin informasi syarat pendaftaran {topic}?"
+    "Ingin tahu prospek karir lulusan {topic}?",
+    "Mau detail kurikulum {topic}?",
+    "Perlu informasi syarat pendaftaran {topic}?"
   ],
   
-  // Template untuk pertanyaan prosedur
   procedure: [
-    "Apakah perlu langkah-langkah detail {topic}?",
+    "Perlu langkah-langkah detail {topic}?",
     "Mau tahu dokumen yang diperlukan untuk {topic}?",
-    "Ingin informasi timeline proses {topic}?"
+    "Ingin informasi timeline {topic}?"
   ],
   
-  // Template umum
+  syariah: [
+    "Ingin mengetahui dalil dan fatwa {topic}?",
+    "Mau tahu penerapan {topic} dalam ekonomi syariah?",
+    "Perlu penjelasan prinsip syariah {topic}?"
+  ],
+  
   general: [
-    "Apakah Anda ingin mengetahui lebih detail tentang {topic}?",
-    "Mau saya jelaskan aspek lain dari {topic}?",
-    "Ingin informasi lengkap mengenai {topic}?"
+    "Apakah ingin mengetahui lebih detail tentang {topic}?",
+    "Mau saya jelaskan aspek lain {topic}?",
+    "Perlu informasi lengkap {topic}?"
   ]
 };
 
 /**
- * FALLBACK RESPONSES - VARIASI FORMAL & CASUAL
+ * FALLBACK RESPONSES - OPTIMIZED
  */
 const FALLBACK_RESPONSES = {
-  // ✅ FALLBACK FORMAL (default)
   formal: [
-    "Afwan, informasi tersebut belum tersedia dalam database pengetahuan saya saat ini. Untuk informasi lengkap, silakan hubungi Admin Kampus di 0821-84-800-600 atau kunjungi website resmi www.tazkia.ac.id.",
-    
-    "Afwan, saat ini informasi yang Anda tanyakan belum tersedia dalam sistem. Mohon hubungi Admin Kampus di nomor 0821-84-800-600 untuk bantuan lebih lanjut.",
-    
-    "Alhamdulillah, saya ingin membantu namun informasi spesifik tersebut sedang tidak tersedia. Silakan langsung konsultasi dengan Admin Kampus di 0821-84-800-600 untuk jawaban yang akurat."
+    "Afwan, informasi belum tersedia. Hubungi Admin Kampus di 0821-84-800-600.",
+    "Afwan, informasi sedang tidak tersedia. Silakan hubungi Admin Kampus 0821-84-800-600.",
+    "Alhamdulillah, saya ingin membantu namun informasi tidak tersedia. Hubungi Admin 0821-84-800-600."
   ],
   
-  // ✅ FALLBACK CASUAL (untuk user engagement)
   casual: [
-    "Wah, sepertinya informasi ini belum ada di databasenya Kia nih 😊 Tapi jangan khawatir! Langsung aja chat Admin Kampus di 0821-84-800-600, mereka pasti bisa bantu!",
-    
-    "Hmm, Kia belum punya info detail tentang ini nih. Tapi coba langsung tanya ke Admin Kampus di 0821-84-800-600, mereka solusinya! 🚀",
-    
-    "Nampaknya Kia perlu update database nih untuk pertanyaan ini 😅 Sambil itu, yuk langsung konsultasi dengan Admin Kampus di 0821-84-800-600, dijamin dapat jawaban lengkap!"
+    "Wah, info ini belum ada di Kia nih 😊 Langsung chat Admin di 0821-84-800-600 ya!",
+    "Hmm, Kia belum punya info detail. Coba tanya Admin di 0821-84-800-600! 🚀",
+    "Kia perlu update database nih 😅 Yuk konsultasi Admin di 0821-84-800-600!"
   ],
   
-  // ✅ FALLBACK PENDAFTAR (khusus calon mahasiswa)
   prospective: [
-    "Spesial untuk calon mahasiswa Tazkia! 🎓 Untuk info lengkapnya, langsung aja chat Admin Pendaftaran di 0821-84-800-600. Mereka siap bantu semua pertanyaan kamu!",
-    
-    "Wah, pertanyaan yang bagus nih! Biar dapat info yang super lengkap, yuk langsung hubungi Admin Pendaftaran di 0821-84-800-600. Dijamin semuanya jelas! ✨",
-    
-    "Hai calon mahasiswa Tazkia! 🎉 Kia sarankan langsung konsultasi dengan Admin di 0821-84-800-600 untuk informasi terupdate. Mereka expert banget soal ini!"
+    "Spesial calon mahasiswa! 🎓 Chat Admin Pendaftaran 0821-84-800-600 untuk info lengkap!",
+    "Wah, pertanyaan bagus! Yuk hubungi Admin 0821-84-800-600 untuk detailnya! ✨",
+    "Hai calon mahasiswa! 🎉 Konsultasi Admin di 0821-84-800-600 untuk info terupdate!"
   ]
 };
 
@@ -104,12 +89,10 @@ const FALLBACK_RESPONSES = {
  */
 async function createEmbedding(text) {
   try {
-    // Cek API Key
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY missing in environment variables');
     }
 
-    // Bersihkan teks untuk embedding yang lebih baik
     const cleanText = text.replace(/\n/g, " ").trim();
     
     console.log(`🧬 [OPENAI] Creating embedding for text (${cleanText.length} chars)...`);
@@ -129,7 +112,44 @@ async function createEmbedding(text) {
 }
 
 /**
- * 2. Generate AI Response - OPTIMIZED FOR SHORT ANSWERS + OFFERS + FALLBACK
+ * ✅ OPTIMASI: Enhanced Chat Completion untuk Intent Analysis
+ */
+async function chatCompletion(messages, options = {}) {
+  const defaultOptions = {
+    maxTokens: options.maxTokens || 150,
+    temperature: options.temperature || 0.1,
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    jsonMode: options.jsonMode || false
+  };
+
+  try {
+    const requestPayload = {
+      model: defaultOptions.model,
+      messages: messages,
+      max_tokens: defaultOptions.maxTokens,
+      temperature: defaultOptions.temperature
+    };
+
+    if (defaultOptions.jsonMode) {
+      requestPayload.response_format = { type: "json_object" };
+    }
+
+    const completion = await openai.chat.completions.create(requestPayload);
+    
+    if (completion.choices && completion.choices[0]) {
+      return completion.choices[0].message.content.trim();
+    } else {
+      throw new Error('Invalid response from OpenAI');
+    }
+    
+  } catch (error) {
+    console.error('❌ [OPENAI] Chat Completion Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * 2. Generate AI Response - OPTIMIZED FOR TOKENS + CONTEXT AWARENESS
  */
 async function generateAIResponse(userMessage, conversationHistory = [], customContext = null, options = {}) {
   try {
@@ -138,91 +158,46 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
     }
 
     const {
-      maxTokens = 600,
-      temperature = 0.2,
+      maxTokens = 350, // ✅ DIKURANGI LAGI
+      temperature = 0.1,
       isShortAnswer = true,
-      languageStyle = 'formal' // ✅ BARU: 'formal', 'casual', 'prospective'
+      languageStyle = 'formal',
+      hasGreeting = false,
+      isFollowUp = false,
+      userType = 'general'
     } = options;
 
     const modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini';
     
     console.log(`🤖 [OPENAI] Generating ${isShortAnswer ? 'SHORT' : 'DETAILED'} response (${languageStyle} style)...`);
 
-    // ✅ DETEKSI JENIS USER UNTUK FALLBACK YANG TEPAT
-    const userType = detectUserType(userMessage, conversationHistory);
-    const finalLanguageStyle = (languageStyle === 'formal' && userType === 'prospective') ? 'prospective' : languageStyle;
+    // ✅ DETEKSI JENIS USER & CONTEXT AWARENESS
+    const detectedUserType = userType || detectUserType(userMessage, conversationHistory);
+    const finalLanguageStyle = getOptimalLanguageStyle(languageStyle, detectedUserType, hasGreeting);
 
-    // ✅ PROMPT YANG DIOPTIMALKAN DENGAN FALLBACK & PENAWARAN
-    let systemPrompt = BASE_SYSTEM_INSTRUCTION;
-    
-    if (customContext) {
-      systemPrompt += `
+    // ✅ BUILD OPTIMIZED SYSTEM PROMPT
+    let systemPrompt = buildOptimizedSystemPrompt(
+      customContext, 
+      userMessage, 
+      finalLanguageStyle, 
+      detectedUserType,
+      hasGreeting,
+      isFollowUp,
+      conversationHistory
+    );
 
-INFORMASI KAMPUS TAZKIA UNTUK ANDA:
+    // Build messages array yang dioptimasi
+    const messages = buildOptimizedMessages(
+      systemPrompt, 
+      conversationHistory, 
+      userMessage, 
+      isFollowUp
+    );
 
-${customContext}
-
-**🔷 ATURAN KETAT UNTUK JAWABAN ANDA:**
-
-**📝 STRUKTUR WAJIB (MAX 3-4 KALIMAT):**
-1. **KALIMAT 1-2:** Jawaban inti yang singkat dan padat
-2. **KALIMAT 3:** Contoh/contoh praktis singkat (jika diperlukan)
-3. **KALIMAT TERAKHIR:** PENAWARAN untuk informasi lebih lanjut
-
-**🎯 CONTOH STRUKTUR YANG HARUS DIIKUTI:**
-- "Murabahah adalah jual beli dengan keuntungan yang disepakati. Bank membeli barang lalu menjual ke nasabah dengan markup. Apakah Anda ingin mengetahui ketentuan penting murabahah lebih lanjut?"
-- "Lokasi kampus di Sentul City Bogor, mudah diakses dari tol. Apakah perlu informasi fasilitas kampus atau program studi yang tersedia?"
-
-**💡 STRATEGI PENAWARAN WAJIB:**
-- SELALU akhiri dengan penawaran untuk informasi detail
-- Pilih jenis penawaran berdasarkan konteks pertanyaan
-- Gunakan template: "Apakah Anda ingin mengetahui [aspek] lebih lanjut?"
-
-**🚫 YANG TIDAK BOLEH DILAKUKAN:**
-- JANGAN berikan semua detail sekaligus
-- JANGAN buat list/poin-poin panjang 
-- JANGAN tulis lebih dari 4 kalimat tanpa penawaran
-
-**Tugas Anda:** BERIKAN JAWABAN SINGKAT + PENAWARAN LANJUTAN!
-`;
-    } else {
-      // ✅ FALLBACK PROMPT DENGAN VARIASI BAHASA
-      const fallbackTemplate = getFallbackTemplate(finalLanguageStyle, userType);
-      
-      systemPrompt += `
-
-INFORMASI:
-User bertanya: "${userMessage}"
-Jenis user terdeteksi: ${userType}
-
-**ATURAN JAWABAN FALLBACK:**
-1. Gunakan template yang sesuai dengan jenis user
-2. MAX 2-3 KALIMAT saja
-3. JANGAN berikan penawaran lanjutan (kecuali untuk prospective)
-4. Arahkan ke Admin Kampus di 0821-84-800-600
-
-**TEMPLATE YANG HARUS DIGUNAKAN:**
-${fallbackTemplate}
-
-**CONTOH RESPONSE YANG DIHARAPKAN:**
-"${fallbackTemplate}"
-`;
-    }
-
-    // Build messages array
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...conversationHistory.map(msg => ({
-        role: msg.role === 'bot' ? 'assistant' : msg.role,
-        content: msg.content
-      })),
-      { role: 'user', content: userMessage }
-    ];
-
-    // Log untuk debugging
+    // Optimized logging
     console.log(`📝 [OPENAI] Messages count: ${messages.length}`);
-    console.log(`👤 [OPENAI] User type: ${userType}, Language: ${finalLanguageStyle}`);
-    console.log(`🔍 [OPENAI] User query: "${userMessage}"`);
+    console.log(`👤 [OPENAI] User type: ${detectedUserType}, Language: ${finalLanguageStyle}`);
+    console.log(`🎯 [OPENAI] Context: hasGreeting=${hasGreeting}, isFollowUp=${isFollowUp}`);
     if (customContext) {
       console.log(`📄 [OPENAI] RAG context length: ${customContext.length} characters`);
     }
@@ -234,25 +209,26 @@ ${fallbackTemplate}
       max_tokens: maxTokens,
       temperature: temperature,
       top_p: 0.8,
-      frequency_penalty: 0.3,
-      presence_penalty: 0.2,
+      frequency_penalty: 0.2,
+      presence_penalty: 0.1,
       stop: ["\n\n", "---", "===="]
     });
 
     const aiReply = completion.choices[0].message.content.trim();
 
-    // Log monitoring detail
+    // Optimized monitoring
     console.log('✅ [OPENAI] Response generated:', {
       model: modelName,
       tokens: completion.usage?.total_tokens || 0,
       hasContext: !!customContext,
       replyLength: aiReply.length,
       isShort: isShortAnswer,
-      userType: userType,
+      userType: detectedUserType,
       languageStyle: finalLanguageStyle,
       wordCount: aiReply.split(' ').length,
-      hasOffer: aiReply.includes('?') && (aiReply.includes('ingin') || aiReply.includes('mau') || aiReply.includes('apakah')),
-      first100chars: aiReply.substring(0, 100) + '...'
+      hasOffer: hasOfferPhrase(aiReply),
+      hasGreeting: hasGreeting,
+      isFollowUp: isFollowUp
     });
 
     return aiReply;
@@ -260,14 +236,102 @@ ${fallbackTemplate}
   } catch (error) {
     console.error('❌ [OPENAI] Error generating response:', error);
     
-    // ✅ FALLBACK ERROR YANG LEBIH BAik
-    const randomFormal = FALLBACK_RESPONSES.formal[Math.floor(Math.random() * FALLBACK_RESPONSES.formal.length)];
-    return randomFormal;
+    return getContextAwareFallback(options);
   }
 }
 
 /**
- * ✅ FUNGSI BARU: Deteksi Jenis User
+ * ✅ OPTIMASI: Build Optimized System Prompt (TOKEN EFFICIENT)
+ */
+function buildOptimizedSystemPrompt(customContext, userMessage, languageStyle, userType, hasGreeting, isFollowUp, conversationHistory) {
+  // Base prompt yang sangat efisien
+  let systemPrompt = BASE_SYSTEM_INSTRUCTION;
+  
+  // Context hints yang super singkat
+  if (hasGreeting) systemPrompt += `\n- User memulai dengan greeting, respon ramah`;
+  if (isFollowUp) systemPrompt += `\n- Ini follow-up, pertimbangkan percakapan sebelumnya`;
+  if (userType === 'engaged') systemPrompt += `\n- User engaged, gunakan gaya personal`;
+  if (userType === 'prospective') systemPrompt += `\n- User calon mahasiswa, beri info encouraging`;
+
+  if (customContext) {
+    // ✅ OPTIMASI DRAMATIS: Prompt yang jauh lebih singkat
+    systemPrompt += `\n\nKONTEKS TAZKIA:\n${customContext}\n\nCONTOH: "Murabahah jual beli syariah. Apakah ingin tahu detailnya?"`;
+  } else {
+    const fallback = getFallbackTemplate(languageStyle, userType);
+    systemPrompt += `\n\nJIKA TIDAK TAHU: "${fallback}"`;
+  }
+  
+  return systemPrompt;
+}
+
+/**
+ * ✅ OPTIMASI: Build Optimized Messages (TOKEN EFFICIENT)
+ */
+function buildOptimizedMessages(systemPrompt, conversationHistory, userMessage, isFollowUp) {
+  const messages = [{ role: 'system', content: systemPrompt }];
+  
+  // ✅ OPTIMASI: Hanya tambahkan 1-2 message history untuk follow-up
+  if (isFollowUp && conversationHistory.length > 0) {
+    const recentHistory = conversationHistory.slice(-2); // Hanya 2 message terakhir
+    messages.push(...recentHistory.map(msg => ({
+      role: msg.role === 'bot' ? 'assistant' : msg.role,
+      content: msg.content.length > 100 ? msg.content.substring(0, 100) + '...' : msg.content
+    })));
+  } else if (conversationHistory.length > 0) {
+    // Untuk regular questions, tambahkan 1 message terakhir saja
+    const lastMessage = conversationHistory.slice(-1);
+    messages.push(...lastMessage.map(msg => ({
+      role: msg.role === 'bot' ? 'assistant' : msg.role,
+      content: msg.content.length > 80 ? msg.content.substring(0, 80) + '...' : msg.content
+    })));
+  }
+  
+  messages.push({ role: 'user', content: userMessage });
+  
+  return messages;
+}
+
+/**
+ * ✅ OPTIMASI: Get Optimal Language Style
+ */
+function getOptimalLanguageStyle(baseStyle, userType, hasGreeting) {
+  if (userType === 'prospective') return 'prospective';
+  if (userType === 'engaged') return 'casual';
+  if (hasGreeting && baseStyle === 'formal') return 'casual';
+  return baseStyle;
+}
+
+/**
+ * ✅ OPTIMASI: Context-Aware Fallback
+ */
+function getContextAwareFallback(options) {
+  const { languageStyle = 'formal', userType = 'general', hasGreeting = false } = options;
+  
+  let fallbackStyle = languageStyle;
+  if (hasGreeting && languageStyle === 'formal') {
+    fallbackStyle = 'casual';
+  }
+  
+  const templates = FALLBACK_RESPONSES[userType] || FALLBACK_RESPONSES[fallbackStyle] || FALLBACK_RESPONSES.formal;
+  return templates[Math.floor(Math.random() * templates.length)];
+}
+
+/**
+ * ✅ OPTIMASI: Check if response has offer phrase
+ */
+function hasOfferPhrase(response) {
+  const offerIndicators = [
+    'ingin', 'mau', 'apakah', 'butuh', 'perlu', 'bisa', 'boleh',
+    'ingin tahu', 'mau tahu', 'apakah perlu', 'apakah ingin'
+  ];
+  
+  return offerIndicators.some(indicator => 
+    response.toLowerCase().includes(indicator) && response.includes('?')
+  );
+}
+
+/**
+ * ✅ OPTIMASI: Deteksi Jenis User dengan Enhanced Logic
  */
 function detectUserType(userMessage, conversationHistory) {
   const message = userMessage.toLowerCase();
@@ -277,13 +341,13 @@ function detectUserType(userMessage, conversationHistory) {
   const prospectiveKeywords = [
     'pendaftaran', 'daftar', 'registrasi', 'mahasiswa baru', 'calon mahasiswa', 
     'syarat daftar', 'biaya kuliah', 'jurusan apa', 'pilih prodi', 'test masuk',
-    'beasiswa', 'uang pangkal', 'registrasi ulang'
+    'beasiswa', 'uang pangkal', 'registrasi ulang', 'penerimaan', 'seleksi'
   ];
   
   // Keyword untuk user engaged
   const engagedKeywords = [
     'thanks', 'thank you', 'makasih', 'terima kasih', 'keren', 'bagus', 'helpful',
-    'mantap', 'oke', 'good', 'nice', 'sip', 'oke banget'
+    'mantap', 'oke', 'good', 'nice', 'sip', 'oke banget', 'wow', 'awesome'
   ];
   
   const isProspective = prospectiveKeywords.some(keyword => 
@@ -300,12 +364,17 @@ function detectUserType(userMessage, conversationHistory) {
 }
 
 /**
- * ✅ FUNGSI BARU: Get Fallback Template
+ * ✅ OPTIMASI: Get Fallback Template dengan Enhanced Logic
  */
 function getFallbackTemplate(languageStyle, userType) {
-  // Prioritaskan prospective style jika terdeteksi
+  // Prioritaskan user type detection
   if (userType === 'prospective') {
     const templates = FALLBACK_RESPONSES.prospective;
+    return templates[Math.floor(Math.random() * templates.length)];
+  }
+  
+  if (userType === 'engaged') {
+    const templates = FALLBACK_RESPONSES.casual;
     return templates[Math.floor(Math.random() * templates.length)];
   }
   
@@ -315,23 +384,29 @@ function getFallbackTemplate(languageStyle, userType) {
 }
 
 /**
- * ✅ FUNGSI BARU: Generate Offer Phrase
+ * ✅ OPTIMASI: Generate Offer Phrase dengan Context Awareness
  */
-function generateOfferPhrase(topic, questionType = 'general') {
+function generateOfferPhrase(topic, questionType = 'general', userType = 'general') {
   const templates = OFFER_TEMPLATES[questionType] || OFFER_TEMPLATES.general;
   const template = templates[Math.floor(Math.random() * templates.length)];
-  return template.replace('{topic}', topic);
+  
+  let finalTopic = topic;
+  if (userType === 'prospective' && questionType === 'program') {
+    finalTopic = 'program studi ini';
+  }
+  
+  return template.replace('{topic}', finalTopic);
 }
 
 /**
- * 3. Test OpenAI Connection - ENHANCED
+ * 3. Test OpenAI Connection - OPTIMIZED
  */
 async function testOpenAIConnection() {
   try {
     if (!process.env.OPENAI_API_KEY) {
       return { 
         success: false, 
-        error: 'OPENAI_API_KEY tidak ditemukan di environment variables' 
+        error: 'OPENAI_API_KEY tidak ditemukan' 
       };
     }
 
@@ -342,10 +417,10 @@ async function testOpenAIConnection() {
       messages: [
         { 
           role: 'user', 
-          content: 'Jawab dengan singkat: Assalamualaikum, apa kabar?' 
+          content: 'Jawab singkat: Assalamualaikum' 
         }
       ],
-      max_tokens: 30,
+      max_tokens: 20,
       temperature: 0.1
     });
 
@@ -375,20 +450,8 @@ async function testOpenAIConnection() {
  */
 async function analyzeAcademicContent(content) {
   try {
-    const prompt = `
-Analisis konten akademik berikut dan berikan insight yang helpful:
-
-${content}
-
-Berikan analisis yang:
-- Jelas dan terstruktur
-- Berfokus pada poin-poin penting  
-- Membantu dalam memahami materi
-- Dalam bahasa Indonesia yang baik
-`;
-
+    const prompt = `Analisis konten akademik berikut:\n\n${content}\n\nBerikan insight yang helpful dan terstruktur.`;
     return await generateAIResponse(prompt, [], null);
-
   } catch (error) {
     console.error('❌ [OPENAI] Error analyzing academic content:', error);
     throw new Error('Gagal menganalisis konten akademik: ' + error.message);
@@ -396,7 +459,7 @@ Berikan analisis yang:
 }
 
 /**
- * 5. Test Embedding Function - untuk debugging
+ * 5. Test Embedding Function - OPTIMIZED
  */
 async function testEmbedding() {
   try {
@@ -422,15 +485,15 @@ async function testEmbedding() {
 }
 
 /**
- * 6. Test RAG Response - untuk debugging RAG khusus
+ * 6. Test RAG Response - OPTIMIZED
  */
 async function testRAGResponse(userMessage, customContext) {
   try {
     console.log('🧪 [OPENAI] Testing RAG response...');
     
     const response = await generateAIResponse(userMessage, [], customContext, {
-      maxTokens: 600,
-      temperature: 0.2,
+      maxTokens: 300,
+      temperature: 0.1,
       isShortAnswer: true
     });
     
@@ -442,7 +505,7 @@ async function testRAGResponse(userMessage, customContext) {
       contextLength: customContext ? customContext.length : 0,
       replyLength: response.length,
       wordCount: response.split(' ').length,
-      hasOffer: response.includes('?') && (response.includes('ingin') || response.includes('mau') || response.includes('apakah'))
+      hasOffer: hasOfferPhrase(response)
     };
     
   } catch (error) {
@@ -455,14 +518,14 @@ async function testRAGResponse(userMessage, customContext) {
 }
 
 /**
- * 7. Test Short Answer - khusus testing jawaban singkat
+ * 7. Test Short Answer - OPTIMIZED
  */
 async function testShortAnswer(userMessage, customContext = null) {
   try {
     console.log('🧪 [OPENAI] Testing SHORT answer response...');
     
     const response = await generateAIResponse(userMessage, [], customContext, {
-      maxTokens: 400,
+      maxTokens: 250,
       temperature: 0.1,
       isShortAnswer: true
     });
@@ -474,8 +537,8 @@ async function testShortAnswer(userMessage, customContext = null) {
       contextUsed: !!customContext,
       replyLength: response.length,
       wordCount: response.split(' ').length,
-      isShort: response.length <= 600,
-      hasOffer: response.includes('?') && (response.includes('ingin') || response.includes('mau') || response.includes('apakah'))
+      isShort: response.length <= 300,
+      hasOffer: hasOfferPhrase(response)
     };
     
   } catch (error) {
@@ -488,33 +551,39 @@ async function testShortAnswer(userMessage, customContext = null) {
 }
 
 /**
- * 8. ✅ FUNGSI BARU: Test Fallback Responses
+ * 8. Test Context-Aware Responses - OPTIMIZED
  */
-async function testFallbackResponses() {
+async function testContextAwareResponses() {
   try {
-    console.log('🧪 [OPENAI] Testing fallback responses...');
+    console.log('🧪 [OPENAI] Testing context-aware responses...');
     
     const testCases = [
-      { message: "Apa syarat beasiswa?", type: "prospective" },
-      { message: "Bagaimana cara daftar ulang?", type: "prospective" },
-      { message: "Fasilitas apa saja?", type: "general" },
-      { message: "Thanks atas bantuannya!", type: "engaged" }
+      { 
+        message: "Halo, mau tanya prodi", 
+        options: { hasGreeting: true, userType: 'prospective' } 
+      },
+      { 
+        message: "Thanks infonya!", 
+        options: { userType: 'engaged', languageStyle: 'casual' } 
+      }
     ];
     
     const results = [];
     
     for (const testCase of testCases) {
-      const response = await generateAIResponse(testCase.message, [], null, {
-        maxTokens: 300,
-        isShortAnswer: true,
-        languageStyle: 'formal'
-      });
+      const response = await generateAIResponse(
+        testCase.message, 
+        [], 
+        null, 
+        testCase.options
+      );
       
       results.push({
         testCase: testCase,
         response: response,
         length: response.length,
-        userType: detectUserType(testCase.message, [])
+        wordCount: response.split(' ').length,
+        hasOffer: hasOfferPhrase(response)
       });
     }
     
@@ -524,7 +593,7 @@ async function testFallbackResponses() {
     };
     
   } catch (error) {
-    console.error('❌ [OPENAI] Fallback test failed:', error);
+    console.error('❌ [OPENAI] Context-aware test failed:', error);
     return {
       success: false,
       error: error.message
@@ -535,12 +604,14 @@ async function testFallbackResponses() {
 module.exports = {
   generateAIResponse,
   createEmbedding,
+  chatCompletion, 
   testOpenAIConnection,
   analyzeAcademicContent,
   testEmbedding,
   testRAGResponse,
   testShortAnswer,
-  testFallbackResponses, 
+  testContextAwareResponses, 
   detectUserType, 
-  generateOfferPhrase 
+  generateOfferPhrase,
+  hasOfferPhrase 
 };

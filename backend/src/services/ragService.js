@@ -22,11 +22,718 @@ const client = new QdrantClient({ host: QDRANT_HOST, port: QDRANT_PORT });
 class RagService {
   
   constructor() {
+    // ✅ PERBAIKAN: Conversation Memory untuk Context Awareness
+    this.conversationMemory = new Map();
+    
+    // ✅ PERBAIKAN: Dynamic Keyword Learning untuk Scalability
+    this.learnedKeywords = new Set([
+      'halo', 'hai', 'hi', 'hello', 'assalamualaikum', 'salam', 
+      'pagi', 'siang', 'sore', 'malam', 'selamat', 'hey', 'hei',
+      'test', 'tes', 'coba', 'p', 'cek', 'woy', 'hola', 'bro',
+      'sis', 'bang', 'mas', 'mbak', 'dek'
+    ]);
+    
     this.ensureCollection();
   }
 
   // =============================================================================
-  // ✅ QUERY EXPANSION OPTIMIZED UNTUK BAHASA INDONESIA
+  // ✅ PERBAIKAN 1 & 4: HYBRID GREETING DETECTION SYSTEM
+  // =============================================================================
+
+  /**
+   * ✅ PERBAIKAN: Hybrid Detection - AI + Rules (Mengatasi Rule-based Rigid & Tidak Scalable)
+   */
+  async detectGreetingType(userMessage, conversationHistory = [], userId = 'default') {
+    const cleanMessage = userMessage.toLowerCase().trim();
+    
+    // 1. Fast Rule-based Pre-check (untuk performance)
+    const ruleBasedResult = this.ruleBasedGreetingCheck(cleanMessage);
+    if (ruleBasedResult.confidence > 0.9) {
+      return ruleBasedResult;
+    }
+    
+    // 2. AI-Powered Analysis (untuk accuracy dan scalability)
+    const aiResult = await this.aiGreetingAnalysis(userMessage, conversationHistory, userId);
+    
+    // 3. Hybrid Decision Making
+    return this.hybridDecision(ruleBasedResult, aiResult);
+  }
+
+  /**
+   * ✅ PERBAIKAN: Enhanced Rule-based Check dengan False Positive Reduction
+   */
+  ruleBasedGreetingCheck(message) {
+    const words = message.split(/\s+/).filter(word => word.length > 1);
+    
+    // Pure greeting detection
+    const pureGreetingWords = words.filter(word => this.learnedKeywords.has(word));
+    const greetingRatio = pureGreetingWords.length / words.length;
+    
+    // Content detection dengan false positive reduction
+    const hasContent = words.some(word => 
+      !this.learnedKeywords.has(word) && 
+      word.length > 2 &&
+      !this.isFillerWord(word) &&
+      this.hasSubstantiveContent(word, message)
+    );
+    
+    let type, confidence;
+    
+    // ✅ PERBAIKAN: Enhanced logic untuk mengurangi false positive
+    if (words.length <= 2 && pureGreetingWords.length === words.length) {
+      type = 'PURE_GREETING';
+      confidence = 0.95;
+    } else if (greetingRatio > 0.7 && !hasContent) {
+      type = 'PURE_GREETING';
+      confidence = 0.85;
+    } else if (greetingRatio > 0.3 && hasContent) {
+      type = 'GREETING_WITH_QUESTION';
+      confidence = 0.75;
+    } else if (greetingRatio > 0.1) {
+      type = 'REGULAR_WITH_GREETING';
+      confidence = 0.6;
+    } else {
+      type = 'REGULAR_QUESTION';
+      confidence = 0.9;
+    }
+    
+    return { type, confidence, method: 'rule_based' };
+  }
+
+  /**
+   * ✅ PERBAIKAN: AI-Powered Analysis untuk cases yang complex
+   */
+  async aiGreetingAnalysis(userMessage, conversationHistory, userId) {
+    try {
+      const context = this.getConversationContext(userId);
+      
+      const prompt = `
+      ANALISIS INTENT PESAN:
+      
+      Pesan: "${userMessage}"
+      Context sebelumnya: ${context.lastTopics.join(', ') || 'tidak ada'}
+      Panjang percakapan: ${context.messageCount} pesan
+      
+      Tentukan jenis intent:
+      1. PURE_GREETING - Hanya sapaan tanpa konten substantive
+      2. GREETING_WITH_QUESTION - Sapaan + pertanyaan jelas
+      3. REGULAR_WITH_GREETING - Pertanyaan biasa dengan kata sapaan
+      4. REGULAR_QUESTION - Pertanyaan biasa tanpa sapaan
+      5. FOLLOW_UP - Kelanjutan dari topik sebelumnya
+      
+      Respond dengan JSON: 
+      {
+        "type": "PURE_GREETING",
+        "confidence": 0.95,
+        "reason": "Hanya berisi kata sapaan tanpa pertanyaan",
+        "extracted_question": null
+      }
+      `;
+      
+      const response = await openaiService.chatCompletion([
+        { role: "system", content: "Anda adalah AI classifier untuk intent percakapan. Analisis dengan teliti." },
+        { role: "user", content: prompt }
+      ], { 
+        maxTokens: 150, 
+        temperature: 0.1
+      });
+      
+      // Parse JSON response
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const result = jsonMatch ? JSON.parse(jsonMatch[0]) : { type: 'REGULAR_QUESTION', confidence: 0.7 };
+      result.method = 'ai_powered';
+      
+      // ✅ PERBAIKAN: Learning - Update keywords dari AI analysis
+      this.updateLearnedKeywords(userMessage, result.type);
+      
+      return result;
+      
+    } catch (error) {
+      console.log('❌ AI analysis failed, using rule-based fallback:', error.message);
+      return this.ruleBasedGreetingCheck(userMessage);
+    }
+  }
+
+  /**
+   * ✅ PERBAIKAN: Hybrid Decision Maker
+   */
+  hybridDecision(ruleResult, aiResult) {
+    // Jika AI confidence tinggi, prioritaskan AI
+    if (aiResult.confidence > 0.8 && aiResult.method === 'ai_powered') {
+      return aiResult;
+    }
+    
+    // Jika rule-based sangat confident, gunakan rules
+    if (ruleResult.confidence > 0.9) {
+      return ruleResult;
+    }
+    
+    // Weighted average untuk cases di tengah
+    const ruleWeight = 0.4;
+    const aiWeight = 0.6;
+    
+    const finalConfidence = (ruleResult.confidence * ruleWeight) + (aiResult.confidence * aiWeight);
+    
+    // Pilih type berdasarkan confidence tertinggi
+    let finalType = ruleResult.confidence > aiResult.confidence ? ruleResult.type : aiResult.type;
+    
+    return {
+      type: finalType,
+      confidence: finalConfidence,
+      method: 'hybrid',
+      components: { rule_based: ruleResult, ai_powered: aiResult }
+    };
+  }
+
+  // =============================================================================
+  // ✅ PERBAIKAN 2: CONTEXT AWARENESS SYSTEM
+  // =============================================================================
+
+  /**
+   * ✅ PERBAIKAN: Conversation Memory Management
+   */
+  updateConversationMemory(userId, userMessage, response, intent) {
+    if (!this.conversationMemory.has(userId)) {
+      this.conversationMemory.set(userId, {
+        messages: [],
+        topics: [],
+        lastInteraction: Date.now(),
+        questionCount: 0,
+        userType: 'general'
+      });
+    }
+    
+    const userMemory = this.conversationMemory.get(userId);
+    
+    // Add new message
+    userMemory.messages.push({
+      content: userMessage,
+      intent: intent,
+      timestamp: Date.now(),
+      response: response
+    });
+    
+    // Keep only last 20 messages
+    if (userMemory.messages.length > 20) {
+      userMemory.messages = userMemory.messages.slice(-20);
+    }
+    
+    // Extract and update topics
+    const newTopics = this.extractTopics(userMessage);
+    userMemory.topics = [...new Set([...userMemory.topics, ...newTopics])].slice(-10);
+    
+    // Update counters
+    if (intent.type !== 'PURE_GREETING') {
+      userMemory.questionCount++;
+    }
+    
+    userMemory.lastInteraction = Date.now();
+    
+    // Update user type based on engagement
+    userMemory.userType = this.determineUserType(userMemory);
+  }
+
+  /**
+   * ✅ PERBAIKAN: Get Conversation Context
+   */
+  getConversationContext(userId) {
+    const defaultContext = {
+      lastTopics: [],
+      messageCount: 0,
+      lastInteraction: null,
+      questionCount: 0,
+      userType: 'general'
+    };
+    
+    if (!this.conversationMemory.has(userId)) {
+      return defaultContext;
+    }
+    
+    const memory = this.conversationMemory.get(userId);
+    const recentMessages = memory.messages.slice(-5);
+    
+    return {
+      lastTopics: memory.topics.slice(-3),
+      messageCount: memory.messages.length,
+      lastInteraction: memory.lastInteraction,
+      questionCount: memory.questionCount,
+      userType: memory.userType,
+      recentMessages: recentMessages.map(m => ({
+        content: m.content.substring(0, 50) + '...',
+        intent: m.intent?.type
+      }))
+    };
+  }
+
+  /**
+   * ✅ PERBAIKAN: Smart Topic Extraction
+   */
+  extractTopics(message) {
+    const topics = [];
+    const lowerMessage = message.toLowerCase();
+    
+    // Topic keywords
+    const topicKeywords = {
+      'prodi': ['prodi', 'program studi', 'jurusan', 'fakultas'],
+      'lokasi': ['lokasi', 'alamat', 'dimana', 'alamat kampus'],
+      'beasiswa': ['beasiswa', 'biaya', 'uang kuliah', 'biaya kuliah'],
+      'pendaftaran': ['daftar', 'pendaftaran', 'syarat', 'registrasi'],
+      'murabahah': ['murabahah', 'syariah', 'riba', 'ekonomi islam'],
+      'kontak': ['kontak', 'telepon', 'hp', 'whatsapp', 'hubungi']
+    };
+    
+    Object.entries(topicKeywords).forEach(([topic, keywords]) => {
+      if (keywords.some(keyword => lowerMessage.includes(keyword))) {
+        topics.push(topic);
+      }
+    });
+    
+    return topics;
+  }
+
+  /**
+   * ✅ PERBAIKAN: Determine User Type dengan Context
+   */
+  determineUserType(userMemory) {
+    if (userMemory.messages.length < 2) return 'general';
+    
+    const recentMessages = userMemory.messages.slice(-3);
+    const engagementSignals = recentMessages.filter(msg => 
+      this.isEngagedUserMessage(msg.content) || 
+      msg.intent?.type === 'FOLLOW_UP'
+    );
+    
+    if (engagementSignals.length >= 2 || userMemory.questionCount >= 3) {
+      return 'engaged';
+    }
+    
+    return 'general';
+  }
+
+  // =============================================================================
+  // ✅ PERBAIKAN 3: FALSE POSITIVE REDUCTION
+  // =============================================================================
+
+  /**
+   * ✅ PERBAIKAN: Enhanced Greeting Detection dengan False Positive Reduction
+   */
+  async enhancedGreetingDetection(userMessage, userId = 'default') {
+    const context = this.getConversationContext(userId);
+    
+    // Check jika ini follow-up dari greeting sebelumnya
+    if (this.isFollowUpGreeting(userMessage, context)) {
+      return {
+        type: 'FOLLOW_UP',
+        confidence: 0.8,
+        method: 'context_aware'
+      };
+    }
+    
+    // Hybrid detection
+    const intent = await this.detectGreetingType(userMessage, [], userId);
+    
+    // False positive reduction rules
+    return this.applyFalsePositiveRules(intent, userMessage, context);
+  }
+
+  /**
+   * ✅ PERBAIKAN: Apply False Positive Reduction Rules
+   */
+  applyFalsePositiveRules(intent, message, context) {
+    let adjustedIntent = { ...intent };
+    
+    // Rule 1: Jika ada question words, likely bukan pure greeting
+    const questionWords = ['apa', 'bagaimana', 'dimana', 'kapan', 'berapa', 'siapa', 'bisa', 'mau', 'ingin'];
+    const hasQuestionWord = questionWords.some(word => message.toLowerCase().includes(word));
+    
+    if (intent.type === 'PURE_GREETING' && hasQuestionWord) {
+      adjustedIntent.type = 'GREETING_WITH_QUESTION';
+      adjustedIntent.confidence *= 0.7;
+      adjustedIntent.falsePositiveFix = 'question_word_detected';
+    }
+    
+    // Rule 2: Jika dalam context panjang, likely follow-up
+    if (context.messageCount > 2 && intent.type === 'PURE_GREETING') {
+      adjustedIntent.type = 'FOLLOW_UP_GREETING';
+      adjustedIntent.confidence = 0.7;
+      adjustedIntent.falsePositiveFix = 'conversation_context';
+    }
+    
+    // Rule 3: Check untuk common false positive patterns
+    const falsePositivePatterns = [
+      { pattern: /halo mau tanya/i, correctType: 'GREETING_WITH_QUESTION' },
+      { pattern: /hai (bang|mas|mbak|sis) mau nanya/i, correctType: 'GREETING_WITH_QUESTION' },
+      { pattern: /assalamualaikum (bang|mas|mbak|sis)/i, correctType: 'GREETING_WITH_QUESTION' },
+      { pattern: /test test/i, correctType: 'PURE_GREETING' },
+      { pattern: /cek cek/i, correctType: 'PURE_GREETING' }
+    ];
+    
+    falsePositivePatterns.forEach(fp => {
+      if (fp.pattern.test(message) && intent.type !== fp.correctType) {
+        adjustedIntent.type = fp.correctType;
+        adjustedIntent.confidence = 0.9;
+        adjustedIntent.falsePositiveFix = 'pattern_matching';
+      }
+    });
+    
+    return adjustedIntent;
+  }
+
+  /**
+   * ✅ PERBAIKAN: Check Follow-up Greeting
+   */
+  isFollowUpGreeting(message, context) {
+    if (context.messageCount === 0) return false;
+    
+    const timeSinceLast = Date.now() - context.lastInteraction;
+    const isQuickReply = timeSinceLast < 300000; // 5 minutes
+    
+    const lastMessage = context.recentMessages[context.recentMessages.length - 1];
+    const lastWasGreeting = lastMessage?.intent === 'PURE_GREETING';
+    
+    return isQuickReply && lastWasGreeting && this.isSimpleGreeting(message);
+  }
+
+  // =============================================================================
+  // ✅ ENHANCED ANSWER QUESTION METHOD (MAIN METHOD)
+  // =============================================================================
+
+  /**
+   * ✅ PERBAIKAN UTAMA: Enhanced Answer Question dengan semua improvements
+   */
+  async answerQuestion(userMessage, conversationHistory = [], options = {}, userId = 'default') {
+    const startTime = performance.now();
+    
+    try {
+      console.log(`\n💬 [RAG-ENHANCED] Processing: "${userMessage}"`);
+      
+      // 1. Enhanced Greeting Detection dengan context awareness
+      const intent = await this.enhancedGreetingDetection(userMessage, userId);
+      console.log(`🎯 [RAG] Intent: ${intent.type} (${intent.confidence.toFixed(2)}) [${intent.method}]`);
+      
+      // 2. Update conversation memory untuk context awareness
+      this.updateConversationMemory(userId, userMessage, null, intent);
+      
+      // 3. Handle berdasarkan intent type
+      switch (intent.type) {
+        case 'PURE_GREETING':
+          return await this.handlePureGreeting(userMessage, userId, startTime);
+          
+        case 'GREETING_WITH_QUESTION':
+          return await this.handleGreetingWithQuestion(userMessage, userId, startTime);
+          
+        case 'FOLLOW_UP':
+        case 'FOLLOW_UP_GREETING':
+          return await this.handleFollowUpQuestion(userMessage, conversationHistory, userId, startTime);
+          
+        default:
+          return await this.handleRegularQuestion(userMessage, conversationHistory, userId, startTime, intent);
+      }
+      
+    } catch (error) {
+      console.error('❌ [RAG-ENHANCED] Error:', error);
+      return this.getErrorResponse();
+    }
+  }
+
+  /**
+   * ✅ Handle Pure Greeting dengan Context Awareness
+   */
+  async handlePureGreeting(userMessage, userId, startTime) {
+    const context = this.getConversationContext(userId);
+    const userType = context.userType;
+    
+    console.log('👋 [RAG] Pure greeting - using context-aware response');
+    
+    const response = this.getContextAwareGreeting(userMessage, userType, context);
+    
+    // Update memory dengan response
+    this.updateConversationMemory(userId, userMessage, response, { type: 'PURE_GREETING' });
+    
+    const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+    console.log(`🚀 [RAG] Pure greeting response completed in ${duration}s`);
+    
+    return response;
+  }
+
+  /**
+   * ✅ Handle Greeting with Question
+   */
+  async handleGreetingWithQuestion(userMessage, userId, startTime) {
+    console.log('🔍 [RAG] Greeting with question - extracting question...');
+    
+    // Extract pertanyaan dari greeting
+    const extractedQuestion = await this.extractQuestionFromGreeting(userMessage);
+    console.log(`📝 [RAG] Extracted question: "${extractedQuestion}"`);
+    
+    // Process seperti regular question tapi dengan gaya yang lebih friendly
+    const context = this.getConversationContext(userId);
+    const relevantDocs = await this.searchRelevantDocs(extractedQuestion);
+    const contextString = this.compileContext(relevantDocs);
+    
+    const aiReply = await openaiService.generateAIResponse(
+      extractedQuestion, 
+      [], 
+      contextString, 
+      {
+        maxTokens: 400,  
+        temperature: 0.1, 
+        isShortAnswer: true,
+        languageStyle: 'casual',
+        hasGreeting: true
+      }
+    );
+    
+    this.updateConversationMemory(userId, userMessage, aiReply, { type: 'GREETING_WITH_QUESTION' });
+    
+    const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+    console.log(`🚀 [RAG] Greeting with question completed in ${duration}s`);
+    
+    return aiReply;
+  }
+
+  /**
+   * ✅ Handle Follow-up Question
+   */
+  async handleFollowUpQuestion(userMessage, conversationHistory, userId, startTime) {
+    console.log('🔄 [RAG] Follow-up question - using conversation context');
+    
+    const context = this.getConversationContext(userId);
+    const relevantDocs = await this.searchRelevantDocs(userMessage);
+    const contextString = this.compileContext(relevantDocs);
+    
+    const aiReply = await openaiService.generateAIResponse(
+      userMessage, 
+      conversationHistory, 
+      contextString, 
+      {
+        maxTokens: 400,  
+        temperature: 0.1, 
+        isShortAnswer: true,
+        languageStyle: context.userType === 'engaged' ? 'casual' : 'formal',
+        isFollowUp: true
+      }
+    );
+    
+    this.updateConversationMemory(userId, userMessage, aiReply, { type: 'FOLLOW_UP' });
+    
+    const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+    console.log(`🚀 [RAG] Follow-up question completed in ${duration}s`);
+    
+    return aiReply;
+  }
+
+  /**
+   * ✅ Handle Regular Question
+   */
+  async handleRegularQuestion(userMessage, conversationHistory, userId, startTime, intent) {
+    console.log('🤔 [RAG] Regular question - normal RAG process');
+    
+    const context = this.getConversationContext(userId);
+    const relevantDocs = await this.searchRelevantDocs(userMessage);
+    const contextString = this.compileContext(relevantDocs);
+    
+    const questionType = this.detectQuestionType(userMessage, relevantDocs);
+    const userType = context.userType;
+    
+    console.log(`👤 [RAG] User type: ${userType}, Question type: ${questionType}`);
+    
+    let aiReply;
+    
+    if (contextString) {
+      console.log('🤖 [RAG] Menggenerate response dengan konteks...');
+      
+      aiReply = await openaiService.generateAIResponse(
+        userMessage, 
+        conversationHistory, 
+        contextString, 
+        {
+          maxTokens: 400,  
+          temperature: 0.1, 
+          isShortAnswer: true,
+          languageStyle: userType === 'engaged' ? 'casual' : 'formal'
+        }
+      );
+    } else {
+      console.log('[RAG] Fallback: Tidak ada konteks relevan');
+      
+      aiReply = await openaiService.generateAIResponse(
+        userMessage, 
+        conversationHistory, 
+        null,
+        {
+          maxTokens: 250,
+          isShortAnswer: true,
+          languageStyle: userType === 'engaged' ? 'casual' : 'formal'
+        }
+      );
+    }
+    
+    this.updateConversationMemory(userId, userMessage, aiReply, intent);
+    
+    const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+    
+    console.log(`🚀 [RAG] Regular question completed in ${duration}s`, {
+      hasContext: !!contextString,
+      docsFound: relevantDocs.length,
+      userType: userType,
+      questionType: questionType,
+      replyLength: aiReply.length
+    });
+
+    return aiReply;
+  }
+
+  // =============================================================================
+  // ✅ CONTEXT-AWARE GREETING RESPONSE SYSTEM
+  // =============================================================================
+
+  /**
+   * ✅ Context-Aware Greeting Response
+   */
+  getContextAwareGreeting(message, userType, context) {
+    const timeBased = this.getTimeBasedGreeting();
+    
+    if (context.messageCount === 0) {
+      // First interaction
+      const greetings = {
+        general: [
+          `${timeBased} 😊 Saya Kia, asisten virtual Tazkia. Ada yang bisa saya bantu?`,
+          `${timeBased} 👋 Salam kenal! Saya Kia. Mau tanya tentang kampus Tazkia?`
+        ],
+        engaged: [
+          `${timeBased} 🎉 Senang bertemu Anda! Saya Kia. Ada yang bisa dibantu?`,
+          `${timeBased} 😄 Halo! Kia di sini. Mau explore info Tazkia hari ini?`
+        ]
+      };
+      return this.getRandomResponse(greetings[userType]);
+    }
+    
+    // Returning user
+    const lastTopic = context.lastTopics[0];
+    const timeSinceLast = Date.now() - context.lastInteraction;
+    const isLongTime = timeSinceLast > 3600000; // 1 hour
+    
+    if (isLongTime) {
+      const welcomeBack = {
+        general: [
+          `${timeBased} 👋 Lama tidak berjumpa! Ada yang bisa Kia bantu?`,
+          `${timeBased} 😊 Halo lagi! Sudah lama ya. Mau tanya apa nih?`
+        ],
+        engaged: [
+          `${timeBased} 🎉 Senang Anda kembali! Ada pertanyaan lagi?`,
+          `${timeBased} 😄 Halo lagi! Kia kangen nih. Mau lanjut bahas ${lastTopic || 'Tazkia'}?`
+        ]
+      };
+      return this.getRandomResponse(welcomeBack[userType]);
+    } else {
+      const quickReturn = {
+        general: [
+          `${timeBased} 👋 Ada yang bisa Kia bantu?`,
+          `${timeBased} 😊 Mau tanya apa nih?`
+        ],
+        engaged: [
+          `${timeBased} 🎉 Yes, balik lagi! Ada pertanyaan lain?`,
+          `${timeBased} 😄 Halo lagi! Mau lanjut bahas ${lastTopic || 'Tazkia'}?`
+        ]
+      };
+      return this.getRandomResponse(quickReturn[userType]);
+    }
+  }
+
+  /**
+   * ✅ Extract Question dari Greeting Message
+   */
+  async extractQuestionFromGreeting(message) {
+    try {
+      const prompt = `
+      Extract the main question from this greeting message. Remove greeting words and return only the question part.
+      
+      Examples:
+      - "Halo, mau tanya tentang prodi apa saja yang ada" → "prodi apa saja yang ada"
+      - "Selamat pagi, saya ingin tahu lokasi kampus" → "lokasi kampus"
+      - "Hi, cara daftar beasiswa bagaimana?" → "cara daftar beasiswa"
+      
+      Message: "${message}"
+      
+      Return only the extracted question without additional text.
+      `;
+      
+      const response = await openaiService.chatCompletion([
+        { role: "system", content: "You are a question extraction assistant." },
+        { role: "user", content: prompt }
+      ], { maxTokens: 100, temperature: 0.1 });
+      
+      return response.trim();
+    } catch (error) {
+      // Fallback: remove common greeting words
+      return message.replace(/(halo|hai|hi|hello|assalamualaikum|salam|selamat\s+(pagi|siang|sore|malam))/gi, '').trim();
+    }
+  }
+
+  // =============================================================================
+  // ✅ HELPER METHODS
+  // =============================================================================
+
+  isFillerWord(word) {
+    const fillers = ['dong', 'ya', 'deh', 'sih', 'lah', 'nih', 'tu'];
+    return fillers.includes(word);
+  }
+
+  hasSubstantiveContent(word, fullMessage) {
+    const substantiveIndicators = ['tanya', 'bertanya', 'mau', 'ingin', 'bisa', 'tolong', 'info'];
+    return substantiveIndicators.some(indicator => 
+      fullMessage.includes(indicator) && word.length > 3
+    );
+  }
+
+  isEngagedUserMessage(message) {
+    const engagedWords = ['makasih', 'terima kasih', 'thanks', 'keren', 'bagus', 'mantap', 'oke', 'sip'];
+    return engagedWords.some(word => message.toLowerCase().includes(word));
+  }
+
+  isSimpleGreeting(message) {
+    const simpleGreetings = ['halo', 'hai', 'hi', 'hello', 'p', 'test', 'tes'];
+    return simpleGreetings.some(greet => message.toLowerCase().trim() === greet);
+  }
+
+  getTimeBasedGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 11) return 'Selamat pagi';
+    if (hour < 15) return 'Selamat siang';
+    if (hour < 19) return 'Selamat sore';
+    return 'Selamat malam';
+  }
+
+  getRandomResponse(responses) {
+    return responses[Math.floor(Math.random() * responses.length)];
+  }
+
+  /**
+   * ✅ PERBAIKAN: Dynamic Keyword Learning untuk Scalability
+   */
+  updateLearnedKeywords(message, intentType) {
+    if (intentType === 'PURE_GREETING') {
+      const words = message.toLowerCase().split(/\s+/);
+      words.forEach(word => {
+        if (word.length > 1 && !this.learnedKeywords.has(word)) {
+          this.learnedKeywords.add(word);
+          console.log(`📚 [RAG] Learned new greeting keyword: "${word}"`);
+        }
+      });
+    }
+  }
+
+  getErrorResponse() {
+    const fallbacks = [
+      "Afwan, sistem sedang mengalami gangguan teknis. Mohon hubungi Admin Kampus di 0821-84-800-600 untuk bantuan lebih lanjut.",
+      "Alhamdulillah, saya ingin membantu namun sedang ada kendala teknis. Silakan hubungi Admin Kampus di 0821-84-800-600 ya!",
+    ];
+    return this.getRandomResponse(fallbacks);
+  }
+
+  // =============================================================================
+  // ✅ EXISTING METHODS (Tetap dipertahankan)
   // =============================================================================
 
   /**
@@ -201,9 +908,9 @@ class RagService {
         matrix[i][j] = b[i - 1] === a[j - 1] 
           ? matrix[i - 1][j - 1]
           : Math.min(
-              matrix[i - 1][j - 1] + 1, // substitution
-              matrix[i][j - 1] + 1,     // insertion
-              matrix[i - 1][j] + 1      // deletion
+              matrix[i - 1][j - 1] + 1, 
+              matrix[i][j - 1] + 1,     
+              matrix[i - 1][j] + 1      
             );
       }
     }
@@ -456,7 +1163,7 @@ class RagService {
       } else if (lowerSection.includes('fasilitas')) {
         type = 'facilities';
       } else if (lowerSection.includes('murabahah') || lowerSection.includes('syariah') || lowerSection.includes('riba')) {
-        type = 'syariah'; // ✅ JENIS BARU: konten ekonomi syariah
+        type = 'syariah';
       }
       
       chunks.push({
@@ -507,7 +1214,7 @@ class RagService {
     });
     
     const context = "INFORMASI RELEVAN DARI DATABASE TAZKIA:\n\n" + 
-                   optimizedDocs.join("\n\n--- INFORMASI TERKAIT ---\n\n");
+                  optimizedDocs.join("\n\n--- INFORMASI TERKAIT ---\n\n");
     
     console.log(`📦 [RAG] Konteks dikompilasi: ${context.length} karakter`);
     
@@ -547,140 +1254,12 @@ class RagService {
   }
 
   /**
-   * ✅ FUNGSI BARU: Deteksi User Type untuk Guest Mode
-   */
-  detectUserType(userMessage, conversationHistory) {
-    const message = userMessage.toLowerCase();
-    const fullConversation = conversationHistory.map(msg => msg.content).join(' ').toLowerCase();
-    
-    // Keyword untuk user engaged
-    const engagedKeywords = [
-      'thanks', 'thank you', 'makasih', 'terima kasih', 'keren', 'bagus', 'helpful',
-      'mantap', 'oke', 'good', 'nice', 'sip', 'oke banget'
-    ];
-    
-    const isEngaged = engagedKeywords.some(keyword => 
-      message.includes(keyword) || fullConversation.includes(keyword)
-    );
-    
-    if (isEngaged) return 'engaged';
-    return 'general';
-  }
-
-  /**
-   * ✅ METHOD BARU: Answer Question dengan Short Answer + Offers (OPTIMIZED TOKENS)
-   */
-  async answerQuestion(userMessage, conversationHistory = [], options = {}) {
-    const startTime = performance.now();
-
-    try {
-      console.log(`\n💬 [RAG] Pertanyaan: "${userMessage}"`);
-
-      const relevantDocs = await this.searchRelevantDocs(userMessage);
-      const contextString = this.compileContext(relevantDocs);
-      
-      // ✅ DETEKSI USER TYPE & QUESTION TYPE
-      const userType = this.detectUserType(userMessage, conversationHistory);
-      const questionType = this.detectQuestionType(userMessage, relevantDocs);
-      
-      console.log(`👤 [RAG] User type: ${userType}, Question type: ${questionType}`);
-      
-      let aiReply;
-      
-      if (contextString) {
-        console.log('🤖 [RAG] Menggenerate SHORT response dengan konteks...');
-        
-        // ✅ TENTUKAN LANGUAGE STYLE BERDASARKAN USER TYPE
-        let languageStyle = 'formal';
-        if (userType === 'engaged') {
-          languageStyle = 'casual';
-        }
-        
-        // ✅ OPTIMASI TOKEN: KURANGI MAX TOKEN DRASTIS
-        aiReply = await openaiService.generateAIResponse(
-          userMessage, 
-          conversationHistory, 
-          contextString, 
-          {
-            maxTokens: 400,  // ✅ DIKURANGI dari 600 ke 400
-            temperature: 0.1, // ✅ DITURUNKAN dari 0.2 ke 0.1
-            isShortAnswer: true,
-            languageStyle: languageStyle
-          }
-        );
-      } else {
-        console.log('🔄 [RAG] Fallback: Tidak ada konteks relevan');
-        
-        const isGreeting = /^(assalam|salam|halo|hai|pagi|siang|sore|malam|tes|p|hi|hello)/i.test(userMessage);
-        
-        if (isGreeting) {
-          aiReply = await openaiService.generateAIResponse(
-            userMessage, 
-            conversationHistory, 
-            null,
-            {
-              maxTokens: 150,  // ✅ SANGAT SINGKAT untuk greeting
-              isShortAnswer: true,
-              languageStyle: 'casual'
-            }
-          );
-        } else {
-          // ✅ GUNAKAN FALLBACK DENGAN LANGUAGE STYLE YANG TEPAT
-          let fallbackStyle = 'formal';
-          if (userType === 'engaged') {
-            fallbackStyle = 'casual';
-          }
-          
-          aiReply = await openaiService.generateAIResponse(
-            userMessage, 
-            conversationHistory, 
-            null,
-            {
-              maxTokens: 250,  // ✅ DIKURANGI dari 300 ke 250
-              isShortAnswer: true,
-              languageStyle: fallbackStyle
-            }
-          );
-        }
-      }
-
-      const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-      
-      // ✅ LOGGING YANG LEBIH DETAIL DENGAN TOKEN INFO
-      console.log(`🚀 [RAG] Selesai dalam ${duration}s`, {
-        hasContext: !!contextString,
-        docsFound: relevantDocs.length,
-        userType: userType,
-        questionType: questionType,
-        replyLength: aiReply.length,
-        wordCount: aiReply.split(' ').length,
-        hasOffer: aiReply.includes('?') && (aiReply.includes('ingin') || aiReply.includes('mau') || aiReply.includes('apakah')),
-        isShort: aiReply.length <= 600 // ✅ FLAG UNTUK MONITORING
-      });
-
-      return aiReply;
-
-    } catch (error) {
-      console.error('❌ [RAG] Error:', error);
-      
-      // ✅ FALLBACK ERROR DENGAN VARIASI
-      const fallbacks = [
-        "Afwan, sistem sedang mengalami gangguan teknis. Mohon hubungi Admin Kampus di 0821-84-800-600 untuk bantuan lebih lanjut.",
-        "Alhamdulillah, saya ingin membantu namun sedang ada kendala teknis. Silakan hubungi Admin Kampus di 0821-84-800-600 ya!",
-        "Wah, sepertinya Kia lagi gangguan nih 😅 Yuk langsung chat Admin Kampus di 0821-84-800-600, mereka pasti bisa bantu!"
-      ];
-      
-      return fallbacks[Math.floor(Math.random() * fallbacks.length)];
-    }
-  }
-
-  /**
    * ✅ METHOD BARU: Answer dengan Custom Options (OPTIMIZED)
    */
   async answerWithOptions(userMessage, conversationHistory = [], customOptions = {}) {
     const defaultOptions = {
-      maxTokens: 400,  // ✅ DIKURANGI
-      temperature: 0.1, // ✅ DITURUNKAN
+      maxTokens: 400,
+      temperature: 0.1,
       isShortAnswer: true,
       languageStyle: 'formal'
     };
@@ -734,7 +1313,7 @@ class RagService {
       for (const question of testQuestions) {
         const startTime = performance.now();
         const answer = await this.answerQuestion(question, [], {
-          maxTokens: 400,  // ✅ DIKURANGI
+          maxTokens: 400,
           isShortAnswer: true
         });
         const duration = ((performance.now() - startTime) / 1000).toFixed(2);
