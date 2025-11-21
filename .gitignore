@@ -4,10 +4,9 @@
 docker-compose.yml
 qdrant_storage/
 mysql_data
-openaiService.js
 geminiService.js  
-ragService.js
 data
 .env
 build
 public
+topicExtractor.js
