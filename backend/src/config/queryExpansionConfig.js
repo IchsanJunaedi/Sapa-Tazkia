@@ -82,6 +82,8 @@ module.exports = {
     'semua pihak': ['semua pihak', 'setiap mitra', 'masing-masing pihak', 'para pihak', 'semua partner'],
     'kerja musyarakah': ['kerja', 'usaha', 'pengelolaan', 'tenaga', 'keahlian', 'kontribusi', 'kewajiban kerja'],
     'ijab qabul': ['ijab qabul', 'penawaran penerimaan', 'kesepakatan bersama', 'serah terima akad'],
+    'firman allah': ['firman allah', 'ayat al-quran', 'qs.', 'surat', 'dalil quran', 'dasar quran', 'landasan quran'],
+    'hadis': ['hadis', 'hadits', 'sunnah', 'riwayat','dalil hadis', 'dasar hadis', 'landasan hadis'],
 
     //  OPTIMASI UNTUK SHORT ANSWER & PENAWARAN
     'lebih lanjut': ['lebih lanjut', 'detail', 'informasi lengkap', 'rincian', 'penjelasan detail', 'selengkapnya'],
