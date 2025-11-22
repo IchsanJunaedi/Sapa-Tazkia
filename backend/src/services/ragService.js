@@ -5,16 +5,22 @@ const path = require('path');
 const expansionConfig = require('../config/queryExpansionConfig');
 
 /**
- * KONFIGURASI RAG SERVICE - OPTIMIZED FOR SHORT ANSWERS
+ * KONFIGURASI RAG SERVICE - OPTIMIZED FOR SHORT ANSWERS & ANTI-HALLUCINATION
  */
 const QDRANT_HOST = process.env.QDRANT_HOST || 'localhost';
 const QDRANT_PORT = process.env.QDRANT_PORT || 6333;
 const COLLECTION_NAME = 'sapa_tazkia_knowledge';
 const VECTOR_SIZE = 1536;
 
-// ✅ OPTIMASI THRESHOLD UNTUK JAWABAN SINGKAT
-const SIMILARITY_THRESHOLD = 0.45;
-const FALLBACK_THRESHOLD = 0.30;
+// ✅ PERBAIKAN: ADAPTIVE THRESHOLD BERDASARKAN PANJANG QUERY
+const getAdaptiveThreshold = (query) => {
+  if (query.length < 10) return 0.50;  // Untuk query sangat pendek
+  if (query.length < 20) return 0.55;  // Untuk query pendek  
+  if (query.length < 30) return 0.60;  // Untuk query medium
+  return 0.65; // Untuk query panjang
+};
+
+const FALLBACK_THRESHOLD = 0.50;    // Threshold fallback yang lebih reasonable
 const TOP_K_DOCS = 10;
 
 const client = new QdrantClient({ host: QDRANT_HOST, port: QDRANT_PORT });
@@ -22,722 +28,15 @@ const client = new QdrantClient({ host: QDRANT_HOST, port: QDRANT_PORT });
 class RagService {
   
   constructor() {
-    // ✅ PERBAIKAN: Conversation Memory untuk Context Awareness
-    this.conversationMemory = new Map();
-    
-    // ✅ PERBAIKAN: Dynamic Keyword Learning untuk Scalability
-    this.learnedKeywords = new Set([
-      'halo', 'hai', 'hi', 'hello', 'assalamualaikum', 'salam', 
-      'pagi', 'siang', 'sore', 'malam', 'selamat', 'hey', 'hei',
-      'test', 'tes', 'coba', 'p', 'cek', 'woy', 'hola', 'bro',
-      'sis', 'bang', 'mas', 'mbak', 'dek'
-    ]);
-    
     this.ensureCollection();
   }
 
   // =============================================================================
-  // ✅ PERBAIKAN 1 & 4: HYBRID GREETING DETECTION SYSTEM
+  // ✅ QUERY EXPANSION OPTIMIZED UNTUK BAHASA INDONESIA - DIPERBAIKI
   // =============================================================================
 
   /**
-   * ✅ PERBAIKAN: Hybrid Detection - AI + Rules (Mengatasi Rule-based Rigid & Tidak Scalable)
-   */
-  async detectGreetingType(userMessage, conversationHistory = [], userId = 'default') {
-    const cleanMessage = userMessage.toLowerCase().trim();
-    
-    // 1. Fast Rule-based Pre-check (untuk performance)
-    const ruleBasedResult = this.ruleBasedGreetingCheck(cleanMessage);
-    if (ruleBasedResult.confidence > 0.9) {
-      return ruleBasedResult;
-    }
-    
-    // 2. AI-Powered Analysis (untuk accuracy dan scalability)
-    const aiResult = await this.aiGreetingAnalysis(userMessage, conversationHistory, userId);
-    
-    // 3. Hybrid Decision Making
-    return this.hybridDecision(ruleBasedResult, aiResult);
-  }
-
-  /**
-   * ✅ PERBAIKAN: Enhanced Rule-based Check dengan False Positive Reduction
-   */
-  ruleBasedGreetingCheck(message) {
-    const words = message.split(/\s+/).filter(word => word.length > 1);
-    
-    // Pure greeting detection
-    const pureGreetingWords = words.filter(word => this.learnedKeywords.has(word));
-    const greetingRatio = pureGreetingWords.length / words.length;
-    
-    // Content detection dengan false positive reduction
-    const hasContent = words.some(word => 
-      !this.learnedKeywords.has(word) && 
-      word.length > 2 &&
-      !this.isFillerWord(word) &&
-      this.hasSubstantiveContent(word, message)
-    );
-    
-    let type, confidence;
-    
-    // ✅ PERBAIKAN: Enhanced logic untuk mengurangi false positive
-    if (words.length <= 2 && pureGreetingWords.length === words.length) {
-      type = 'PURE_GREETING';
-      confidence = 0.95;
-    } else if (greetingRatio > 0.7 && !hasContent) {
-      type = 'PURE_GREETING';
-      confidence = 0.85;
-    } else if (greetingRatio > 0.3 && hasContent) {
-      type = 'GREETING_WITH_QUESTION';
-      confidence = 0.75;
-    } else if (greetingRatio > 0.1) {
-      type = 'REGULAR_WITH_GREETING';
-      confidence = 0.6;
-    } else {
-      type = 'REGULAR_QUESTION';
-      confidence = 0.9;
-    }
-    
-    return { type, confidence, method: 'rule_based' };
-  }
-
-  /**
-   * ✅ PERBAIKAN: AI-Powered Analysis untuk cases yang complex
-   */
-  async aiGreetingAnalysis(userMessage, conversationHistory, userId) {
-    try {
-      const context = this.getConversationContext(userId);
-      
-      const prompt = `
-      ANALISIS INTENT PESAN:
-      
-      Pesan: "${userMessage}"
-      Context sebelumnya: ${context.lastTopics.join(', ') || 'tidak ada'}
-      Panjang percakapan: ${context.messageCount} pesan
-      
-      Tentukan jenis intent:
-      1. PURE_GREETING - Hanya sapaan tanpa konten substantive
-      2. GREETING_WITH_QUESTION - Sapaan + pertanyaan jelas
-      3. REGULAR_WITH_GREETING - Pertanyaan biasa dengan kata sapaan
-      4. REGULAR_QUESTION - Pertanyaan biasa tanpa sapaan
-      5. FOLLOW_UP - Kelanjutan dari topik sebelumnya
-      
-      Respond dengan JSON: 
-      {
-        "type": "PURE_GREETING",
-        "confidence": 0.95,
-        "reason": "Hanya berisi kata sapaan tanpa pertanyaan",
-        "extracted_question": null
-      }
-      `;
-      
-      const response = await openaiService.chatCompletion([
-        { role: "system", content: "Anda adalah AI classifier untuk intent percakapan. Analisis dengan teliti." },
-        { role: "user", content: prompt }
-      ], { 
-        maxTokens: 150, 
-        temperature: 0.1
-      });
-      
-      // Parse JSON response
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      const result = jsonMatch ? JSON.parse(jsonMatch[0]) : { type: 'REGULAR_QUESTION', confidence: 0.7 };
-      result.method = 'ai_powered';
-      
-      // ✅ PERBAIKAN: Learning - Update keywords dari AI analysis
-      this.updateLearnedKeywords(userMessage, result.type);
-      
-      return result;
-      
-    } catch (error) {
-      console.log('❌ AI analysis failed, using rule-based fallback:', error.message);
-      return this.ruleBasedGreetingCheck(userMessage);
-    }
-  }
-
-  /**
-   * ✅ PERBAIKAN: Hybrid Decision Maker
-   */
-  hybridDecision(ruleResult, aiResult) {
-    // Jika AI confidence tinggi, prioritaskan AI
-    if (aiResult.confidence > 0.8 && aiResult.method === 'ai_powered') {
-      return aiResult;
-    }
-    
-    // Jika rule-based sangat confident, gunakan rules
-    if (ruleResult.confidence > 0.9) {
-      return ruleResult;
-    }
-    
-    // Weighted average untuk cases di tengah
-    const ruleWeight = 0.4;
-    const aiWeight = 0.6;
-    
-    const finalConfidence = (ruleResult.confidence * ruleWeight) + (aiResult.confidence * aiWeight);
-    
-    // Pilih type berdasarkan confidence tertinggi
-    let finalType = ruleResult.confidence > aiResult.confidence ? ruleResult.type : aiResult.type;
-    
-    return {
-      type: finalType,
-      confidence: finalConfidence,
-      method: 'hybrid',
-      components: { rule_based: ruleResult, ai_powered: aiResult }
-    };
-  }
-
-  // =============================================================================
-  // ✅ PERBAIKAN 2: CONTEXT AWARENESS SYSTEM
-  // =============================================================================
-
-  /**
-   * ✅ PERBAIKAN: Conversation Memory Management
-   */
-  updateConversationMemory(userId, userMessage, response, intent) {
-    if (!this.conversationMemory.has(userId)) {
-      this.conversationMemory.set(userId, {
-        messages: [],
-        topics: [],
-        lastInteraction: Date.now(),
-        questionCount: 0,
-        userType: 'general'
-      });
-    }
-    
-    const userMemory = this.conversationMemory.get(userId);
-    
-    // Add new message
-    userMemory.messages.push({
-      content: userMessage,
-      intent: intent,
-      timestamp: Date.now(),
-      response: response
-    });
-    
-    // Keep only last 20 messages
-    if (userMemory.messages.length > 20) {
-      userMemory.messages = userMemory.messages.slice(-20);
-    }
-    
-    // Extract and update topics
-    const newTopics = this.extractTopics(userMessage);
-    userMemory.topics = [...new Set([...userMemory.topics, ...newTopics])].slice(-10);
-    
-    // Update counters
-    if (intent.type !== 'PURE_GREETING') {
-      userMemory.questionCount++;
-    }
-    
-    userMemory.lastInteraction = Date.now();
-    
-    // Update user type based on engagement
-    userMemory.userType = this.determineUserType(userMemory);
-  }
-
-  /**
-   * ✅ PERBAIKAN: Get Conversation Context
-   */
-  getConversationContext(userId) {
-    const defaultContext = {
-      lastTopics: [],
-      messageCount: 0,
-      lastInteraction: null,
-      questionCount: 0,
-      userType: 'general'
-    };
-    
-    if (!this.conversationMemory.has(userId)) {
-      return defaultContext;
-    }
-    
-    const memory = this.conversationMemory.get(userId);
-    const recentMessages = memory.messages.slice(-5);
-    
-    return {
-      lastTopics: memory.topics.slice(-3),
-      messageCount: memory.messages.length,
-      lastInteraction: memory.lastInteraction,
-      questionCount: memory.questionCount,
-      userType: memory.userType,
-      recentMessages: recentMessages.map(m => ({
-        content: m.content.substring(0, 50) + '...',
-        intent: m.intent?.type
-      }))
-    };
-  }
-
-  /**
-   * ✅ PERBAIKAN: Smart Topic Extraction
-   */
-  extractTopics(message) {
-    const topics = [];
-    const lowerMessage = message.toLowerCase();
-    
-    // Topic keywords
-    const topicKeywords = {
-      'prodi': ['prodi', 'program studi', 'jurusan', 'fakultas'],
-      'lokasi': ['lokasi', 'alamat', 'dimana', 'alamat kampus'],
-      'beasiswa': ['beasiswa', 'biaya', 'uang kuliah', 'biaya kuliah'],
-      'pendaftaran': ['daftar', 'pendaftaran', 'syarat', 'registrasi'],
-      'murabahah': ['murabahah', 'syariah', 'riba', 'ekonomi islam'],
-      'kontak': ['kontak', 'telepon', 'hp', 'whatsapp', 'hubungi']
-    };
-    
-    Object.entries(topicKeywords).forEach(([topic, keywords]) => {
-      if (keywords.some(keyword => lowerMessage.includes(keyword))) {
-        topics.push(topic);
-      }
-    });
-    
-    return topics;
-  }
-
-  /**
-   * ✅ PERBAIKAN: Determine User Type dengan Context
-   */
-  determineUserType(userMemory) {
-    if (userMemory.messages.length < 2) return 'general';
-    
-    const recentMessages = userMemory.messages.slice(-3);
-    const engagementSignals = recentMessages.filter(msg => 
-      this.isEngagedUserMessage(msg.content) || 
-      msg.intent?.type === 'FOLLOW_UP'
-    );
-    
-    if (engagementSignals.length >= 2 || userMemory.questionCount >= 3) {
-      return 'engaged';
-    }
-    
-    return 'general';
-  }
-
-  // =============================================================================
-  // ✅ PERBAIKAN 3: FALSE POSITIVE REDUCTION
-  // =============================================================================
-
-  /**
-   * ✅ PERBAIKAN: Enhanced Greeting Detection dengan False Positive Reduction
-   */
-  async enhancedGreetingDetection(userMessage, userId = 'default') {
-    const context = this.getConversationContext(userId);
-    
-    // Check jika ini follow-up dari greeting sebelumnya
-    if (this.isFollowUpGreeting(userMessage, context)) {
-      return {
-        type: 'FOLLOW_UP',
-        confidence: 0.8,
-        method: 'context_aware'
-      };
-    }
-    
-    // Hybrid detection
-    const intent = await this.detectGreetingType(userMessage, [], userId);
-    
-    // False positive reduction rules
-    return this.applyFalsePositiveRules(intent, userMessage, context);
-  }
-
-  /**
-   * ✅ PERBAIKAN: Apply False Positive Reduction Rules
-   */
-  applyFalsePositiveRules(intent, message, context) {
-    let adjustedIntent = { ...intent };
-    
-    // Rule 1: Jika ada question words, likely bukan pure greeting
-    const questionWords = ['apa', 'bagaimana', 'dimana', 'kapan', 'berapa', 'siapa', 'bisa', 'mau', 'ingin'];
-    const hasQuestionWord = questionWords.some(word => message.toLowerCase().includes(word));
-    
-    if (intent.type === 'PURE_GREETING' && hasQuestionWord) {
-      adjustedIntent.type = 'GREETING_WITH_QUESTION';
-      adjustedIntent.confidence *= 0.7;
-      adjustedIntent.falsePositiveFix = 'question_word_detected';
-    }
-    
-    // Rule 2: Jika dalam context panjang, likely follow-up
-    if (context.messageCount > 2 && intent.type === 'PURE_GREETING') {
-      adjustedIntent.type = 'FOLLOW_UP_GREETING';
-      adjustedIntent.confidence = 0.7;
-      adjustedIntent.falsePositiveFix = 'conversation_context';
-    }
-    
-    // Rule 3: Check untuk common false positive patterns
-    const falsePositivePatterns = [
-      { pattern: /halo mau tanya/i, correctType: 'GREETING_WITH_QUESTION' },
-      { pattern: /hai (bang|mas|mbak|sis) mau nanya/i, correctType: 'GREETING_WITH_QUESTION' },
-      { pattern: /assalamualaikum (bang|mas|mbak|sis)/i, correctType: 'GREETING_WITH_QUESTION' },
-      { pattern: /test test/i, correctType: 'PURE_GREETING' },
-      { pattern: /cek cek/i, correctType: 'PURE_GREETING' }
-    ];
-    
-    falsePositivePatterns.forEach(fp => {
-      if (fp.pattern.test(message) && intent.type !== fp.correctType) {
-        adjustedIntent.type = fp.correctType;
-        adjustedIntent.confidence = 0.9;
-        adjustedIntent.falsePositiveFix = 'pattern_matching';
-      }
-    });
-    
-    return adjustedIntent;
-  }
-
-  /**
-   * ✅ PERBAIKAN: Check Follow-up Greeting
-   */
-  isFollowUpGreeting(message, context) {
-    if (context.messageCount === 0) return false;
-    
-    const timeSinceLast = Date.now() - context.lastInteraction;
-    const isQuickReply = timeSinceLast < 300000; // 5 minutes
-    
-    const lastMessage = context.recentMessages[context.recentMessages.length - 1];
-    const lastWasGreeting = lastMessage?.intent === 'PURE_GREETING';
-    
-    return isQuickReply && lastWasGreeting && this.isSimpleGreeting(message);
-  }
-
-  // =============================================================================
-  // ✅ ENHANCED ANSWER QUESTION METHOD (MAIN METHOD)
-  // =============================================================================
-
-  /**
-   * ✅ PERBAIKAN UTAMA: Enhanced Answer Question dengan semua improvements
-   */
-  async answerQuestion(userMessage, conversationHistory = [], options = {}, userId = 'default') {
-    const startTime = performance.now();
-    
-    try {
-      console.log(`\n💬 [RAG-ENHANCED] Processing: "${userMessage}"`);
-      
-      // 1. Enhanced Greeting Detection dengan context awareness
-      const intent = await this.enhancedGreetingDetection(userMessage, userId);
-      console.log(`🎯 [RAG] Intent: ${intent.type} (${intent.confidence.toFixed(2)}) [${intent.method}]`);
-      
-      // 2. Update conversation memory untuk context awareness
-      this.updateConversationMemory(userId, userMessage, null, intent);
-      
-      // 3. Handle berdasarkan intent type
-      switch (intent.type) {
-        case 'PURE_GREETING':
-          return await this.handlePureGreeting(userMessage, userId, startTime);
-          
-        case 'GREETING_WITH_QUESTION':
-          return await this.handleGreetingWithQuestion(userMessage, userId, startTime);
-          
-        case 'FOLLOW_UP':
-        case 'FOLLOW_UP_GREETING':
-          return await this.handleFollowUpQuestion(userMessage, conversationHistory, userId, startTime);
-          
-        default:
-          return await this.handleRegularQuestion(userMessage, conversationHistory, userId, startTime, intent);
-      }
-      
-    } catch (error) {
-      console.error('❌ [RAG-ENHANCED] Error:', error);
-      return this.getErrorResponse();
-    }
-  }
-
-  /**
-   * ✅ Handle Pure Greeting dengan Context Awareness
-   */
-  async handlePureGreeting(userMessage, userId, startTime) {
-    const context = this.getConversationContext(userId);
-    const userType = context.userType;
-    
-    console.log('👋 [RAG] Pure greeting - using context-aware response');
-    
-    const response = this.getContextAwareGreeting(userMessage, userType, context);
-    
-    // Update memory dengan response
-    this.updateConversationMemory(userId, userMessage, response, { type: 'PURE_GREETING' });
-    
-    const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-    console.log(`🚀 [RAG] Pure greeting response completed in ${duration}s`);
-    
-    return response;
-  }
-
-  /**
-   * ✅ Handle Greeting with Question
-   */
-  async handleGreetingWithQuestion(userMessage, userId, startTime) {
-    console.log('🔍 [RAG] Greeting with question - extracting question...');
-    
-    // Extract pertanyaan dari greeting
-    const extractedQuestion = await this.extractQuestionFromGreeting(userMessage);
-    console.log(`📝 [RAG] Extracted question: "${extractedQuestion}"`);
-    
-    // Process seperti regular question tapi dengan gaya yang lebih friendly
-    const context = this.getConversationContext(userId);
-    const relevantDocs = await this.searchRelevantDocs(extractedQuestion);
-    const contextString = this.compileContext(relevantDocs);
-    
-    const aiReply = await openaiService.generateAIResponse(
-      extractedQuestion, 
-      [], 
-      contextString, 
-      {
-        maxTokens: 400,  
-        temperature: 0.1, 
-        isShortAnswer: true,
-        languageStyle: 'casual',
-        hasGreeting: true
-      }
-    );
-    
-    this.updateConversationMemory(userId, userMessage, aiReply, { type: 'GREETING_WITH_QUESTION' });
-    
-    const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-    console.log(`🚀 [RAG] Greeting with question completed in ${duration}s`);
-    
-    return aiReply;
-  }
-
-  /**
-   * ✅ Handle Follow-up Question
-   */
-  async handleFollowUpQuestion(userMessage, conversationHistory, userId, startTime) {
-    console.log('🔄 [RAG] Follow-up question - using conversation context');
-    
-    const context = this.getConversationContext(userId);
-    const relevantDocs = await this.searchRelevantDocs(userMessage);
-    const contextString = this.compileContext(relevantDocs);
-    
-    const aiReply = await openaiService.generateAIResponse(
-      userMessage, 
-      conversationHistory, 
-      contextString, 
-      {
-        maxTokens: 400,  
-        temperature: 0.1, 
-        isShortAnswer: true,
-        languageStyle: context.userType === 'engaged' ? 'casual' : 'formal',
-        isFollowUp: true
-      }
-    );
-    
-    this.updateConversationMemory(userId, userMessage, aiReply, { type: 'FOLLOW_UP' });
-    
-    const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-    console.log(`🚀 [RAG] Follow-up question completed in ${duration}s`);
-    
-    return aiReply;
-  }
-
-  /**
-   * ✅ Handle Regular Question
-   */
-  async handleRegularQuestion(userMessage, conversationHistory, userId, startTime, intent) {
-    console.log('🤔 [RAG] Regular question - normal RAG process');
-    
-    const context = this.getConversationContext(userId);
-    const relevantDocs = await this.searchRelevantDocs(userMessage);
-    const contextString = this.compileContext(relevantDocs);
-    
-    const questionType = this.detectQuestionType(userMessage, relevantDocs);
-    const userType = context.userType;
-    
-    console.log(`👤 [RAG] User type: ${userType}, Question type: ${questionType}`);
-    
-    let aiReply;
-    
-    if (contextString) {
-      console.log('🤖 [RAG] Menggenerate response dengan konteks...');
-      
-      aiReply = await openaiService.generateAIResponse(
-        userMessage, 
-        conversationHistory, 
-        contextString, 
-        {
-          maxTokens: 400,  
-          temperature: 0.1, 
-          isShortAnswer: true,
-          languageStyle: userType === 'engaged' ? 'casual' : 'formal'
-        }
-      );
-    } else {
-      console.log('[RAG] Fallback: Tidak ada konteks relevan');
-      
-      aiReply = await openaiService.generateAIResponse(
-        userMessage, 
-        conversationHistory, 
-        null,
-        {
-          maxTokens: 250,
-          isShortAnswer: true,
-          languageStyle: userType === 'engaged' ? 'casual' : 'formal'
-        }
-      );
-    }
-    
-    this.updateConversationMemory(userId, userMessage, aiReply, intent);
-    
-    const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-    
-    console.log(`🚀 [RAG] Regular question completed in ${duration}s`, {
-      hasContext: !!contextString,
-      docsFound: relevantDocs.length,
-      userType: userType,
-      questionType: questionType,
-      replyLength: aiReply.length
-    });
-
-    return aiReply;
-  }
-
-  // =============================================================================
-  // ✅ CONTEXT-AWARE GREETING RESPONSE SYSTEM
-  // =============================================================================
-
-  /**
-   * ✅ Context-Aware Greeting Response
-   */
-  getContextAwareGreeting(message, userType, context) {
-    const timeBased = this.getTimeBasedGreeting();
-    
-    if (context.messageCount === 0) {
-      // First interaction
-      const greetings = {
-        general: [
-          `${timeBased} 😊 Saya Kia, asisten virtual Tazkia. Ada yang bisa saya bantu?`,
-          `${timeBased} 👋 Salam kenal! Saya Kia. Mau tanya tentang kampus Tazkia?`
-        ],
-        engaged: [
-          `${timeBased} 🎉 Senang bertemu Anda! Saya Kia. Ada yang bisa dibantu?`,
-          `${timeBased} 😄 Halo! Kia di sini. Mau explore info Tazkia hari ini?`
-        ]
-      };
-      return this.getRandomResponse(greetings[userType]);
-    }
-    
-    // Returning user
-    const lastTopic = context.lastTopics[0];
-    const timeSinceLast = Date.now() - context.lastInteraction;
-    const isLongTime = timeSinceLast > 3600000; // 1 hour
-    
-    if (isLongTime) {
-      const welcomeBack = {
-        general: [
-          `${timeBased} 👋 Lama tidak berjumpa! Ada yang bisa Kia bantu?`,
-          `${timeBased} 😊 Halo lagi! Sudah lama ya. Mau tanya apa nih?`
-        ],
-        engaged: [
-          `${timeBased} 🎉 Senang Anda kembali! Ada pertanyaan lagi?`,
-          `${timeBased} 😄 Halo lagi! Kia kangen nih. Mau lanjut bahas ${lastTopic || 'Tazkia'}?`
-        ]
-      };
-      return this.getRandomResponse(welcomeBack[userType]);
-    } else {
-      const quickReturn = {
-        general: [
-          `${timeBased} 👋 Ada yang bisa Kia bantu?`,
-          `${timeBased} 😊 Mau tanya apa nih?`
-        ],
-        engaged: [
-          `${timeBased} 🎉 Yes, balik lagi! Ada pertanyaan lain?`,
-          `${timeBased} 😄 Halo lagi! Mau lanjut bahas ${lastTopic || 'Tazkia'}?`
-        ]
-      };
-      return this.getRandomResponse(quickReturn[userType]);
-    }
-  }
-
-  /**
-   * ✅ Extract Question dari Greeting Message
-   */
-  async extractQuestionFromGreeting(message) {
-    try {
-      const prompt = `
-      Extract the main question from this greeting message. Remove greeting words and return only the question part.
-      
-      Examples:
-      - "Halo, mau tanya tentang prodi apa saja yang ada" → "prodi apa saja yang ada"
-      - "Selamat pagi, saya ingin tahu lokasi kampus" → "lokasi kampus"
-      - "Hi, cara daftar beasiswa bagaimana?" → "cara daftar beasiswa"
-      
-      Message: "${message}"
-      
-      Return only the extracted question without additional text.
-      `;
-      
-      const response = await openaiService.chatCompletion([
-        { role: "system", content: "You are a question extraction assistant." },
-        { role: "user", content: prompt }
-      ], { maxTokens: 100, temperature: 0.1 });
-      
-      return response.trim();
-    } catch (error) {
-      // Fallback: remove common greeting words
-      return message.replace(/(halo|hai|hi|hello|assalamualaikum|salam|selamat\s+(pagi|siang|sore|malam))/gi, '').trim();
-    }
-  }
-
-  // =============================================================================
-  // ✅ HELPER METHODS
-  // =============================================================================
-
-  isFillerWord(word) {
-    const fillers = ['dong', 'ya', 'deh', 'sih', 'lah', 'nih', 'tu'];
-    return fillers.includes(word);
-  }
-
-  hasSubstantiveContent(word, fullMessage) {
-    const substantiveIndicators = ['tanya', 'bertanya', 'mau', 'ingin', 'bisa', 'tolong', 'info'];
-    return substantiveIndicators.some(indicator => 
-      fullMessage.includes(indicator) && word.length > 3
-    );
-  }
-
-  isEngagedUserMessage(message) {
-    const engagedWords = ['makasih', 'terima kasih', 'thanks', 'keren', 'bagus', 'mantap', 'oke', 'sip'];
-    return engagedWords.some(word => message.toLowerCase().includes(word));
-  }
-
-  isSimpleGreeting(message) {
-    const simpleGreetings = ['halo', 'hai', 'hi', 'hello', 'p', 'test', 'tes'];
-    return simpleGreetings.some(greet => message.toLowerCase().trim() === greet);
-  }
-
-  getTimeBasedGreeting() {
-    const hour = new Date().getHours();
-    if (hour < 11) return 'Selamat pagi';
-    if (hour < 15) return 'Selamat siang';
-    if (hour < 19) return 'Selamat sore';
-    return 'Selamat malam';
-  }
-
-  getRandomResponse(responses) {
-    return responses[Math.floor(Math.random() * responses.length)];
-  }
-
-  /**
-   * ✅ PERBAIKAN: Dynamic Keyword Learning untuk Scalability
-   */
-  updateLearnedKeywords(message, intentType) {
-    if (intentType === 'PURE_GREETING') {
-      const words = message.toLowerCase().split(/\s+/);
-      words.forEach(word => {
-        if (word.length > 1 && !this.learnedKeywords.has(word)) {
-          this.learnedKeywords.add(word);
-          console.log(`📚 [RAG] Learned new greeting keyword: "${word}"`);
-        }
-      });
-    }
-  }
-
-  getErrorResponse() {
-    const fallbacks = [
-      "Afwan, sistem sedang mengalami gangguan teknis. Mohon hubungi Admin Kampus di 0821-84-800-600 untuk bantuan lebih lanjut.",
-      "Alhamdulillah, saya ingin membantu namun sedang ada kendala teknis. Silakan hubungi Admin Kampus di 0821-84-800-600 ya!",
-    ];
-    return this.getRandomResponse(fallbacks);
-  }
-
-  // =============================================================================
-  // ✅ EXISTING METHODS (Tetap dipertahankan)
-  // =============================================================================
-
-  /**
-   * Universal query expansion menggunakan config external - OPTIMIZED
+   * Universal query expansion menggunakan config external - OPTIMIZED & DIPERBAIKI
    */
   expandQueryWithTypos(query) {
     const normalized = query.toLowerCase().trim();
@@ -751,6 +50,9 @@ class RagService {
     
     // 1. Original query
     expandedQueries.add(normalized);
+    
+    // ✅ PERBAIKAN KRITIS: AGGRESSIVE EXPANSION UNTUK TERM SYARIAH
+    this.addSyariahSpecificExpansions(normalized, expandedQueries);
     
     // 2. ✅ OPTIMASI BARU: Ekspansi khusus untuk query bahasa Indonesia
     this.addIndonesianSpecificExpansions(normalized, expandedQueries);
@@ -782,17 +84,91 @@ class RagService {
     this.addContextualExpansions(normalized, expandedQueries, contextualExpansions, contextualKeywords);
 
     // 6. ✅ OPTIMASI: Tambah query sederhana untuk fallback
-    const words = normalized.split(' ').filter(word => word.length > 3);
+    const words = normalized.split(' ').filter(word => word.length > 2); // 🔽 dari 3 ke 2
     words.forEach(word => {
       expandedQueries.add(word);
     });
 
-    // 7. Limit to reasonable number
-    const finalQueries = Array.from(expandedQueries).slice(0, 15);
+    // ✅ PERBAIKAN: KURANGI QUERY EXPANSION TAPI TAMBAH KUALITAS
+    const finalQueries = this.prioritizeExpandedQueries(Array.from(expandedQueries));
     
-    console.log(`🔍 [RAG] Expanded queries (${finalQueries.length}):`, finalQueries.slice(0, 8));
+    console.log(`🔍 [RAG] Expanded queries (${finalQueries.length}):`, finalQueries.slice(0, 6));
     
     return finalQueries;
+  }
+
+  /**
+   * ✅ PERBAIKAN BARU: AGGRESSIVE EXPANSION UNTUK TERM SYARIAH
+   */
+  addSyariahSpecificExpansions(query, expandedQueries) {
+    const syariahTerms = {
+      'mudarabah': [
+        'pengertian mudarabah', 'definisi mudarabah', 'apa itu mudarabah',
+        'mudarabah dalam ekonomi syariah', 'fatwa mudarabah dsn mui',
+        'prinsip mudarabah', 'akad mudarabah', 'bagi hasil mudarabah',
+        'mudharabah', 'mudharabah dalam islam', 'konsep mudharabah'
+      ],
+      'mudharabah': [
+        'pengertian mudharabah', 'definisi mudharabah', 'apa itu mudharabah', 
+        'mudharabah ekonomi syariah', 'fatwa mudharabah',
+        'mudarabah', 'qiradh', 'muqaradhah'
+      ],
+      'murabahah': [
+        'pengertian murabahah', 'definisi murabahah', 'apa itu murabahah',
+        'jual beli murabahah', 'transaksi murabahah', 'fatwa murabahah'
+      ],
+      'musyarakah': [
+        'pengertian musyarakah', 'definisi musyarakah', 'apa itu musyarakah',
+        'kerjasama musyarakah', 'usaha patungan syariah', 'fatwa musyarakah'
+      ]
+    };
+
+    Object.keys(syariahTerms).forEach(term => {
+      if (query.includes(term)) {
+        syariahTerms[term].forEach(expansion => {
+          expandedQueries.add(expansion);
+        });
+        console.log(`   ✅ Added syariah expansions for: ${term}`);
+      }
+    });
+  }
+
+  /**
+   * ✅ PERBAIKAN BARU: PRIORITIZE EXPANDED QUERIES
+   */
+  prioritizeExpandedQueries(queries) {
+    // Prioritaskan queries yang lebih panjang dan meaningful
+    const prioritized = queries
+      .filter(q => q.length >= 3) // Hapus query terlalu pendek
+      .sort((a, b) => {
+        // Prioritaskan queries dengan kata kunci syariah
+        const syariahScoreA = this.getSyariahRelevanceScore(a);
+        const syariahScoreB = this.getSyariahRelevanceScore(b);
+        
+        if (syariahScoreA !== syariahScoreB) {
+          return syariahScoreB - syariahScoreA;
+        }
+        
+        // Kemudian prioritaskan yang lebih panjang
+        return b.length - a.length;
+      })
+      .slice(0, 8); // Max 8 queries
+
+    return prioritized;
+  }
+
+  /**
+   * Helper untuk score relevansi syariah
+   */
+  getSyariahRelevanceScore(query) {
+    const syariahKeywords = [
+      'mudarabah', 'mudharabah', 'murabahah', 'musyarakah', 'ijarah',
+      'syariah', 'riba', 'fatwa', 'dsn-mui', 'ekonomi islam'
+    ];
+    
+    return syariahKeywords.filter(keyword => 
+      query.toLowerCase().includes(keyword)
+    ).length;
   }
 
   /**
@@ -908,9 +284,9 @@ class RagService {
         matrix[i][j] = b[i - 1] === a[j - 1] 
           ? matrix[i - 1][j - 1]
           : Math.min(
-              matrix[i - 1][j - 1] + 1, 
-              matrix[i][j - 1] + 1,     
-              matrix[i - 1][j] + 1      
+              matrix[i - 1][j - 1] + 1, // substitution
+              matrix[i][j - 1] + 1,     // insertion
+              matrix[i - 1][j] + 1      // deletion
             );
       }
     }
@@ -938,11 +314,84 @@ class RagService {
   }
 
   /**
-   * ✅ OPTIMIZED SEARCH dengan Multiple Embeddings
+   * ✅ PERBAIKAN 1: OPTIMAL CHUNKING DENGAN SIZE LIMIT & OVERLAP
+   */
+  optimalChunking(content, filename, chunkSize = 500, overlap = 50) {
+    const chunks = [];
+    
+    console.log(`   🔍 Menganalisis konten ${filename} untuk optimal chunking...`);
+    
+    // Split by paragraphs dulu
+    const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 30);
+    
+    let currentChunk = "";
+    
+    for (const paragraph of paragraphs) {
+      const paragraphText = paragraph.trim();
+      
+      if ((currentChunk.length + paragraphText.length) > chunkSize && currentChunk.length > 0) {
+        // Simpan chunk saat ini
+        const title = this.extractTitle(currentChunk) || `Bagian dari ${filename}`;
+        const type = this.detectChunkType(currentChunk);
+        
+        chunks.push({
+          type: type,
+          title: title,
+          content: currentChunk.trim()
+        });
+        
+        // Mulai chunk baru dengan overlap (ambil 50 kata terakhir)
+        const words = currentChunk.split(/\s+/);
+        const overlapWords = words.slice(-overlap).join(' ');
+        currentChunk = overlapWords + ' ' + paragraphText;
+      } else {
+        currentChunk += ' ' + paragraphText;
+      }
+    }
+    
+    // Add last chunk jika masih ada konten
+    if (currentChunk.trim().length > 0) {
+      const title = this.extractTitle(currentChunk) || `Bagian dari ${filename}`;
+      const type = this.detectChunkType(currentChunk);
+      
+      chunks.push({
+        type: type,
+        title: title,
+        content: currentChunk.trim()
+      });
+    }
+    
+    console.log(`   📊 Optimal chunks: ${chunks.length} (size: ${chunkSize}, overlap: ${overlap})`);
+    return chunks;
+  }
+
+  /**
+   * Helper untuk extract title dari chunk
+   */
+  extractTitle(chunkContent) {
+    const titleMatch = chunkContent.match(/^#+\s+(.+)$/m);
+    if (titleMatch) {
+      return titleMatch[1].trim();
+    }
+    
+    // Ambil 5-7 kata pertama sebagai title fallback
+    const words = chunkContent.split(/\s+/).slice(0, 7);
+    return words.join(' ') + (words.length >= 7 ? '...' : '');
+  }
+
+  /**
+   * ✅ PERBAIKAN 3: SEARCH DENGAN METADATA FILTERING & ADAPTIVE THRESHOLD
    */
   async searchRelevantDocs(query) {
     try {
       console.log(`🔍 [RAG] Original query: "${query}"`);
+      
+      // Deteksi question type untuk filtering
+      const questionType = this.detectQuestionType(query, []);
+      
+      // ✅ PERBAIKAN: GUNAKAN ADAPTIVE THRESHOLD
+      const adaptiveThreshold = getAdaptiveThreshold(query);
+      console.log(`   🎯 Adaptive threshold: ${adaptiveThreshold} (query length: ${query.length})`);
       
       // Expand query dengan synonyms dan typo handling
       const expandedQueries = this.expandQueryWithTypos(query);
@@ -951,7 +400,7 @@ class RagService {
       let bestQuery = query;
       let bestScore = 0;
 
-      // ✅ OPTIMASI: Buat embedding untuk SETIAP expanded query
+      // ✅ OPTIMASI: Buat embedding untuk SETIAP expanded query dengan filtering
       for (const expandedQuery of expandedQueries) {
         try {
           console.log(`   🔍 Mencari dengan: "${expandedQuery}"`);
@@ -959,20 +408,46 @@ class RagService {
           // Buat embedding untuk query ini
           const queryVector = await openaiService.createEmbedding(expandedQuery);
           
+          // ✅ PERBAIKAN 3: TAMBAH METADATA FILTERING
+          let filter = null;
+          if (questionType === 'syariah') {
+            filter = {
+              must: [
+                { key: 'chunk_type', match: { value: 'syariah' } }
+              ]
+            };
+            console.log(`   🎯 Applying syariah filter`);
+          } else if (questionType === 'location') {
+            filter = {
+              must: [
+                { key: 'chunk_type', match: { value: 'location' } }
+              ]
+            };
+          } else if (questionType === 'program') {
+            filter = {
+              must: [
+                { key: 'chunk_type', match: { value: 'program' } }
+              ]
+            };
+          }
+
           const searchResult = await client.search(COLLECTION_NAME, {
             vector: queryVector,
             limit: TOP_K_DOCS,
             with_payload: true,
-            score_threshold: SIMILARITY_THRESHOLD
+            score_threshold: adaptiveThreshold, // ✅ GUNAKAN ADAPTIVE THRESHOLD
+            filter: filter // ✅ Gunakan filter metadata
           });
 
-          console.log(`   📊 Hasil: ${searchResult.length} dokumen`);
+          console.log(`   📊 Hasil: ${searchResult.length} dokumen (filter: ${questionType}, threshold: ${adaptiveThreshold})`);
 
-          // Pilih results dengan score tertinggi
+          // ✅ PERBAIKAN 9: APPLY SIMPLE RERANKER
           if (searchResult.length > 0) {
-            const currentBestScore = Math.max(...searchResult.map(r => r.score));
-            if (searchResult.length > bestResults.length || currentBestScore > bestScore) {
-              bestResults = searchResult;
+            const rerankedResults = await this.rerankResults(expandedQuery, searchResult, 5);
+            
+            const currentBestScore = Math.max(...rerankedResults.map(r => r.rerankScore));
+            if (rerankedResults.length > bestResults.length || currentBestScore > bestScore) {
+              bestResults = rerankedResults;
               bestQuery = expandedQuery;
               bestScore = currentBestScore;
             }
@@ -993,7 +468,7 @@ class RagService {
       if (bestResults.length === 0) {
         console.log(`🔎 [RAG] Fallback: Mencari dengan threshold lebih rendah (${FALLBACK_THRESHOLD})...`);
         
-        for (const expandedQuery of expandedQueries.slice(0, 8)) {
+        for (const expandedQuery of expandedQueries.slice(0, 5)) {
           try {
             const queryVector = await openaiService.createEmbedding(expandedQuery);
             const fallbackResults = await client.search(COLLECTION_NAME, {
@@ -1017,12 +492,18 @@ class RagService {
 
       // LOG HASIL DETAIL
       if (bestResults.length > 0) {
-        console.log(`📄 [RAG] Dokumen ditemukan:`);
+        console.log(`📄 [RAG] Dokumen ditemukan setelah reranking:`);
         bestResults.forEach((result, index) => {
-          console.log(`   ${index + 1}. Score: ${result.score.toFixed(3)} | Type: ${result.payload.chunk_type} | File: ${result.payload.source_file}`);
+          console.log(`   ${index + 1}. Score: ${result.score.toFixed(3)} | Rerank: ${result.rerankScore?.toFixed(3)} | Type: ${result.payload.chunk_type} | File: ${result.payload.source_file}`);
           console.log(`      Title: ${result.payload.title}`);
           console.log(`      Preview: ${result.payload.text.substring(0, 80)}...`);
         });
+        
+        return bestResults.map(res => ({
+          text: res.payload.text,
+          score: res.score,
+          rerankScore: res.rerankScore
+        }));
       } else {
         console.log(`❌ [RAG] TIDAK ADA DOKUMEN YANG COCOK untuk semua expanded queries`);
         
@@ -1033,9 +514,9 @@ class RagService {
         } catch (error) {
           console.log(`🐛 [DEBUG] Gagal cek koleksi: ${error.message}`);
         }
+        
+        return [];
       }
-
-      return bestResults.map(res => res.payload.text);
 
     } catch (error) {
       console.error('❌ [RAG] Retrieval Error:', error);
@@ -1075,8 +556,9 @@ class RagService {
         console.log(`\n📄 [RAG] Memproses: ${file}`);
         console.log(`   📝 Konten panjang: ${content.length} karakter`);
         
-        const chunks = this.simpleChunking(content, file);
-        console.log(`   🔪 Dibagi menjadi ${chunks.length} chunks`);
+        // ✅ PERBAIKAN 1: GUNAKAN OPTIMAL CHUNKING
+        const chunks = this.optimalChunking(content, file);
+        console.log(`   🔪 Dibagi menjadi ${chunks.length} chunks optimal`);
 
         const points = [];
 
@@ -1128,72 +610,14 @@ class RagService {
     }
   }
 
+  // ❌ KEEP OLD METHOD FOR BACKWARD COMPATIBILITY
   simpleChunking(content, filename) {
-    const chunks = [];
-    
-    console.log(`   🔍 Menganalisis konten ${filename}...`);
-    
-    const sections = content.split(/(?=^#+\s+)/m).filter(section => section.trim().length > 0);
-    
-    console.log(`   📑 Ditemukan ${sections.length} sections utama`);
-    
-    for (const section of sections) {
-      const cleanSection = section.trim();
-      if (cleanSection.length < 30) continue;
-      
-      let title = 'Informasi Umum';
-      const titleMatch = cleanSection.match(/^#+\s+(.+)$/m);
-      if (titleMatch) {
-        title = titleMatch[1].trim();
-      } else {
-        title = cleanSection.substring(0, 50).replace(/\n/g, ' ').trim() + '...';
-      }
-      
-      let type = 'general';
-      const lowerSection = cleanSection.toLowerCase();
-      
-      if (lowerSection.includes('alamat') || lowerSection.includes('lokasi') || lowerSection.includes('jl.')) {
-        type = 'location';
-      } else if (lowerSection.includes('fakultas') || lowerSection.includes('program studi')) {
-        type = 'program';
-      } else if (lowerSection.includes('kontak') || lowerSection.includes('hotline') || lowerSection.includes('website')) {
-        type = 'contact';
-      } else if (lowerSection.includes('beasiswa')) {
-        type = 'scholarship';
-      } else if (lowerSection.includes('fasilitas')) {
-        type = 'facilities';
-      } else if (lowerSection.includes('murabahah') || lowerSection.includes('syariah') || lowerSection.includes('riba')) {
-        type = 'syariah';
-      }
-      
-      chunks.push({
-        type: type,
-        title: title,
-        content: cleanSection
-      });
-      
-      console.log(`   ➕ Chunk: "${title.substring(0, 40)}..." (${type})`);
-    }
-    
-    if (chunks.length === 0) {
-      console.log(`   ⚠️ Tidak ada sections, menggunakan paragraph splitting`);
-      const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 50);
-      
-      for (const [index, paragraph] of paragraphs.entries()) {
-        chunks.push({
-          type: 'paragraph',
-          title: `Bagian ${index + 1} - ${filename}`,
-          content: paragraph.trim()
-        });
-      }
-    }
-    
-    console.log(`   📊 Total chunks: ${chunks.length}`);
-    return chunks;
+    console.log(`   ⚠️ Menggunakan simpleChunking (legacy) untuk ${filename}`);
+    return this.optimalChunking(content, filename, 600, 0); // Fallback tanpa overlap
   }
 
   /**
-   * ✅ OPTIMASI BARU: Compile Context yang Lebih Efisien untuk Jawaban Singkat
+   * ✅ PERBAIKAN 8: OPTIMAL CONTEXT COMPILATION
    */
   compileContext(docs) {
     if (!docs || docs.length === 0) {
@@ -1203,32 +627,117 @@ class RagService {
     
     console.log(`📋 [RAG] Mengkompilasi ${docs.length} dokumen untuk jawaban singkat`);
     
-    // ✅ OPTIMASI: Ambil hanya bagian paling relevan dari setiap dokumen
-    const optimizedDocs = docs.map(doc => {
-      // Ambil hanya 300-500 karakter pertama dari setiap dokumen
-      // untuk menghindari konteks yang terlalu panjang
-      if (doc.length > 500) {
-        return doc.substring(0, 500) + '...';
+    // Prioritaskan dokumen dengan score tertinggi
+    const sortedDocs = docs.sort((a, b) => (b.rerankScore || b.score) - (a.rerankScore || a.score));
+    
+    // Ambil dokumen terbaik sampai mencapai token limit
+    let totalLength = 0;
+    const MAX_CONTEXT_LENGTH = 2500; // Character limit
+    const optimizedDocs = [];
+    
+    for (const doc of sortedDocs) {
+      const docText = doc.text;
+      if (totalLength + docText.length <= MAX_CONTEXT_LENGTH) {
+        optimizedDocs.push(docText);
+        totalLength += docText.length;
+      } else {
+        // Potong dokumen terakhir jika perlu, tapi pastikan masih bermakna
+        const remaining = MAX_CONTEXT_LENGTH - totalLength;
+        if (remaining > 150) { // Minimal 150 karakter agar bermakna
+          const truncated = this.truncateAtSentence(docText, remaining);
+          optimizedDocs.push(truncated);
+          totalLength += truncated.length;
+        }
+        break;
       }
-      return doc;
-    });
+    }
     
     const context = "INFORMASI RELEVAN DARI DATABASE TAZKIA:\n\n" + 
-                  optimizedDocs.join("\n\n--- INFORMASI TERKAIT ---\n\n");
+                   optimizedDocs.join("\n\n--- INFORMASI TERKAIT ---\n\n");
     
-    console.log(`📦 [RAG] Konteks dikompilasi: ${context.length} karakter`);
-    
+    console.log(`📦 [RAG] Konteks optimal: ${optimizedDocs.length} dokumen, ${context.length} karakter`);
     return context;
   }
 
   /**
-   * ✅ OPTIMASI BARU: Deteksi Question Type untuk Penawaran yang Tepat
+   * Helper untuk truncate di akhir kalimat
+   */
+  truncateAtSentence(text, maxLength) {
+    if (text.length <= maxLength) return text;
+    
+    // Cari titik potong di akhir kalimat
+    const truncated = text.substring(0, maxLength);
+    const lastSentenceEnd = Math.max(
+      truncated.lastIndexOf('. '),
+      truncated.lastIndexOf('? '),
+      truncated.lastIndexOf('! ')
+    );
+    
+    if (lastSentenceEnd > maxLength * 0.7) { // Minimal 70% dari maxLength
+      return text.substring(0, lastSentenceEnd + 1) + '..';
+    }
+    
+    return truncated + '...';
+  }
+
+  /**
+   * ✅ PERBAIKAN 9: SIMPLE RERANKER
+   */
+  async rerankResults(query, searchResults, topN = 3) {
+    const questionType = this.detectQuestionType(query, []);
+    
+    const reranked = searchResults.map(result => {
+      let score = result.score * 0.6; // 60% dari similarity score
+      
+      // 20% untuk chunk type relevance
+      if (result.payload.chunk_type === questionType) {
+        score += 0.2;
+        console.log(`   🎯 Bonus chunk type match: ${result.payload.chunk_type} === ${questionType}`);
+      }
+      
+      // 20% untuk content length optimality (300-800 chars ideal)
+      const length = result.payload.text.length;
+      if (length >= 300 && length <= 800) {
+        score += 0.2;
+      } else if (length > 100 && length < 1200) {
+        score += 0.1;
+      }
+      
+      return { ...result, rerankScore: score };
+    });
+    
+    const finalResults = reranked
+      .sort((a, b) => b.rerankScore - a.rerankScore)
+      .slice(0, topN);
+      
+    console.log(`🎯 [RAG] Reranked: ${finalResults.length} dari ${searchResults.length} results`);
+    return finalResults;
+  }
+
+  /**
+   * ✅ PERBAIKAN KRITIS: DETEKSI QUESTION TYPE YANG LEBIH AKURAT
    */
   detectQuestionType(userMessage, relevantDocs) {
     const message = userMessage.toLowerCase();
-    const docsText = relevantDocs.join(' ').toLowerCase();
     
-    // Deteksi berdasarkan keyword
+    // ✅ PERBAIKAN: DETEKSI LEBIH AKURAT UNTUK TERM SYARIAH
+    const syariahKeywords = [
+      'mudarabah', 'mudharabah', 'murabahah', 'musyarakah', 'ijarah',
+      'riba', 'syariah', 'islamic', 'fatwa', 'dsn-mui', 'dsn mui',
+      'akad', 'halal', 'haram', 'fiqh', 'muamalah', 'bank syariah',
+      'ekonomi islam', 'keuangan syariah'
+    ];
+    
+    const hasSyariahKeyword = syariahKeywords.some(keyword => 
+      message.includes(keyword)
+    );
+    
+    if (hasSyariahKeyword) {
+      console.log(`   🎯 Detected syariah question: "${message}"`);
+      return 'syariah';
+    }
+    
+    // Deteksi berdasarkan keyword lainnya
     if (message.includes('apa itu') || message.includes('pengertian') || message.includes('definisi')) {
       return 'definition';
     } else if (message.includes('dimana') || message.includes('lokasi') || message.includes('alamat')) {
@@ -1237,20 +746,148 @@ class RagService {
       return 'program';
     } else if (message.includes('cara') || message.includes('proses') || message.includes('tahapan')) {
       return 'procedure';
-    } else if (message.includes('murabahah') || message.includes('riba') || message.includes('syariah')) {
-      return 'syariah';
     }
     
-    // Deteksi berdasarkan konten dokumen
-    if (docsText.includes('fakultas') || docsText.includes('program studi')) {
-      return 'program';
-    } else if (docsText.includes('jl.') || docsText.includes('sentul') || docsText.includes('bogor')) {
-      return 'location';
-    } else if (docsText.includes('murabahah') || docsText.includes('fatwa') || docsText.includes('dsn-mui')) {
-      return 'syariah';
+    // Deteksi berdasarkan konten dokumen jika ada
+    if (relevantDocs && relevantDocs.length > 0) {
+      const docsText = relevantDocs.join(' ').toLowerCase();
+      if (docsText.includes('fakultas') || docsText.includes('program studi')) {
+        return 'program';
+      } else if (docsText.includes('jl.') || docsText.includes('sentul') || docsText.includes('bogor')) {
+        return 'location';
+      } else if (docsText.includes('murabahah') || docsText.includes('fatwa') || docsText.includes('dsn-mui')) {
+        return 'syariah';
+      }
     }
     
     return 'general';
+  }
+
+  /**
+   * ✅ FUNGSI BARU: Deteksi User Type untuk Guest Mode
+   */
+  detectUserType(userMessage, conversationHistory) {
+    const message = userMessage.toLowerCase();
+    const fullConversation = conversationHistory.map(msg => msg.content).join(' ').toLowerCase();
+    
+    // Keyword untuk user engaged
+    const engagedKeywords = [
+      'thanks', 'thank you', 'makasih', 'terima kasih', 'keren', 'bagus', 'helpful',
+      'mantap', 'oke', 'good', 'nice', 'sip', 'oke banget'
+    ];
+    
+    const isEngaged = engagedKeywords.some(keyword => 
+      message.includes(keyword) || fullConversation.includes(keyword)
+    );
+    
+    if (isEngaged) return 'engaged';
+    return 'general';
+  }
+
+  /**
+   * ✅ METHOD BARU: Answer Question dengan Short Answer + Offers (OPTIMIZED TOKENS)
+   */
+  async answerQuestion(userMessage, conversationHistory = [], options = {}) {
+    const startTime = performance.now();
+
+    try {
+      console.log(`\n💬 [RAG] Pertanyaan: "${userMessage}"`);
+
+      const relevantDocs = await this.searchRelevantDocs(userMessage);
+      const contextString = this.compileContext(relevantDocs);
+      
+      // ✅ DETEKSI USER TYPE & QUESTION TYPE
+      const userType = this.detectUserType(userMessage, conversationHistory);
+      const questionType = this.detectQuestionType(userMessage, relevantDocs);
+      
+      console.log(`👤 [RAG] User type: ${userType}, Question type: ${questionType}`);
+      
+      let aiReply;
+      
+      if (contextString) {
+        console.log('🤖 [RAG] Menggenerate SHORT response dengan konteks...');
+        
+        // ✅ TENTUKAN LANGUAGE STYLE BERDASARKAN USER TYPE
+        let languageStyle = 'formal';
+        if (userType === 'engaged') {
+          languageStyle = 'casual';
+        }
+        
+        aiReply = await openaiService.generateAIResponse(
+          userMessage, 
+          conversationHistory, 
+          contextString, 
+          {
+            maxTokens: 400,
+            temperature: 0.01,
+            isShortAnswer: true,
+            languageStyle: languageStyle,
+            questionType: questionType // Pass question type untuk fallback
+          }
+        );
+      } else {
+        console.log('🔄 [RAG] Fallback: Tidak ada konteks relevan');
+        
+        const isGreeting = /^(assalam|salam|halo|hai|pagi|siang|sore|malam|tes|p|hi|hello)/i.test(userMessage);
+        
+        if (isGreeting) {
+          aiReply = await openaiService.generateAIResponse(
+            userMessage, 
+            conversationHistory, 
+            null,
+            {
+              maxTokens: 150,
+              isShortAnswer: true,
+              languageStyle: 'casual'
+            }
+          );
+        } else {
+          let fallbackStyle = 'formal';
+          if (userType === 'engaged') {
+            fallbackStyle = 'casual';
+          }
+          
+          aiReply = await openaiService.generateAIResponse(
+            userMessage, 
+            conversationHistory, 
+            null,
+            {
+              maxTokens: 250,
+              isShortAnswer: true,
+              languageStyle: fallbackStyle,
+              questionType: questionType // Pass question type untuk fallback
+            }
+          );
+        }
+      }
+
+      const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+      
+      console.log(`🚀 [RAG] Selesai dalam ${duration}s`, {
+        hasContext: !!contextString,
+        docsFound: relevantDocs.length,
+        userType: userType,
+        questionType: questionType,
+        replyLength: aiReply.length,
+        wordCount: aiReply.split(' ').length,
+        hasOffer: aiReply.includes('?') && (aiReply.includes('ingin') || aiReply.includes('mau') || aiReply.includes('apakah')),
+        isShort: aiReply.length <= 600
+      });
+
+      return aiReply;
+
+    } catch (error) {
+      console.error('❌ [RAG] Error:', error);
+      
+      // ✅ FALLBACK ERROR DENGAN VARIASI
+      const fallbacks = [
+        "Afwan, sistem sedang mengalami gangguan teknis. Mohon hubungi Admin Kampus di 0821-84-800-600 untuk bantuan lebih lanjut.",
+        "Alhamdulillah, saya ingin membantu namun sedang ada kendala teknis. Silakan hubungi Admin Kampus di 0821-84-800-600 ya!",
+        "Wah, sepertinya Kia lagi gangguan nih 😅 Yuk langsung chat Admin Kampus di 0821-84-800-600, mereka pasti bisa bantu!"
+      ];
+      
+      return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+    }
   }
 
   /**
@@ -1259,7 +896,7 @@ class RagService {
   async answerWithOptions(userMessage, conversationHistory = [], customOptions = {}) {
     const defaultOptions = {
       maxTokens: 400,
-      temperature: 0.1,
+      temperature: 0.01,
       isShortAnswer: true,
       languageStyle: 'formal'
     };
@@ -1291,6 +928,31 @@ class RagService {
     } catch (error) {
       return { exists: false, error: error.message };
     }
+  }
+
+  /**
+   * Detect chunk type from content
+   */
+  detectChunkType(content) {
+    const lowerContent = content.toLowerCase();
+    
+    if (lowerContent.includes('alamat') || lowerContent.includes('lokasi') || lowerContent.includes('jl.')) {
+      return 'location';
+    } else if (lowerContent.includes('fakultas') || lowerContent.includes('program studi')) {
+      return 'program';
+    } else if (lowerContent.includes('kontak') || lowerContent.includes('hotline') || lowerContent.includes('website')) {
+      return 'contact';
+    } else if (lowerContent.includes('beasiswa')) {
+      return 'scholarship';
+    } else if (lowerContent.includes('fasilitas')) {
+      return 'facilities';
+    } else if (lowerContent.includes('murabahah') || lowerContent.includes('syariah') || lowerContent.includes('riba') ||
+               lowerContent.includes('musyarakah') || lowerContent.includes('mudharabah') || lowerContent.includes('ijarah') ||
+               lowerContent.includes('mudarabah') || lowerContent.includes('qiradh')) {
+      return 'syariah';
+    }
+    
+    return 'general';
   }
 
   /**
@@ -1329,7 +991,6 @@ class RagService {
         });
       }
       
-      // ✅ STATISTIK YANG LEBIH DETAIL
       const shortAnswers = results.filter(r => r.isShort);
       const withOffers = results.filter(r => r.hasOffer);
       
