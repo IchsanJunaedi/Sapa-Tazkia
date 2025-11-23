@@ -9,85 +9,112 @@ const openai = new OpenAI({
 });
 
 /**
- * ✅ SYSTEM PROMPT UPDATED: Mendukung format List/Bullet Points
+ * ============================================================================
+ * 🛡️ GOD MODE PROMPT CONFIGURATION (STRICT ANTI-HALLUCINATION)
+ * ============================================================================
  */
-const OPTIMIZED_SYSTEM_PROMPT = `Anda adalah "Kia" - Asisten Virtual Universitas Tazkia.
 
-📚 **ATURAN UTAMA:**
-1. **SUMBER:** Jawab HANYA berdasarkan KONTEKS yang diberikan.
-2. **FORMAT LIST:** Jika menyebutkan Program Studi, Syarat, atau Langkah-langkah, GUNAKAN BULLET POINTS.
-3. **KETIDAKTAHUAN:** Jika info tidak ada di konteks, arahkan ke Admin (0821-84-800-600).
-4. **GAYA BAHASA:** Indonesia formal namun ramah, informatif, dan to-the-point.
+const OPTIMIZED_SYSTEM_PROMPT = `
+⛔ **CRITICAL INSTRUCTION (BACA DULU):**
+Anda adalah "Kia", AI Khusus Universitas Tazkia.
+Anda **DILARANG KERAS** menjawab pertanyaan di luar topik akademik/kampus Tazkia.
 
-💡 **STRUKTUR JAWABAN:**
-- Pendahuluan singkat (1 kalimat).
-- Isi utama (gunakan poin-poin jika berupa daftar).
-- Penutup/Tawaran bantuan.`;
+🚫 **DAFTAR TOPIK TERLARANG (HARUS DITOLAK):**
+1. **Kuliner/Resep Masakan:** (Contoh: "Cara buat nasi goreng", "Resep seblak"). Jawab: "Afwan, Kia hanya melayani info akademik, bukan resep masakan."
+2. **Hiburan/Selebriti/Film:** (Contoh: "Siapa artis A?", "Film terbaru").
+3. **Politik & Isu Sensitif.**
+4. **Tugas Sekolah Umum:** (Contoh: "Hitung luas lingkaran", "Apa ibu kota Peru").
 
-/**
- * ✅ CONTEXT PROMPTS
- */
+✅ **TUGAS UTAMA:**
+Hanya menjawab pertanyaan User menggunakan data yang disediakan di **{context}**.
+
+🧠 **REASONING PROCESS (SEBELUM MENJAWAB):**
+1. Cek Topik: Apakah ini tentang Tazkia/Islam/Akademik? 
+   - JIKA TIDAK -> TOLAK dengan sopan & Islami.
+   - JIKA YA -> Lanjut ke langkah 2.
+2. Cek Konteks: Apakah jawabannya ada di {context}?
+   - JIKA TIDAK ADA -> Katakan "Mohon maaf, data spesifik belum tersedia." JANGAN MENGARANG.
+   - JIKA ADA -> Jawab sesuai data.
+
+🎨 **GAYA BAHASA & ADAB:**
+- **Salam:** Awali dengan "Assalamualaikum" atau "Waalaikumsalam".
+- **Tone:** Ramah, Formal, Islami ("Insya Allah", "Alhamdulillah", "Afwan").
+- **Doa Penutup:** Wajib ada doa singkat di akhir.
+- **Format:** Gunakan Bullet Points untuk daftar.
+`;
+
 const CONTEXT_ENFORCEMENT_PROMPTS = {
-  syariah: `KONTEKS SYARIAH DITEMUKAN:
+  syariah: `KONTEKS HUKUM/SYARIAH:
 {context}
-**INSTRUKSI:** Jelaskan fatwa/prinsip berdasarkan teks di atas.`,
 
-  general: `INFORMASI DITEMUKAN:
+PERTANYAAN USER: "{query}"
+
+INSTRUKSI:
+1. Jawab berdasarkan teks di atas.
+2. Jika teks tidak relevan dengan pertanyaan, katakan data tidak ditemukan.`,
+
+  general: `INFORMASI KAMPUS:
 {context}
-**INSTRUKSI:** Jawab pertanyaan user menggunakan fakta di atas.`,
+
+PERTANYAAN USER: "{query}"
+
+INSTRUKSI:
+1. Cek apakah {context} relevan dengan "{query}".
+2. JANGAN gunakan pengetahuan luar (internet/umum) jika {context} kosong.`,
   
-  program: `DATA PROGRAM STUDI DITEMUKAN:
+  program: `DATA AKADEMIK:
 {context}
-**INSTRUKSI:** Sebutkan daftar Program Studi atau detail kurikulum secara lengkap menggunakan Bullet Points.`,
+
+PERTANYAAN USER: "{query}"
+
+INSTRUKSI:
+1. Fokus pada Program Studi yang ditanyakan.
+2. Jika user bertanya PRODI KEDOKTERAN/TEKNIK yang tidak ada di list, katakan PRODI TERSEBUT TIDAK TERSEDIA DI TAZKIA.`
 };
 
-/**
- * TEMPLATE PENAWARAN
- */
 const OFFER_TEMPLATES = {
   program: [
-    "Ingin tahu prospek karir lulusannya?",
-    "Mau rincian biaya kuliahnya?",
-    "Perlu info syarat pendaftarannya?"
+    "Tertarik dengan prospek karirnya juga, Kak? 😊",
+    "Kia punya info rincian biaya kuliahnya, mau dilihat?",
+    "Perlu info syarat pendaftaran untuk jurusan ini?"
   ],
   general: [
-    "Ada lagi yang bisa Kia bantu?",
-    "Butuh info pendaftaran?",
-    "Ingin tersambung ke admin?"
+    "Ada hal lain yang bisa Kia bantu jelaskan? ✨",
+    "Apakah Kakak butuh panduan pendaftaran?",
+    "Ingin Kia hubungkan langsung ke Admin Kampus?"
+  ],
+  syariah: [
+    "Ingin tahu contoh penerapannya di bank syariah?",
+    "Perlu dalil Al-Quran yang mendasarinya?",
+    "Ada istilah fiqh lain yang membingungkan Kakak?"
   ]
 };
 
-/**
- * FALLBACK RESPONSES
- */
 const FALLBACK_RESPONSES = {
-  withContext: [
-    "Berdasarkan data kami: {keyInfo}",
-    "Dari informasi yang tersedia: {keyInfo}"
+  lowConfidence: [
+    "Afwan, Kia kurang yakin dengan jawaban untuk pertanyaan tersebut. 🤔 Agar informasinya valid, silakan tanya langsung ke Admin Kampus di 0821-84-800-600 ya.",
+    "Mohon maaf, Kia belum menemukan informasi yang pas di database. Boleh dibantu Admin kami di 0821-84-800-600? 🙏"
   ],
   noContext: [
-    "Mohon maaf, detail tersebut belum tersedia di database Kia. Silakan hubungi Admin di 0821-84-800-600.",
-    "Kia belum menemukan info spesifiknya. Boleh dibantu Admin kami di 0821-84-800-600 ya kak."
+    "Afwan, detail tersebut belum tersedia di data Kia saat ini. Silakan hubungi Admin Kampus di 0821-84-800-600 ya Kak. 😊",
+    "Qadarullah, Kia belum punya data lengkap soal itu. Coba konsultasi ke Admin di 0821-84-800-600 ya! ✨"
   ]
 };
 
 /**
- * 1. Generate Embedding
+ * ============================================================================
+ * 🛠️ CORE SERVICE LOGIC
+ * ============================================================================
  */
+
 async function createEmbedding(text) {
   try {
     if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY missing');
-
-    // Bersihkan teks tapi pertahankan spasi penting
     const cleanText = text.replace(/\s+/g, " ").trim();
-    
-    console.log(`🧬 [OPENAI] Creating embedding (${cleanText.length} chars)...`);
-    
     const response = await openai.embeddings.create({
       model: "text-embedding-3-small",
       input: cleanText,
     });
-
     return response.data[0].embedding;
   } catch (error) {
     console.error('❌ [OPENAI] Error creating embedding:', error);
@@ -95,18 +122,14 @@ async function createEmbedding(text) {
   }
 }
 
-/**
- * 2. Chat Completion (Helper for raw calls)
- */
 async function chatCompletion(messages, options = {}) {
   try {
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: messages,
       max_tokens: options.maxTokens || 500,
-      temperature: options.temperature || 0.1
+      temperature: options.temperature || 0.3
     });
-    
     return completion.choices[0].message.content.trim();
   } catch (error) {
     console.error('❌ [OPENAI] Completion Error:', error);
@@ -114,14 +137,11 @@ async function chatCompletion(messages, options = {}) {
   }
 }
 
-/**
- * ✅ PERBAIKAN UTAMA: Generate AI Response
- */
 async function generateAIResponse(userMessage, conversationHistory = [], customContext = null, options = {}) {
   try {
     const {
-      maxTokens = 1000, 
-      temperature = 0.2, 
+      maxTokens = 600, 
+      temperature = 0.1, 
       userType = 'general',
       questionType = 'general',
       forceContextUsage = false
@@ -131,7 +151,6 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
     
     console.log(`🤖 [OPENAI] Generating response for "${questionType}"...`);
 
-    // Build Messages
     const messages = buildContextEnforcementMessages(
       userMessage, 
       conversationHistory, 
@@ -141,28 +160,27 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
       forceContextUsage
     );
 
-    // Call OpenAI
     const completion = await openai.chat.completions.create({
       model: modelName,
       messages: messages,
       max_tokens: maxTokens,
       temperature: temperature,
-      presence_penalty: 0.2,
+      presence_penalty: 0.0, 
     });
 
     let aiReply = completion.choices[0].message.content.trim();
 
-    // Validasi Output
+    // Validasi Output Layer 2
     aiReply = validateAndEnhanceResponse(aiReply, customContext, userMessage, questionType);
     
-    // ✅ PERBAIKAN LOGGING: Menampilkan Token Usage
-    console.log('✅ [OPENAI] Response generated:', {
+    // ✅ LOGGING TOKEN YANG DIPERBAIKI (PASTI MUNCUL)
+    const usage = completion.usage || { total_tokens: 0, prompt_tokens: 0, completion_tokens: 0 };
+    console.log('💰 [OPENAI USAGE]', {
       model: modelName,
-      totalTokens: completion.usage?.total_tokens || 0,
-      promptTokens: completion.usage?.prompt_tokens || 0, // Token input (User + Context)
-      completionTokens: completion.usage?.completion_tokens || 0, // Token output (Jawaban AI)
-      length: aiReply.length,
-      contextUsed: checkContextUsage(aiReply, customContext)
+      inputTokens: usage.prompt_tokens,
+      outputTokens: usage.completion_tokens,
+      totalTokens: usage.total_tokens, // Ini yang Anda cari
+      responseLength: aiReply.length
     });
 
     return aiReply;
@@ -173,9 +191,6 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
   }
 }
 
-/**
- * Helper: Build Messages
- */
 function buildContextEnforcementMessages(userMessage, conversationHistory, customContext, userType, questionType, forceContextUsage) {
   const messages = [];
   
@@ -183,18 +198,23 @@ function buildContextEnforcementMessages(userMessage, conversationHistory, custo
   
   if (customContext) {
     const contextTemplate = CONTEXT_ENFORCEMENT_PROMPTS[questionType] || CONTEXT_ENFORCEMENT_PROMPTS.general;
-    systemPrompt = contextTemplate.replace('{context}', customContext);
+    
+    systemPrompt = contextTemplate
+        .replace('{context}', customContext)
+        .replace('{query}', userMessage);
     
     if (forceContextUsage) {
-      systemPrompt += `\n\n⚠️ **PENTING:** Gunakan data di atas! Jangan mengarang bebas.`;
+      systemPrompt += `\n\n⚠️ **PERINGATAN KERAS:** Gunakan data di atas! Jika pertanyaan User adalah tentang RESEP/MASAKAN/HIBURAN, JANGAN GUNAKAN DATA, TAPI TOLAK PERMINTAAN.`;
     }
   } else {
-    systemPrompt += `\n\n⚠️ **INFO:** Konteks tidak ditemukan. Gunakan pengetahuan umum terbatas atau arahkan ke Admin.`;
+    systemPrompt += `\n\n⚠️ **INFO:** Database Kosong.
+    INSTRUKSI:
+    1. Jika pertanyaan adalah sapaan ("Halo", "Assalamualaikum"), jawab ramah.
+    2. Jika pertanyaan butuh FAKTA (Biaya, Prodi, Resep, Cara), KATAKAN TIDAK TAHU. JANGAN MENGARANG.`;
   }
   
   messages.push({ role: 'system', content: systemPrompt });
 
-  // History (batasi 2 terakhir agar hemat token dan tetap fokus)
   if (conversationHistory.length > 0) {
     const recentHistory = conversationHistory.slice(-2); 
     messages.push(...recentHistory.map(msg => ({
@@ -208,13 +228,9 @@ function buildContextEnforcementMessages(userMessage, conversationHistory, custo
   return messages;
 }
 
-/**
- * ✅ PERBAIKAN: Extract Key Info yang menghormati format List/Markdown
- */
 function extractKeyInformation(context, question) {
   if (!context) return null;
   
-  // Jika konteks mengandung list (bullet points), ambil blok tersebut
   if (context.includes('- ') || context.includes('1. ')) {
     const lines = context.split('\n');
     const relevantLines = lines.filter(line => 
@@ -225,66 +241,62 @@ function extractKeyInformation(context, question) {
       )
     );
     
-    // Jika menemukan struktur list, kembalikan chunk yang lebih besar
     if (relevantLines.length > 0) {
-      // Ambil 600 karakter pertama dari konteks yang relevan untuk menjaga struktur
-      return context.substring(0, 600) + "..."; 
+      let result = context.substring(0, 600);
+      const lastDot = result.lastIndexOf('.');
+      if (lastDot > 100) result = result.substring(0, lastDot + 1);
+      return result + "..";
     }
   }
 
-  // Fallback ke logika kalimat jika bukan list
   const sentences = context.split(/[.!?]+/).filter(s => s.trim().length > 20);
   return sentences.slice(0, 3).join('. ') + '.';
 }
 
-/**
- * Validate Response
- */
 function validateAndEnhanceResponse(response, context, question, questionType) {
   const lowerRes = response.toLowerCase();
   
-  // Cek response "Malas" atau "Menyerah"
+  const forbiddenKeywords = ['tumis', 'siapkan bahan', 'panaskan minyak', 'potong-potong', 'sajikan hangat'];
+  if (forbiddenKeywords.some(word => lowerRes.includes(word))) {
+      console.warn('🚨 [OPENAI] Hallucination Detected (Recipe). Blocking output.');
+      return "Afwan Kak, Kia adalah asisten akademik. Kia tidak memiliki kapabilitas untuk memberikan resep masakan atau info di luar topik kampus. Ada yang bisa Kia bantu seputar perkuliahan? 😊";
+  }
+
   const invalidPhrases = [
     'maaf, informasi tidak ditemukan',
     'tidak ada dalam konteks',
-    'saya tidak tahu'
+    'saya tidak tahu',
+    'konteks yang diberikan tidak mencantumkan'
   ];
 
   const isInvalid = invalidPhrases.some(p => lowerRes.includes(p));
   
-  // Jika punya konteks tapi AI bilang tidak tahu -> Paksa ekstrak manual
   if (context && isInvalid) {
-    console.log('⚠️ [OPENAI] AI menolak menjawab padahal ada konteks. Melakukan override...');
     const keyInfo = extractKeyInformation(context, question);
     if (keyInfo) {
-      return `Berdasarkan data yang ada, berikut informasinya:\n\n${keyInfo}\n\n${generateOfferPhrase(extractTopic(question), questionType)}`;
+      return `Afwan Kak, berdasarkan data yang Kia miliki:\n\n${keyInfo}\n\n${generateOfferPhrase(extractTopic(question), questionType)}`;
     }
   }
 
   return response;
 }
 
-/**
- * Smart Fallback
- */
 function getSmartFallback(question, context, options) {
   const { questionType } = options;
   
   if (context) {
     const keyInfo = extractKeyInformation(context, question);
     if (keyInfo) {
-      return `Informasi singkat yang ditemukan: ${keyInfo}. Silakan tanya lebih detail.`;
+      return `Afwan, informasi singkat yang Kia temukan: ${keyInfo}. Silakan tanya lebih detail ya Kak.`;
     }
   }
   
-  return FALLBACK_RESPONSES.noContext[0];
+  const fallbacks = FALLBACK_RESPONSES.noContext;
+  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
 
-/**
- * Utils
- */
 function extractTopic(question) {
-  const ignore = ['apa', 'saja', 'yang', 'ada', 'di', 'prodi', 'fakultas'];
+  const ignore = ['apa', 'saja', 'yang', 'ada', 'di', 'prodi', 'fakultas', 'bagaimana', 'bisa', 'tolong', 'jelaskan', 'kak', 'kia'];
   return question.toLowerCase().split(' ')
     .filter(w => !ignore.includes(w) && w.length > 3)
     .join(' ') || 'topik ini';
@@ -295,17 +307,11 @@ function generateOfferPhrase(topic, type = 'general') {
   return list[Math.floor(Math.random() * list.length)];
 }
 
-function hasOfferPhrase(text) {
-  return text.includes('?') && (text.includes('Ingin') || text.includes('Mau'));
-}
-
 function checkContextUsage(response, context) {
   if (!context) return 'none';
-  const keyword = context.split(' ')[0].substring(0, 5).toLowerCase();
+  const keyword = context.substring(0, 20).toLowerCase().split(' ')[0]; 
   return response.toLowerCase().includes(keyword) ? 'good' : 'weak';
 }
-
-// --- Testing Functions (Simplified) ---
 
 async function testOpenAIConnection() {
   try {
