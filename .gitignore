@@ -5,7 +5,6 @@ docker-compose.yml
 qdrant_storage/
 mysql_data
 geminiService.js  
-data
 .env
 build
 public

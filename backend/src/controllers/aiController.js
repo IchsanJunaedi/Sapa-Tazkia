@@ -9,8 +9,11 @@ const prisma = require('../../config/prisma');
  * ============================================================================
  */
 
-// ✅ FUNCTION SEND CHAT (SUPPORT GUEST MODE & RAG)
+// ✅ FUNCTION SEND CHAT (DENGAN RAG FALLBACK HANDLING)
 const sendChat = async (req, res) => {
+  let currentConversationId = null;
+  let shouldCreateNewConversation = false;
+
   try {
     const { message, conversationId, isNewChat } = req.body;
     
@@ -54,13 +57,31 @@ const sendChat = async (req, res) => {
       }
     }
 
-    // 3. 🧠 PANGGIL RAG SERVICE (CORE INTELLIGENCE)
+    // 3. 🧠 PANGGIL RAG SERVICE DENGAN FALLBACK HANDLING
     console.log('🚀 [AI CONTROLLER] Calling RAG Service...');
-    const aiResponse = await ragService.answerQuestion(cleanMessage, conversationHistory);
+    let aiResponse;
+    
+    try {
+      // Coba RAG service dulu
+      aiResponse = await ragService.answerQuestion(cleanMessage, conversationHistory);
+      console.log('✅ [AI CONTROLLER] RAG Response successful');
+    } catch (ragError) {
+      console.error('❌ [AI CONTROLLER] RAG Service failed:', ragError.message);
+      
+      // FALLBACK: Gunakan OpenAI langsung tanpa RAG
+      console.log('🔄 [AI CONTROLLER] Using OpenAI fallback...');
+      try {
+        aiResponse = await generateAIResponse(cleanMessage, conversationHistory, 'general');
+        console.log('✅ [AI CONTROLLER] Fallback response successful');
+      } catch (fallbackError) {
+        console.error('❌ [AI CONTROLLER] Fallback also failed:', fallbackError.message);
+        throw new Error('All AI services unavailable');
+      }
+    }
 
     // 4. LOGIC PENYIMPANAN DATABASE (HANYA JIKA USER LOGIN)
-    let currentConversationId = conversationId ? parseInt(conversationId) : null;
-    let shouldCreateNewConversation = isNewChat || !conversationId;
+    currentConversationId = conversationId ? parseInt(conversationId) : null;
+    shouldCreateNewConversation = isNewChat || !conversationId;
 
     if (userId) {
       try {
@@ -131,6 +152,7 @@ const sendChat = async (req, res) => {
         }
       } catch (dbError) {
         console.error('❌ [AI CONTROLLER] Database save error (Response sent anyway):', dbError.message);
+        // Jangan throw error di sini, response AI sudah jadi
       }
     }
 
@@ -145,10 +167,18 @@ const sendChat = async (req, res) => {
 
   } catch (error) {
     console.error('❌ [AI CONTROLLER] Chat Error:', error);
+    
+    // Response error yang lebih informative
+    const errorMessage = error.message.includes('All AI services unavailable') 
+      ? "Maaf, layanan AI sedang sibuk. Silakan coba beberapa saat lagi."
+      : "Afwan, sistem sedang mengalami gangguan.";
+
     res.status(500).json({
       success: false,
-      message: "Afwan, sistem sedang mengalami gangguan.",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      conversationId: currentConversationId,
+      timestamp: new Date().toISOString()
     });
   }
 };
@@ -160,7 +190,6 @@ const sendChat = async (req, res) => {
  */
 
 // ✅ FUNCTION TRIGGER INGESTION (HARD RESET MODE)
-// Menggunakan resetAndReingest() agar data lama/hantu terhapus bersih
 const triggerIngestion = async (req, res) => {
   try {
     console.log("🔄 [AI CONTROLLER] Memulai PROSES RESET & RE-INGESTION...");
@@ -170,7 +199,6 @@ const triggerIngestion = async (req, res) => {
     console.log('📊 [AI CONTROLLER] Status sebelum reset:', beforeStatus);
     
     // 2. Lakukan Hard Reset & Ingest Ulang
-    // Ini akan menghapus collection lama dan membuatnya baru dari file yang ada sekarang
     const result = await ragService.resetAndReingest();
     
     if (result.success) {
