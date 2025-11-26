@@ -9,19 +9,97 @@ const path = require('path');
 
 /**
  * ============================================================================
- * MIDDLEWARE SETUP - FIXED WITH GUEST-FRIENDLY AUTH
+ * RATE LIMITER SETUP - ENHANCED WITH NEW RATE LIMIT SYSTEM
  * ============================================================================
  */
 
-// ✅ GUEST-FRIENDLY AUTH: Menggunakan middleware baru yang sudah diperbaiki
+// ✅ PERBAIKAN: Import rate limit middleware yang baru
+let rateLimitMiddleware;
+let guestRateLimit;
+let userRateLimit;
+let premiumRateLimit;
+let ipRateLimit;
+
+try {
+  const rateLimitModule = require('../middleware/rateLimitMiddleware');
+  rateLimitMiddleware = rateLimitModule.rateLimitMiddleware;
+  guestRateLimit = rateLimitModule.guestRateLimit;
+  userRateLimit = rateLimitModule.userRateLimit;
+  premiumRateLimit = rateLimitModule.premiumRateLimit;
+  ipRateLimit = rateLimitModule.ipRateLimit;
+  
+  console.log('✅ [RATE LIMIT] Enhanced rate limiter loaded successfully');
+} catch (error) {
+  console.error('❌ [RATE LIMIT] Failed to load enhanced rate limiter:', error.message);
+  
+  // ✅ FALLBACK: Create safe fallback rate limiters
+  const fallbackRateLimiter = (req, res, next) => {
+    console.log('⚠️ [RATE LIMIT] Using fallback rate limiter');
+    next();
+  };
+  
+  rateLimitMiddleware = fallbackRateLimiter;
+  guestRateLimit = fallbackRateLimiter;
+  userRateLimit = fallbackRateLimiter;
+  premiumRateLimit = fallbackRateLimiter;
+  ipRateLimit = fallbackRateLimiter;
+}
+
+/**
+ * ============================================================================
+ * CUSTOM RATE LIMIT STRATEGY FOR AI ROUTES
+ * ============================================================================
+ */
+
+// ✅ CUSTOM RATE LIMIT: Strategi khusus untuk routes AI
+const aiSpecificRateLimit = (req, res, next) => {
+  // Skip rate limiting jika dimatikan di environment
+  if (process.env.RATE_LIMIT_ENABLED === 'false') {
+    return next();
+  }
+
+  // Terapkan IP-based rate limiting terlebih dahulu
+  ipRateLimit(req, res, (ipError) => {
+    if (ipError) {
+      return next(ipError);
+    }
+
+    // Terapkan user-specific rate limiting berdasarkan authentication
+    if (req.user) {
+      // User terautentikasi - gunakan user rate limits
+      if (req.user.isPremium || req.user.role === 'premium') {
+        premiumRateLimit(req, res, next);
+      } else {
+        userRateLimit(req, res, next);
+      }
+    } else {
+      // Guest user - gunakan guest rate limits
+      guestRateLimit(req, res, next);
+    }
+  });
+};
+
+/**
+ * ============================================================================
+ * MIDDLEWARE SETUP - ENHANCED WITH RATE LIMIT AWARENESS
+ * ============================================================================
+ */
+
+// ✅ GUEST-FRIENDLY AUTH dengan rate limit awareness
 const guestFriendlyAuth = authMiddleware.guestFriendlyAuth;
 
-// ✅ BACKWARD COMPATIBILITY: Optional auth untuk routes yang butuh lebih strict
+// ✅ RATE LIMIT AWARE OPTIONAL AUTH
 const optionalAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
   
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authMiddleware.requireAuth(req, res, next);
+    return authMiddleware.requireAuth(req, res, (authError) => {
+      if (authError) {
+        console.log('👤 [AUTH] Auth failed, falling back to guest');
+        req.user = null;
+      }
+      next();
+    });
   }
   
   req.user = null;
@@ -31,13 +109,13 @@ const optionalAuth = (req, res, next) => {
 
 /**
  * ============================================================================
- * UTILITY FUNCTIONS
+ * UTILITY FUNCTIONS - ENHANCED
  * ============================================================================
  */
 
 // Function untuk cek dan validasi data directory
 const validateDataDirectory = () => {
-  const dataDir = path.join(__dirname, '../../data'); // ✅ PATH YANG BENAR: backend/data/
+  const dataDir = path.join(__dirname, '../../data');
   
   console.log('📁 [VALIDATE] Checking data directory:', dataDir);
   
@@ -62,18 +140,47 @@ const validateDataDirectory = () => {
   };
 };
 
+// ✅ UTILITY: Safe async handler untuk menghindari try-catch berulang
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// ✅ UTILITY: Rate limit info extractor untuk response
+const addRateLimitHeaders = (req, res, rateLimitInfo) => {
+  if (rateLimitInfo) {
+    res.set({
+      'X-RateLimit-Limit': rateLimitInfo.limit,
+      'X-RateLimit-Remaining': rateLimitInfo.remaining,
+      'X-RateLimit-Reset': rateLimitInfo.resetTime
+    });
+  }
+};
+
 /**
  * ============================================================================
- * 1. PUBLIC / HYBRID ROUTES (BISA GUEST, BISA LOGIN) - FIXED AUTH
+ * 1. PUBLIC / HYBRID ROUTES (BISA GUEST, BISA LOGIN) - ENHANCED RATE LIMITING
  * ============================================================================
  */
 
-// ✅ CHAT ROUTE UTAMA (RAG INTEGRATED) - GUEST FRIENDLY
-router.post('/chat', guestFriendlyAuth, aiController.sendChat);
+// ✅ CHAT ROUTE UTAMA (RAG INTEGRATED) - ENHANCED RATE LIMITING
+router.post('/chat', 
+  guestFriendlyAuth, 
+  aiSpecificRateLimit, 
+  asyncHandler(async (req, res, next) => {
+    try {
+      // ✅ FIX: Langsung panggil controller tanpa manipulasi response
+      await aiController.sendChat(req, res);  
+      // Tambahkan rate limit info ke response jika ada    
+    } catch (error) {
+      next(error);
+    }
+  })
+);
 
-// ✅ PUBLIC KNOWLEDGE BASE STATUS - GUEST FRIENDLY
-router.get('/knowledge-status', guestFriendlyAuth, async (req, res) => {
-  try {
+// ✅ PUBLIC KNOWLEDGE BASE STATUS - GUEST FRIENDLY (NO RATE LIMIT)
+router.get('/knowledge-status', 
+  guestFriendlyAuth, 
+  asyncHandler(async (req, res) => {
     console.log('🔍 [DEBUG] Checking knowledge base status...');
     
     // 1. Cek koneksi Qdrant
@@ -107,6 +214,7 @@ router.get('/knowledge-status', guestFriendlyAuth, async (req, res) => {
         ready_for_ingestion: dataCheck.exists && dataCheck.count > 0
       },
       access_type: req.user ? 'authenticated' : 'guest',
+      user_type: req.user ? (req.user.isPremium ? 'premium' : 'user') : 'guest',
       timestamp: new Date().toISOString()
     };
 
@@ -123,20 +231,14 @@ router.get('/knowledge-status', guestFriendlyAuth, async (req, res) => {
     }
 
     res.json(responseData);
-    
-  } catch (error) {
-    console.error('❌ [DEBUG] Status check failed:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message,
-      message: "Gagal memeriksa status knowledge base" 
-    });
-  }
-});
+  })
+);
 
-// ✅ MANUAL INGESTION TRIGGER - PUBLIC (GUEST FRIENDLY) - FIXED
-router.post('/ingest-now', guestFriendlyAuth, async (req, res) => {
-  try {
+// ✅ MANUAL INGESTION TRIGGER - PUBLIC dengan RATE LIMIT RINGAN
+router.post('/ingest-now', 
+  guestFriendlyAuth, 
+  ipRateLimit, // Hanya IP-based limiting untuk ingestion
+  asyncHandler(async (req, res) => {
     console.log('🚀 [INGEST] Manual ingestion triggered...');
     
     // Log user info untuk debugging
@@ -175,10 +277,8 @@ router.post('/ingest-now', guestFriendlyAuth, async (req, res) => {
     
     // Jalankan ingestion
     console.log('🔄 [INGEST] Starting data ingestion process...');
-    // Gunakan resetAndReingest untuk membersihkan data hantu (Ghost Data)
     const result = await ragService.resetAndReingest();
     
-    // ✅ FIX: Perbaikan pengecekan result yang undefined
     if (result && result.success) {
       // Cek status setelah ingestion
       const afterStatus = await ragService.getCollectionInfo();
@@ -210,7 +310,6 @@ router.post('/ingest-now', guestFriendlyAuth, async (req, res) => {
     } else {
       console.log('❌ [INGEST] Failed:', result?.error || 'Unknown error');
       
-      // ✅ FIX: Definisikan errorResponse dengan benar
       const errorResponse = { 
         success: false, 
         error: result?.error || 'Ingestion failed without error message',
@@ -230,41 +329,19 @@ router.post('/ingest-now', guestFriendlyAuth, async (req, res) => {
 
       res.status(500).json(errorResponse);
     }
-    
-  } catch (error) {
-    console.error('❌ [INGEST] Error:', error);
-    
-    // ✅ FIX: Definisikan errorResponse di catch block
-    const errorResponse = {
-      success: false,
-      error: error.message,
-      message: "Terjadi error saat proses ingestion"
-    };
-    
-    // Berikan saran berdasarkan jenis error
-    if (error.message.includes('Qdrant') || error.message.includes('connection')) {
-      errorResponse.suggestion = 'Pastikan Qdrant container berjalan: docker-compose up -d qdrant';
-    } else if (error.message.includes('ENOENT') || error.message.includes('no such file')) {
-      errorResponse.suggestion = 'Pastikan folder data exists: backend/data/ dengan file .md di dalamnya';
-    } else if (error.message.includes('directory') || error.message.includes('path')) {
-      errorResponse.suggestion = 'Pastikan struktur folder benar. Data harus di: backend/data/';
-    } else if (error.message.includes('OpenAI') || error.message.includes('API key')) {
-      errorResponse.suggestion = 'Cek OpenAI API key di environment variables';
-    }
-
-    res.status(500).json(errorResponse);
-  }
-});
+  })
+);
 
 /**
  * ============================================================================
- * 2. PROTECTED ROUTES (WAJIB LOGIN) - UNCHANGED
+ * 2. PROTECTED ROUTES (WAJIB LOGIN) - ENHANCED RATE LIMITING
  * ============================================================================
  */
 
-// ✅ KNOWLEDGE BASE INGESTION (PROTECTED)
-router.post('/ingest', authMiddleware.requireAuth, async (req, res) => {
-  try {
+// ✅ KNOWLEDGE BASE INGESTION (PROTECTED) - NO RATE LIMIT (Admin action)
+router.post('/ingest', 
+  authMiddleware.requireAuth, 
+  asyncHandler(async (req, res) => {
     console.log('🚀 [INGEST] Protected ingestion triggered by user:', req.user.id);
     
     // Validasi data directory sebelum proses
@@ -279,7 +356,6 @@ router.post('/ingest', authMiddleware.requireAuth, async (req, res) => {
     }
     
     const beforeStatus = await ragService.getCollectionInfo();
-    // Menggunakan resetAndReingest untuk konsistensi
     const result = await ragService.resetAndReingest();
     
     if (result && result.success) {
@@ -303,62 +379,71 @@ router.post('/ingest', authMiddleware.requireAuth, async (req, res) => {
         data_validation: dataCheck
       });
     }
-    
-  } catch (error) {
-    console.error('❌ [INGEST] Error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message,
-      message: "Gagal memproses data pengetahuan" 
-    });
-  }
-});
+  })
+);
 
-// ✅ MANAJEMEN PERCAKAPAN (PROTECTED)
+// ✅ MANAJEMEN PERCAKAPAN (PROTECTED) - NO RATE LIMIT (Read-only operations)
 router.get('/conversations', authMiddleware.requireAuth, aiController.getConversations);
 router.get('/history/:chatId', authMiddleware.requireAuth, aiController.getChatHistory);
 router.delete('/conversations/:chatId', authMiddleware.requireAuth, aiController.deleteConversation);
 
-// ✅ FITUR AKADEMIK (PROTECTED)
-router.post('/analyze-academic', authMiddleware.requireAuth, aiController.analyzeAcademicPerformance);
-router.post('/study-recommendations', authMiddleware.requireAuth, aiController.getStudyRecommendations);
+// ✅ FITUR AKADEMIK (PROTECTED) - ENHANCED RATE LIMITING
+router.post('/analyze-academic', 
+  authMiddleware.requireAuth, 
+  userRateLimit, 
+  aiController.analyzeAcademicPerformance
+);
+
+router.post('/study-recommendations', 
+  authMiddleware.requireAuth, 
+  userRateLimit, 
+  aiController.getStudyRecommendations
+);
 
 /**
  * ============================================================================
- * 3. TEST & UTILITY ROUTES (PUBLIC) - GUEST FRIENDLY
+ * 3. TEST & UTILITY ROUTES (PUBLIC) - ENHANCED RATE LIMITING
  * ============================================================================
  */
 
-// Test koneksi AI sederhana - GUEST FRIENDLY
-router.post('/test-ai', guestFriendlyAuth, async (req, res) => {
-  try {
+// Test koneksi AI sederhana - GUEST FRIENDLY + RATE LIMITED
+router.post('/test-ai', 
+  guestFriendlyAuth, 
+  aiSpecificRateLimit,
+  asyncHandler(async (req, res) => {
     const { message } = req.body;
     const testMessage = message || 'Halo, tes koneksi AI';
     
     console.log('🔍 [TEST-AI] Testing AI with message:', testMessage);
     const response = await openaiService.generateAIResponse(testMessage, [], null);
     
-    res.json({
+    const responseData = {
       success: true,
       message: 'AI Test - Successful',
       test_message: testMessage,
       response: response,
       access_type: req.user ? 'authenticated' : 'guest',
+      user_type: req.user ? (req.user.isPremium ? 'premium' : 'user') : 'guest',
       timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('❌ [TEST-AI] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      message: 'AI Test - Failed'
-    });
-  }
-});
+    };
 
-// Test koneksi OpenAI - GUEST FRIENDLY
-router.get('/test-openai', guestFriendlyAuth, async (req, res) => {
-  try {
+    // Tambahkan rate limit info jika ada
+    if (res.get('X-RateLimit-Remaining')) {
+      responseData.rate_limit = {
+        remaining: parseInt(res.get('X-RateLimit-Remaining')),
+        limit: parseInt(res.get('X-RateLimit-Limit')),
+        reset: parseInt(res.get('X-RateLimit-Reset'))
+      };
+    }
+
+    res.json(responseData);
+  })
+);
+
+// Test koneksi OpenAI - GUEST FRIENDLY (NO RATE LIMIT - Diagnostic)
+router.get('/test-openai', 
+  guestFriendlyAuth, 
+  asyncHandler(async (req, res) => {
     console.log('🔧 [TEST-OPENAI] Testing OpenAI connection...');
     
     const testResult = await openaiService.testOpenAIConnection();
@@ -370,6 +455,7 @@ router.get('/test-openai', guestFriendlyAuth, async (req, res) => {
         response: testResult.message,
         model: testResult.model,
         access_type: req.user ? 'authenticated' : 'guest',
+        user_type: req.user ? (req.user.isPremium ? 'premium' : 'user') : 'guest',
         timestamp: new Date().toISOString()
       });
     } else {
@@ -379,19 +465,13 @@ router.get('/test-openai', guestFriendlyAuth, async (req, res) => {
         message: 'OpenAI Connection Test - Failed'
       });
     }
-  } catch (error) {
-    console.error('❌ [TEST-OPENAI] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      message: 'OpenAI Connection Test - Failed'
-    });
-  }
-});
+  })
+);
 
-// Test Embedding Function - GUEST FRIENDLY
-router.get('/test-embedding', guestFriendlyAuth, async (req, res) => {
-  try {
+// Test Embedding Function - GUEST FRIENDLY (NO RATE LIMIT - Diagnostic)
+router.get('/test-embedding', 
+  guestFriendlyAuth, 
+  asyncHandler(async (req, res) => {
     console.log('🧬 [TEST-EMBEDDING] Testing embedding function...');
     
     const testText = "Lokasi kampus Tazkia di Sentul City Bogor";
@@ -404,21 +484,17 @@ router.get('/test-embedding', guestFriendlyAuth, async (req, res) => {
       dimensions: embedding.length,
       sample: embedding.slice(0, 5),
       access_type: req.user ? 'authenticated' : 'guest',
+      user_type: req.user ? (req.user.isPremium ? 'premium' : 'user') : 'guest',
       timestamp: new Date().toISOString()
     });
-  } catch (error) {
-    console.error('❌ [TEST-EMBEDDING] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      message: 'Embedding Test - Failed'
-    });
-  }
-});
+  })
+);
 
-// Test RAG System - NEW ENDPOINT - GUEST FRIENDLY
-router.post('/test-rag', guestFriendlyAuth, async (req, res) => {
-  try {
+// Test RAG System - GUEST FRIENDLY + RATE LIMITED
+router.post('/test-rag', 
+  guestFriendlyAuth, 
+  aiSpecificRateLimit,
+  asyncHandler(async (req, res) => {
     const { message } = req.body;
     const testMessage = message || 'lokasi kampus tazkia';
     
@@ -431,7 +507,7 @@ router.post('/test-rag', guestFriendlyAuth, async (req, res) => {
     // Test full RAG process
     const ragResponse = await ragService.answerQuestion(testMessage, []);
     
-    res.json({
+    const responseData = {
       success: true,
       message: 'RAG System Test - Completed',
       test_query: testMessage,
@@ -442,19 +518,24 @@ router.post('/test-rag', guestFriendlyAuth, async (req, res) => {
       })),
       rag_response: ragResponse,
       access_type: req.user ? 'authenticated' : 'guest',
+      user_type: req.user ? (req.user.isPremium ? 'premium' : 'user') : 'guest',
       timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('❌ [TEST-RAG] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      message: 'RAG System Test - Failed'
-    });
-  }
-});
+    };
 
-// Public Test (Cek apakah API hidup) - PUBLIC
+    // Tambahkan rate limit info jika ada
+    if (res.get('X-RateLimit-Remaining')) {
+      responseData.rate_limit = {
+        remaining: parseInt(res.get('X-RateLimit-Remaining')),
+        limit: parseInt(res.get('X-RateLimit-Limit')),
+        reset: parseInt(res.get('X-RateLimit-Reset'))
+      };
+    }
+
+    res.json(responseData);
+  })
+);
+
+// Public Test (Cek apakah API hidup) - PUBLIC (NO RATE LIMIT)
 router.get('/public-test', (req, res) => {
   res.json({
     success: true,
@@ -462,13 +543,15 @@ router.get('/public-test', (req, res) => {
     timestamp: new Date().toISOString(),
     rag_enabled: true,
     guest_access: true,
-    version: '2.5' // ✅ UPDATE VERSION - FIXED ERROR HANDLING
+    rate_limits_enabled: process.env.RATE_LIMIT_ENABLED !== 'false',
+    version: '3.0' // ✅ UPDATE VERSION - ENHANCED RATE LIMITING
   });
 });
 
-// Health Check dengan detail - GUEST FRIENDLY
-router.get('/health', guestFriendlyAuth, async (req, res) => {
-  try {
+// Health Check dengan detail - GUEST FRIENDLY (NO RATE LIMIT - Diagnostic)
+router.get('/health', 
+  guestFriendlyAuth, 
+  asyncHandler(async (req, res) => {
     const collectionInfo = await ragService.getCollectionInfo();
     const dataCheck = validateDataDirectory();
     
@@ -492,10 +575,23 @@ router.get('/health', guestFriendlyAuth, async (req, res) => {
       embeddingStatus = 'ERROR: ' + error.message;
     }
     
+    // Test Redis connection untuk rate limiting
+    let redisStatus = 'UNKNOWN';
+    try {
+      const redisService = require('../services/redisService');
+      redisStatus = await redisService.healthCheck() ? 'HEALTHY' : 'UNHEALTHY';
+    } catch (error) {
+      redisStatus = 'ERROR: ' + error.message;
+    }
+    
     res.json({ 
       status: 'OK', 
       service: 'AI Service', 
       rag_enabled: true,
+      rate_limiting: {
+        enabled: process.env.RATE_LIMIT_ENABLED !== 'false',
+        redis: redisStatus
+      },
       openai_status: openaiStatus,
       embedding_status: embeddingStatus,
       data_directory: dataCheck,
@@ -505,26 +601,21 @@ router.get('/health', guestFriendlyAuth, async (req, res) => {
         status: collectionInfo.exists ? 'READY' : 'NO_DATA'
       },
       access_type: req.user ? 'authenticated' : 'guest',
+      user_type: req.user ? (req.user.isPremium ? 'premium' : 'user') : 'guest',
       timestamp: new Date().toISOString()
     });
-  } catch (error) {
-    console.error('❌ [HEALTH] Error:', error);
-    res.status(500).json({
-      status: 'ERROR',
-      service: 'AI Service',
-      error: error.message
-    });
-  }
-});
+  })
+);
 
-// Reset Knowledge Base (Hati-hati!) - PROTECTED
-router.post('/reset-knowledge', authMiddleware.requireAuth, async (req, res) => {
-  try {
+// Reset Knowledge Base (Hati-hati!) - PROTECTED (NO RATE LIMIT - Admin action)
+router.post('/reset-knowledge', 
+  authMiddleware.requireAuth, 
+  asyncHandler(async (req, res) => {
     console.log('🔄 [RESET] Resetting knowledge base...');
     
     // Hanya admin yang bisa reset
-    if (!req.user.isAdmin) { // Pastikan field isAdmin ada di user model atau sesuaikan logika
-      // Jika tidak ada role admin, kita skip check ini untuk development
+    if (!req.user.isAdmin) {
+      // Skip untuk development, uncomment untuk production
       // return res.status(403).json({
       //   success: false,
       //   message: 'Hanya admin yang dapat mereset knowledge base'
@@ -538,59 +629,116 @@ router.post('/reset-knowledge', authMiddleware.requireAuth, async (req, res) => 
       message: 'Knowledge Base Reset Successful',
       result
     });
-    
-  } catch (error) {
-    console.error('❌ [RESET] Error:', error);
-    res.status(500).json({
+  })
+);
+
+// Rate Limit Status Check - PUBLIC
+router.get('/rate-limit-status',
+  guestFriendlyAuth,
+  asyncHandler(async (req, res) => {
+    try {
+      const rateLimitService = require('../services/rateLimitService');
+      const userId = req.user?.id || null;
+      const ipAddress = req.ip;
+      const userType = req.user ? (req.user.isPremium ? 'premium' : 'user') : 'guest';
+      
+      const status = await rateLimitService.checkRateLimit(userId, ipAddress, userType);
+      const bucketStatus = await rateLimitService.checkTokenBucket(userId, ipAddress, userType);
+      
+      res.json({
+        success: true,
+        data: {
+          user_type: userType,
+          authenticated: !!req.user,
+          window_limits: status,
+          token_bucket: bucketStatus,
+          adaptive_limits: await rateLimitService.getAdaptiveLimit(userType)
+        }
+      });
+    } catch (error) {
+      console.error('Error getting rate limit status:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get rate limit status'
+      });
+    }
+  })
+);
+
+/**
+ * ============================================================================
+ * ERROR HANDLING & DOCUMENTATION
+ * ============================================================================
+ */
+
+// Error handling middleware khusus untuk routes ini
+router.use((error, req, res, next) => {
+  console.error('❌ [ROUTE ERROR] Unhandled error:', error);
+  
+  // Handle rate limit errors specifically
+  if (error.status === 429) {
+    return res.status(429).json({
       success: false,
-      error: error.message
+      error: 'Rate limit exceeded',
+      message: error.message,
+      retry_after: error.retryAfter,
+      limit: error.limit,
+      reset_time: error.resetTime
     });
   }
+  
+  res.status(500).json({
+    success: false,
+    error: error.message,
+    message: 'Terjadi kesalahan internal server'
+  });
 });
 
 // Dokumentasi Route Sederhana - PUBLIC
 router.get('/', (req, res) => {
   res.json({
-    message: '🤖 SAPA TAZKIA AI API v2.5 (Guest-Friendly RAG System)',
-    description: 'AI Chatbot dengan RAG untuk Universitas Tazkia - FIXED ERROR HANDLING',
+    message: '🤖 SAPA TAZKIA AI API v3.0 (Enhanced Rate Limiting)',
+    description: 'AI Chatbot dengan RAG untuk Universitas Tazkia',
     endpoints: {
       public: {
-        chat: 'POST /api/ai/chat (Guest/Auth)',
+        chat: 'POST /api/ai/chat (Guest/Auth - ENHANCED RATE LIMITED)',
         status: 'GET /api/ai/knowledge-status (Guest/Auth)',
         health: 'GET /api/ai/health (Guest/Auth)',
         test: 'GET /api/ai/public-test (Guest/Auth)',
         test_embedding: 'GET /api/ai/test-embedding (Guest/Auth)',
-        test_rag: 'POST /api/ai/test-rag (Guest/Auth)'
+        test_rag: 'POST /api/ai/test-rag (Guest/Auth - RATE LIMITED)',
+        rate_limit_status: 'GET /api/ai/rate-limit-status (Guest/Auth)'
       },
       protected: {
         ingest: 'POST /api/ai/ingest (Auth Only)',
         conversations: 'GET /api/ai/conversations (Auth Only)',
-        history: 'GET /api/ai/history/:chatId (Auth Only)'
+        history: 'GET /api/ai/history/:chatId (Auth Only)',
+        analyze_academic: 'POST /api/ai/analyze-academic (Auth Only - RATE LIMITED)',
+        study_recommendations: 'POST /api/ai/study-recommendations (Auth Only - RATE LIMITED)'
       },
       utility: {
         manual_ingest: 'POST /api/ai/ingest-now (Guest/Auth - Testing)',
         test_openai: 'GET /api/ai/test-openai (Guest/Auth)',
-        test_ai: 'POST /api/ai/test-ai (Guest/Auth)'
+        test_ai: 'POST /api/ai/test-ai (Guest/Auth - RATE LIMITED)',
+        reset_knowledge: 'POST /api/ai/reset-knowledge (Auth Only)'
       }
     },
+    rate_limits: {
+      guest: '10 requests / minute, 50 / hour, 200 / day',
+      user: '30 requests / minute, 200 / hour, 1000 / day', 
+      premium: '100 requests / minute, 1000 / hour, 5000 / day',
+      ip_based: '20 requests / minute (additional security)',
+      adaptive: 'Automatic reduction under high system load',
+      status: process.env.RATE_LIMIT_ENABLED !== 'false' ? 'ACTIVE' : 'DISABLED'
+    },
     guest_features: [
-      'Chat dengan AI + RAG',
+      'Chat dengan AI + RAG (Rate Limited)',
       'Akses knowledge base', 
       'Cek status sistem',
       'Test ingestion (untuk development)',
       'Test embedding & OpenAI',
-      'Test RAG system'
-    ],
-    next_steps: [
-      '1. POST /api/ai/ingest-now - Untuk mengisi knowledge base',
-      '2. GET /api/ai/knowledge-status - Untuk cek status data',
-      '3. POST /api/ai/chat - Untuk test chat dengan RAG'
-    ],
-    fixes_in_v2_5: [
-      '✅ Fixed error handling in /ingest-now route',
-      '✅ Fixed undefined variable errorResponse',
-      '✅ Added data directory validation',
-      '✅ Improved error messages and suggestions'
+      'Test RAG system (Rate Limited)',
+      'Check rate limit status'
     ],
     timestamp: new Date().toISOString()
   });
