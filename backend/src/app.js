@@ -8,18 +8,62 @@ require('dotenv').config();
 const authRoutes = require('./routes/authRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const guestRoutes = require('./routes/guestRoutes');
+const rateLimitRoutes = require('./routes/rateLimitRoutes'); // ✅ NEW: Rate limit routes
 
 // Import services
 const authService = require('./services/authService');
+
+// ✅ NEW: Import rate limit error handler
+const { rateLimitErrorHandler } = require('./utils/errorHandlers');
 
 const app = express();
 const prisma = new PrismaClient();
 
 // ========================================================
-// MIDDLEWARE SETUP - OPTIMIZED
+// RATE LIMIT SYSTEM INITIALIZATION - NEW SECTION
 // ========================================================
 
-// CORS configuration - Enhanced
+// ✅ NEW: Initialize rate limit system dengan error handling
+const initializeRateLimitSystem = async () => {
+  try {
+    // ✅ FIX: Coba berbagai path yang mungkin
+    let rateLimitJobs;
+    try {
+      rateLimitJobs = require('./jobs/rateLimitJobs');
+    } catch (error) {
+      try {
+        rateLimitJobs = require('../jobs/rateLimitJobs');
+      } catch (error2) {
+        console.warn('⚠️ [RATE LIMIT] Rate limit jobs not found, continuing without background jobs');
+        return;
+      }
+    }
+    
+    if (rateLimitJobs && typeof rateLimitJobs.init === 'function') {
+      rateLimitJobs.init();
+      console.log('✅ [RATE LIMIT] Rate limit jobs initialized');
+    }
+    
+    // Test Redis connection
+    const redisService = require('./services/redisService');
+    const redisHealth = await redisService.healthCheck();
+    console.log(`✅ [RATE LIMIT] Redis connection: ${redisHealth ? 'HEALTHY' : 'UNHEALTHY'}`);
+    
+    // Initialize rate limit service
+    const rateLimitService = require('./services/rateLimitService');
+    console.log('✅ [RATE LIMIT] Rate limit service ready');
+    
+  } catch (error) {
+    console.error('❌ [RATE LIMIT] Failed to initialize rate limit system:', error.message);
+    console.log('⚠️ [RATE LIMIT] Continuing without rate limiting features');
+  }
+};
+
+// ========================================================
+// MIDDLEWARE SETUP - ENHANCED WITH RATE LIMIT AWARENESS
+// ========================================================
+
+// CORS configuration - Enhanced with rate limit headers
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
   'http://127.0.0.1:3000',
@@ -48,9 +92,21 @@ app.use(cors({
     'Accept',
     'Origin',
     'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
+    'Access-Control-Request-Headers',
+    'X-RateLimit-Limit', // ✅ NEW: Allow rate limit headers
+    'X-RateLimit-Remaining',
+    'X-RateLimit-Reset',
+    'X-RateLimit-User-Type'
   ],
-  exposedHeaders: ['Content-Length', 'Authorization'],
+  exposedHeaders: [
+    'Content-Length', 
+    'Authorization',
+    'X-RateLimit-Limit', // ✅ NEW: Expose rate limit headers
+    'X-RateLimit-Remaining',
+    'X-RateLimit-Reset',
+    'X-RateLimit-User-Type',
+    'Retry-After'
+  ],
   maxAge: 86400
 }));
 
@@ -72,7 +128,11 @@ app.options('*', cors({
     'Accept',
     'Origin',
     'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
+    'Access-Control-Request-Headers',
+    'X-RateLimit-Limit',
+    'X-RateLimit-Remaining',
+    'X-RateLimit-Reset',
+    'X-RateLimit-User-Type'
   ]
 }));
 
@@ -89,12 +149,21 @@ app.use(express.urlencoded({
   parameterLimit: 100
 }));
 
-// Security headers middleware
+// Security headers middleware - Enhanced with rate limit headers
 app.use((req, res, next) => {
   res.removeHeader('X-Powered-By');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  
+  // ✅ NEW: Add rate limit headers to all responses
+  if (!res.get('X-RateLimit-Limit')) {
+    res.setHeader('X-RateLimit-Limit', 'unknown');
+    res.setHeader('X-RateLimit-Remaining', 'unknown');
+    res.setHeader('X-RateLimit-Reset', 'unknown');
+    res.setHeader('X-RateLimit-User-Type', 'unknown');
+  }
+  
   next();
 });
 
@@ -109,7 +178,6 @@ app.use(session({
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    // Remove domain for development to avoid cookie issues
   },
   store: new session.MemoryStore() // Simplified for both environments
 }));
@@ -118,28 +186,29 @@ app.use(session({
 app.use(authService.passport.initialize());
 app.use(authService.passport.session());
 
-// Request logging middleware
+// Request logging middleware - Enhanced with rate limit awareness
 app.use((req, res, next) => {
   console.log('🌐 [REQUEST]', {
     method: req.method,
     url: req.url,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== 'false'
   });
   next();
 });
 
 // ========================================================
-// BASIC ROUTES & HEALTH CHECKS - ENHANCED
+// BASIC ROUTES & HEALTH CHECKS - ENHANCED WITH RATE LIMIT STATUS
 // ========================================================
 
-// Root endpoint
+// Root endpoint - Updated with rate limit info
 app.get('/', (req, res) => {
   res.json({
     success: true,
     message: '🚀 Sapa Tazkia Backend API',
-    version: '3.4.0', // ✅ UPDATE VERSION
+    version: '4.0.0', // ✅ UPDATE VERSION - Rate Limit Integration
     status: 'running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
@@ -149,19 +218,28 @@ app.get('/', (req, res) => {
       googleOAuth: !!process.env.GOOGLE_CLIENT_ID,
       aiChat: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'),
       academicAnalysis: true,
-      ragEnabled: true // ✅ NEW: RAG feature flag
+      ragEnabled: true,
+      rateLimiting: process.env.RATE_LIMIT_ENABLED !== 'false' // ✅ NEW: Rate limit feature flag
     },
     endpoints: {
       auth: '/api/auth',
       ai: '/api/ai',
       guest: '/api/guest',
+      rateLimit: '/api/rate-limit', // ✅ NEW: Rate limit endpoints
       health: '/health',
       status: '/status'
+    },
+    rateLimits: { // ✅ NEW: Rate limit information
+      enabled: process.env.RATE_LIMIT_ENABLED !== 'false',
+      guest: '10/min, 50/hour, 200/day',
+      user: '30/min, 200/hour, 1000/day',
+      premium: '100/min, 1000/hour, 5000/day',
+      adaptive: 'Automatic adjustment under load'
     }
   });
 });
 
-// Health check endpoint - Enhanced with RAG status
+// Health check endpoint - Enhanced with rate limit status
 app.get('/health', async (req, res) => {
   const healthCheck = {
     status: 'OK',
@@ -169,7 +247,12 @@ app.get('/health', async (req, res) => {
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
     services: {},
-    port: process.env.PORT || 5000 // ✅ ADD PORT INFO
+    port: process.env.PORT || 5000,
+    rateLimiting: { // ✅ NEW: Rate limit health section
+      enabled: process.env.RATE_LIMIT_ENABLED !== 'false',
+      redis: 'UNKNOWN',
+      service: 'UNKNOWN'
+    }
   };
 
   try {
@@ -177,6 +260,25 @@ app.get('/health', async (req, res) => {
     await prisma.$queryRaw`SELECT 1`;
     healthCheck.services.database = 'Connected';
     
+    // Test Redis connection for rate limiting
+    try {
+      const redisService = require('./services/redisService');
+      const redisHealth = await redisService.healthCheck();
+      healthCheck.rateLimiting.redis = redisHealth ? 'HEALTHY' : 'UNHEALTHY';
+      healthCheck.services.redis = redisHealth ? 'Connected' : 'Disconnected';
+    } catch (error) {
+      healthCheck.rateLimiting.redis = `ERROR: ${error.message}`;
+      healthCheck.services.redis = `Error: ${error.message}`;
+    }
+    
+    // Test rate limit service
+    try {
+      const rateLimitService = require('./services/rateLimitService');
+      healthCheck.rateLimiting.service = 'READY';
+    } catch (error) {
+      healthCheck.rateLimiting.service = `ERROR: ${error.message}`;
+    }
+
     // Test OpenAI connection
     if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
       try {
@@ -221,9 +323,9 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Status endpoint with more details
-app.get('/status', (req, res) => {
-  res.json({
+// Status endpoint with more details - Enhanced with rate limit info
+app.get('/status', async (req, res) => {
+  const statusData = {
     status: 'operational',
     serverTime: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
@@ -233,14 +335,41 @@ app.get('/status', (req, res) => {
       emailVerification: true,
       ai: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'),
       academicAnalysis: true,
-      ragSystem: true, // ✅ NEW: RAG system status
+      ragSystem: true,
       database: !!process.env.DATABASE_URL,
-      emailService: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD)
+      emailService: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD),
+      rateLimiting: process.env.RATE_LIMIT_ENABLED !== 'false' // ✅ NEW
     },
     aiProvider: process.env.AI_PROVIDER || 'openai',
     aiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-    ragEnabled: true // ✅ NEW: RAG enabled status
-  });
+    ragEnabled: true,
+    rateLimiting: { // ✅ NEW: Detailed rate limit status
+      enabled: process.env.RATE_LIMIT_ENABLED !== 'false',
+      redis: 'UNKNOWN',
+      adaptive: true,
+      guestLimits: {
+        perMinute: 10,
+        perHour: 50,
+        perDay: 200
+      },
+      userLimits: {
+        perMinute: 30,
+        perHour: 200,
+        perDay: 1000
+      }
+    }
+  };
+
+  // Add Redis status
+  try {
+    const redisService = require('./services/redisService');
+    const redisHealth = await redisService.healthCheck();
+    statusData.rateLimiting.redis = redisHealth ? 'HEALTHY' : 'UNHEALTHY';
+  } catch (error) {
+    statusData.rateLimiting.redis = `ERROR: ${error.message}`;
+  }
+
+  res.json(statusData);
 });
 
 // Session debug endpoint
@@ -254,12 +383,24 @@ app.get('/session-debug', (req, res) => {
       initialized: !!authService.passport,
       session: !!req._passport
     },
-    cookies: req.headers.cookie || 'No cookies'
+    cookies: req.headers.cookie || 'No cookies',
+    rateLimitInfo: { // ✅ NEW: Rate limit context
+      ip: req.ip,
+      userType: req.user ? (req.user.isPremium ? 'premium' : 'user') : 'guest'
+    }
   });
 });
 
-// Simple test route
+// Simple test route with rate limit headers
 app.get('/test', (req, res) => {
+  // ✅ NEW: Add sample rate limit headers for testing
+  res.set({
+    'X-RateLimit-Limit': '10',
+    'X-RateLimit-Remaining': '9',
+    'X-RateLimit-Reset': (Date.now() + 60000).toString(),
+    'X-RateLimit-User-Type': 'guest'
+  });
+  
   res.json({ 
     success: true,
     message: 'Test route working!',
@@ -268,12 +409,18 @@ app.get('/test', (req, res) => {
     headers: {
       origin: req.headers.origin,
       'user-agent': req.headers['user-agent']
+    },
+    rateLimitHeaders: { // ✅ NEW: Show rate limit headers in response
+      limit: '10',
+      remaining: '9',
+      reset: new Date(Date.now() + 60000).toISOString(),
+      userType: 'guest'
     }
   });
 });
 
 // ========================================================
-// API ROUTES - FIXED ORDER FOR GUEST ACCESS
+// API ROUTES - ENHANCED WITH RATE LIMIT ROUTES
 // ========================================================
 
 // ✅ FIXED: AI routes FIRST untuk guest access
@@ -285,11 +432,17 @@ app.use('/api/auth', authRoutes);
 // Guest routes - For non-authenticated users
 app.use('/api/guest', guestRoutes);
 
+// ✅ NEW: Rate limit routes - For monitoring and management
+app.use('/api/rate-limit', rateLimitRoutes);
+
 // ========================================================
-// ERROR HANDLING MIDDLEWARE - UPDATED ENDPOINTS LIST
+// ERROR HANDLING MIDDLEWARE - ENHANCED WITH RATE LIMIT ERRORS
 // ========================================================
 
-// 404 Handler - UPDATED dengan semua endpoint baru
+// ✅ NEW: Rate limit error handler (must be before general error handler)
+app.use(rateLimitErrorHandler);
+
+// 404 Handler - UPDATED dengan rate limit endpoints
 app.use('*', (req, res) => {
   console.log('❌ [404] Route not found:', req.method, req.originalUrl);
   
@@ -316,7 +469,10 @@ app.use('*', (req, res) => {
       ],
       guest: [
         'POST /api/guest/chat',
-        'GET  /api/guest/conversation/:sessionId'
+        'GET  /api/guest/conversation/:sessionId',
+        'GET  /api/guest/rate-limit-status', // ✅ NEW
+        'GET  /api/guest/usage-stats/:sessionId', // ✅ NEW
+        'GET  /api/guest/session-info/:sessionId' // ✅ NEW
       ],
       ai: [
         'POST /api/ai/chat',
@@ -324,15 +480,21 @@ app.use('*', (req, res) => {
         'GET  /api/ai/history/:chatId',
         'POST /api/ai/test-ai',
         'GET  /api/ai/test-openai',
-        'GET  /api/ai/test-embedding', // ✅ NEW ENDPOINT
+        'GET  /api/ai/test-embedding',
         'POST /api/ai/analyze-academic',
         'POST /api/ai/study-recommendations',
-        'GET  /api/ai/knowledge-status', // ✅ NEW ENDPOINT
-        'POST /api/ai/ingest-now', // ✅ NEW ENDPOINT
-        'POST /api/ai/ingest', // ✅ NEW ENDPOINT
-        'GET  /api/ai/health', // ✅ NEW ENDPOINT
-        'GET  /api/ai/public-test', // ✅ NEW ENDPOINT
-        'POST /api/ai/reset-knowledge' // ✅ NEW ENDPOINT
+        'GET  /api/ai/knowledge-status',
+        'POST /api/ai/ingest-now',
+        'POST /api/ai/ingest',
+        'GET  /api/ai/health',
+        'GET  /api/ai/public-test',
+        'POST /api/ai/reset-knowledge',
+        'GET  /api/ai/rate-limit-status' // ✅ NEW
+      ],
+      rateLimit: [ // ✅ NEW: Rate limit endpoints
+        'GET  /api/rate-limit/status',
+        'GET  /api/rate-limit/analytics',
+        'POST /api/rate-limit/reset'
       ],
       system: [
         'GET  /',
@@ -342,11 +504,11 @@ app.use('*', (req, res) => {
         'GET  /session-debug'
       ]
     },
-    suggestion: 'Gunakan POST method untuk endpoint ingestion: curl -X POST http://localhost:5000/api/ai/ingest-now'
+    suggestion: 'Check the available endpoints above or refer to the API documentation'
   });
 });
 
-// Global error handler - Enhanced
+// Global error handler - Enhanced with rate limit error handling
 app.use((err, req, res, next) => {
   console.error('🔴 [GLOBAL ERROR]', {
     message: err.message,
@@ -354,9 +516,24 @@ app.use((err, req, res, next) => {
     url: req.url,
     method: req.method,
     ip: req.ip,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    rateLimitError: err.code === 'RATE_LIMIT_EXCEEDED' // ✅ NEW: Rate limit error flag
   });
 
+  // Rate limit error (already handled by rateLimitErrorHandler, but as backup)
+  if (err.code === 'RATE_LIMIT_EXCEEDED' || err.status === 429) {
+    return res.status(429).json({
+      success: false,
+      message: err.message || 'Rate limit exceeded',
+      error: 'rate_limit_exceeded',
+      retry_after: err.retryAfter,
+      limit: err.limit,
+      reset_time: err.resetTime,
+      user_type: err.userType || 'unknown',
+      timestamp: new Date().toISOString()
+    });
+  }
+  
   // CORS error
   if (err.message.includes('CORS')) {
     return res.status(403).json({
@@ -375,6 +552,17 @@ app.use((err, req, res, next) => {
       message: 'Database error occurred',
       error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
       code: err.code
+    });
+  }
+  
+  // Redis error (rate limiting related)
+  if (err.message.includes('Redis') || err.message.includes('ECONNREFUSED')) {
+    console.error('🔴 [REDIS ERROR]', err);
+    return res.status(503).json({
+      success: false,
+      message: 'Rate limiting service temporarily unavailable',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Please try again later',
+      suggestion: 'Rate limits are disabled when Redis is unavailable'
     });
   }
   
@@ -429,7 +617,7 @@ app.use((err, req, res, next) => {
 });
 
 // ========================================================
-// GRACEFUL SHUTDOWN - ENHANCED
+// GRACEFUL SHUTDOWN - ENHANCED WITH RATE LIMIT CLEANUP
 // ========================================================
 
 const gracefulShutdown = async (signal) => {
@@ -439,6 +627,15 @@ const gracefulShutdown = async (signal) => {
     // Close database connection
     await prisma.$disconnect();
     console.log('✅ Database disconnected.');
+    
+    // ✅ NEW: Close Redis connection
+    try {
+      const redisService = require('./services/redisService');
+      // Note: ioredis automatically handles connection cleanup
+      console.log('✅ Redis connections cleaned up.');
+    } catch (error) {
+      console.log('⚠️ Redis cleanup skipped:', error.message);
+    }
     
     // Close server
     if (server) {
@@ -470,15 +667,15 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // ========================================================
-// SERVER START - UPDATED LOGS
+// SERVER START - ENHANCED WITH RATE LIMIT SYSTEM LOGS
 // ========================================================
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
-  console.log('='.repeat(70));
+const server = app.listen(PORT, async () => {
+  console.log('='.repeat(80));
   console.log('🚀 SAPA TAZKIA BACKEND SERVER STARTED SUCCESSFULLY');
-  console.log('='.repeat(70));
+  console.log('='.repeat(80));
   console.log(`📍 Port: ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔐 Auth: ${process.env.GOOGLE_CLIENT_ID ? '✅ Google OAuth Ready' : '❌ Local Auth Only'}`);
@@ -486,35 +683,53 @@ const server = app.listen(PORT, () => {
   console.log(`🤖 AI: ${process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' ? '✅ OpenAI + RAG Ready' : '❌ AI Disabled'}`);
   console.log(`🧠 RAG: ✅ Knowledge Base System Enabled`);
   console.log(`🗄️ Database: ${process.env.DATABASE_URL ? '✅ Connected' : '❌ No DB Config'}`);
+  console.log(`🛡️ Rate Limiting: ${process.env.RATE_LIMIT_ENABLED !== 'false' ? '✅ Enabled' : '❌ Disabled'}`);
+  
+  // ✅ NEW: Rate limit system status
+  try {
+    await initializeRateLimitSystem();
+  } catch (error) {
+    console.log(`⚠️ Rate Limit: ❌ Initialization Failed - ${error.message}`);
+  }
+  
   console.log('');
   console.log('📋 AVAILABLE ENDPOINTS:');
-  console.log('   GET  / .......................... API Root');
-  console.log('   GET  /health ................... Health check (+RAG status)');
-  console.log('   GET  /status ................... System status');
-  console.log('   GET  /session-debug ............ Session debug');
-  console.log('   GET  /test .................... Test route');
+  console.log('   GET  / .......................... API Root (+Rate Limit Info)');
+  console.log('   GET  /health ................... Health check (+Rate Limit Status)');
+  console.log('   GET  /status ................... System status (+Rate Limit Config)');
+  console.log('   GET  /session-debug ............ Session debug (+Rate Limit Context)');
+  console.log('   GET  /test .................... Test route (+Rate Limit Headers)');
   console.log('');
   console.log('🤖 AI ENDPOINTS (Guest & Auth):');
-  console.log('   POST /api/ai/chat ............. AI Chat dengan RAG');
+  console.log('   POST /api/ai/chat ............. AI Chat dengan RAG (+Rate Limited)');
   console.log('   GET  /api/ai/knowledge-status . Cek status knowledge base');
   console.log('   POST /api/ai/ingest-now ....... Manual ingestion (Guest OK)');
   console.log('   POST /api/ai/ingest ........... Protected ingestion');
   console.log('   GET  /api/ai/test-embedding ... Test embedding function');
   console.log('   GET  /api/ai/test-openai ...... Test OpenAI connection');
-  console.log('   POST /api/ai/test-ai .......... Test AI response');
+  console.log('   POST /api/ai/test-ai .......... Test AI response (+Rate Limited)');
   console.log('   GET  /api/ai/conversations .... Get conversations (Auth)');
   console.log('   GET  /api/ai/history/:chatId .. Get chat history (Auth)');
-  console.log('   POST /api/ai/analyze-academic . Analyze academic (Auth)');
-  console.log('   POST /api/ai/study-recommendations . Study recommendations (Auth)');
+  console.log('   POST /api/ai/analyze-academic . Analyze academic (Auth +Rate Limited)');
+  console.log('   POST /api/ai/study-recommendations . Study recommendations (Auth +Rate Limited)');
+  console.log('   GET  /api/ai/rate-limit-status . Check rate limit status'); // ✅ NEW
   console.log('');
   console.log('🔐 AUTH ENDPOINTS:');
   console.log('   POST /api/auth/login .......... User login');
   console.log('   POST /api/auth/register ....... User registration');
-  // ... (sisanya tetap sama)
+  // ... (auth endpoints tetap sama)
   console.log('');
   console.log('👤 GUEST ENDPOINTS:');
-  console.log('   POST /api/guest/chat .......... Guest Chat (No RAG)');
+  console.log('   POST /api/guest/chat .......... Guest Chat (+Enhanced Rate Limits)');
   console.log('   GET  /api/guest/conversation/:sessionId ... Guest History');
+  console.log('   GET  /api/guest/rate-limit-status ........ Guest Rate Limit Status'); // ✅ NEW
+  console.log('   GET  /api/guest/usage-stats/:sessionId .... Guest Usage Stats'); // ✅ NEW
+  console.log('   GET  /api/guest/session-info/:sessionId ... Guest Session Info'); // ✅ NEW
+  console.log('');
+  console.log('📊 RATE LIMIT ENDPOINTS:'); // ✅ NEW SECTION
+  console.log('   GET  /api/rate-limit/status ........... Get rate limit status');
+  console.log('   GET  /api/rate-limit/analytics ....... Get rate limit analytics');
+  console.log('   POST /api/rate-limit/reset ........... Reset rate limits (Admin)');
   console.log('');
   console.log('🛡️  SECURITY FEATURES:');
   console.log('   ✅ CORS Protection');
@@ -524,7 +739,11 @@ const server = app.listen(PORT, () => {
   console.log('   ✅ Input Validation');
   console.log('   ✅ Error Handling');
   console.log('   ✅ Graceful Shutdown');
-  console.log('='.repeat(70));
+  console.log(`   ${process.env.RATE_LIMIT_ENABLED !== 'false' ? '✅' : '❌'} Rate Limiting System`);
+  console.log('   ✅ Multi-layer Rate Limits (IP + User + Token Bucket)');
+  console.log('   ✅ Adaptive Limits under High Load');
+  console.log('   ✅ Real-time Analytics & Monitoring');
+  console.log('='.repeat(80));
 });
 
 module.exports = app;

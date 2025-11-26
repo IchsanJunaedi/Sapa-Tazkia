@@ -7,7 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+//
 // ==================== USERS & AUTH ====================
+//
 
 model User {
   id        Int      @id @default(autoincrement())
@@ -25,7 +27,7 @@ model User {
   phone     String?  @db.VarChar(15)
   programStudiId Int?
   angkatan  Int?
-  
+
   status    String   @default("pending") @db.VarChar(20)
 
   createdAt DateTime @default(now())
@@ -62,7 +64,9 @@ model Session {
   @@map("sessions")
 }
 
+//
 // ==================== ACADEMIC ====================
+//
 
 model ProgramStudi {
   id        Int      @id @default(autoincrement())
@@ -126,7 +130,9 @@ model AcademicSummary {
   @@map("academic_summary")
 }
 
+//
 // ==================== CHAT ====================
+//
 
 model Conversation {
   id        Int       @id @default(autoincrement())
@@ -152,4 +158,62 @@ model Message {
   conversation Conversation @relation(fields: [conversationId], references: [id])
 
   @@map("chat_messages")
+}
+
+//
+// ==================== RATE LIMITING (NEW) ====================
+//
+
+model RateLimit {
+  id        String   @id @default(cuid())
+  userId    String?  @unique
+  ipAddress String?
+  type      RateLimitType
+
+  // Token bucket metrics
+  tokens          Int       @default(30)
+  lastRefill      DateTime  @default(now())
+  burstCapacity   Int       @default(15)
+  refillRate      Int       @default(1) // tokens per second
+
+  // Usage analytics
+  totalRequests   Int       @default(0)
+  blockedRequests Int       @default(0)
+  lastRequest     DateTime? @default(now())
+
+  // Adaptive limits
+  currentLimit    Int       @default(30)
+  limitMultiplier Float     @default(1.0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ipAddress])
+  @@index([userId])
+  @@index([type])
+}
+
+model RateLimitLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  ipAddress    String?
+  userAgent    String?
+  endpoint     String
+  method       String
+  statusCode   Int
+  wasBlocked   Boolean  @default(false)
+  requestSize  Int?     // tokens used
+  responseTime Int?     // ms
+  timestamp    DateTime @default(now())
+
+  @@index([timestamp])
+  @@index([userId, timestamp])
+  @@index([ipAddress, timestamp])
+}
+
+enum RateLimitType {
+  GUEST
+  USER
+  PREMIUM
+  IP
 }

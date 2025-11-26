@@ -27,13 +27,16 @@
     "express-session": "^1.18.2",
     "express-validator": "^7.3.0",
     "faiss-node": "^0.5.1",
+    "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.2",
+    "node-cron": "^3.0.3",
     "nodemailer": "^7.0.10",
     "openai": "^4.104.0",
     "passport": "^0.6.0",
     "passport-google-oauth20": "^2.0.0",
     "pdf-parse": "^2.4.5",
-    "pdfkit": "^0.14.0"
+    "pdfkit": "^0.14.0",
+    "rate-limiter-flexible": "^2.4.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.10",
