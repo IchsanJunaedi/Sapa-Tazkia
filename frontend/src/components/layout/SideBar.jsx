@@ -2,30 +2,19 @@ import React, { useState } from 'react';
 import { PenSquare, User, Settings, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 
 const Sidebar = ({ 
-  // Props untuk user dan auth
   user,
   onLogin,
   onLogout,
-  
-  // Props untuk chat history
   chatHistory = [],
   currentChatId,
   onSelectChat,
   onDeleteChat,
   isDeleting = false,
-  
-  // Props untuk toggle sidebar
   isSidebarOpen,
   onToggleSidebar,
-  
-  // Props untuk actions
   onNewChat,
   onSettingsClick,
-  
-  // ✅ PERBAIKAN: Tambah prop untuk loading state
   isStartingNewChat = false,
-  
-  // Custom styling
   className = ''
 }) => {
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
@@ -34,24 +23,17 @@ const Sidebar = ({
   const [isProfilePopupVisible, setIsProfilePopupVisible] = useState(false);
   const [isChatsSectionOpen, setIsChatsSectionOpen] = useState(true);
   
-  // ✅ FUNGSI: Untuk mendapatkan nama user dengan maksimal 2 kata
+  // ✅ FUNGSI: Helper
   const getUserName = () => {
     const fullName = user?.name || user?.fullName || user?.username || 'User';
     const words = fullName.split(' ').slice(0, 2);
     return words.join(' ');
   };
 
-  // ✅ FUNGSI: Untuk mendapatkan NIM user
-  const getUserNIM = () => {
-    return user?.nim || user?.studentId || 'NIM tidak tersedia';
-  };
+  const getUserNIM = () => user?.nim || user?.studentId || 'NIM tidak tersedia';
+  const getUserEmail = () => user?.email || 'Email tidak tersedia';
 
-  // ✅ FUNGSI: Untuk mendapatkan email user
-  const getUserEmail = () => {
-    return user?.email || 'Email tidak tersedia';
-  };
-
-  // ✅ FUNGSI: Mengelompokkan chat berdasarkan waktu
+  // ✅ FUNGSI: Grouping
   const groupChatsByTime = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -90,50 +72,36 @@ const Sidebar = ({
     return groups;
   };
 
-  // ✅ FUNGSI: Format bulan dan tahun
   const formatMonthYear = (timestamp) => {
     const date = new Date(timestamp);
     return date.toLocaleDateString('id-ID', { year: 'numeric', month: 'long' });
   };
 
-  // ✅ FUNGSI: Menampilkan popup delete
+  // ✅ FUNGSI: Actions
   const handleMoreClick = (chatId, event) => {
     if (!isSidebarOpen) return;
-    
     const rect = event.currentTarget.getBoundingClientRect();
-    setPopupPosition({
-      x: rect.left - 120,
-      y: rect.top
-    });
+    setPopupPosition({ x: rect.left - 120, y: rect.top });
     setSelectedChatId(chatId);
     setIsPopupVisible(true);
   };
 
-  // ✅ FUNGSI: Menampilkan popup profile
   const handleProfileClick = (event) => {
     if (!user || !isSidebarOpen) {
-      if (!user) {
-        onLogin?.();
-      }
+      if (!user) onLogin?.();
       return;
     }
-
     const rect = event.currentTarget.getBoundingClientRect();
-    setPopupPosition({
-      x: rect.left,
-      y: rect.top - 200
-    });
+    setPopupPosition({ x: rect.left, y: rect.top - 200 });
     setIsProfilePopupVisible(true);
   };
 
-  // ✅ FUNGSI: Menutup semua popup
   const handleCloseAllPopups = () => {
     setIsPopupVisible(false);
     setIsProfilePopupVisible(false);
     setSelectedChatId(null);
   };
 
-  // ✅ FUNGSI: Handle delete chat dari popup
   const handleDeleteFromPopup = () => {
     if (selectedChatId && onDeleteChat) {
       onDeleteChat(selectedChatId);
@@ -141,7 +109,6 @@ const Sidebar = ({
     }
   };
 
-  // ✅ FUNGSI: Handle logout
   const handleLogout = () => {
     if (onLogout) {
       onLogout();
@@ -149,55 +116,20 @@ const Sidebar = ({
     }
   };
 
-  // ✅ FUNGSI: Toggle section Chats
-  const toggleChatsSection = () => {
-    setIsChatsSectionOpen(!isChatsSectionOpen);
-  };
+  const toggleChatsSection = () => setIsChatsSectionOpen(!isChatsSectionOpen);
 
-  // ✅ PERBAIKAN SEDERHANA: Handle new chat tanpa complexity
   const handleNewChat = (e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
-    // ✅ SEDERHANA: Skip hanya berdasarkan loading state dari parent
-    if (isDeleting || isStartingNewChat) {
-      console.log('⏳ [SIDEBAR] New chat skipped - already loading');
-      return;
-    }
-    
-    console.log('🔄 [SIDEBAR] New chat button clicked');
-    
-    if (onNewChat) {
-      onNewChat();
-    }
-    
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (isDeleting || isStartingNewChat) return;
+    if (onNewChat) onNewChat();
     handleCloseAllPopups();
   };
 
-  // ✅ PERBAIKAN SEDERHANA: Handle select chat tanpa complexity
   const handleSelectChat = (chatId, e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
-    // ✅ SEDERHANA: Skip hanya berdasarkan loading state dari parent
-    if (isDeleting || isStartingNewChat) {
-      console.log('⏳ [SIDEBAR] Select chat skipped - currently loading');
-      return;
-    }
-    
-    if (chatId === currentChatId) {
-      console.log('⏩ [SIDEBAR] Select chat skipped - already active chat');
-      return;
-    }
-    
-    console.log('🔍 [SIDEBAR] Chat selected:', chatId);
-    if (onSelectChat) {
-      onSelectChat(chatId);
-    }
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (isDeleting || isStartingNewChat) return;
+    if (chatId === currentChatId) return;
+    if (onSelectChat) onSelectChat(chatId);
   };
 
   const ToggleIcon = ({ open }) => (
@@ -210,11 +142,28 @@ const Sidebar = ({
 
   const groupedChats = groupChatsByTime();
 
+  // Helper Render Group
+  const renderChatGroup = (chats) => (
+    chats.map(chat => (
+      <ChatItem 
+        key={chat.id}
+        chat={chat}
+        currentChatId={currentChatId}
+        onSelectChat={handleSelectChat}
+        onDeleteChat={onDeleteChat}
+        isDeleting={isDeleting}
+        isStartingNewChat={isStartingNewChat}
+        handleMoreClick={handleMoreClick}
+        isSidebarOpen={isSidebarOpen}
+      />
+    ))
+  );
+
   return (
     <>
       <div className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative ${className}`}>
         
-        {/* Header Sidebar (Settings & Toggle) */}
+        {/* Header */}
         {isSidebarOpen ? (
           <div className="flex justify-between items-center mb-8 flex-shrink-0">
             <button 
@@ -247,7 +196,7 @@ const Sidebar = ({
           </div>
         )}
 
-        {/* ✅ PERBAIKAN: New Chat Section yang lebih sederhana */}
+        {/* New Chat Button */}
         <div className="flex flex-col flex-shrink-0">
           <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
             <button
@@ -272,7 +221,7 @@ const Sidebar = ({
           </div>
         </div>
 
-        {/* Chats Section Header dengan Toggle */}
+        {/* Chats Toggle */}
         <div className="mt-6 flex-shrink-0">
           {isSidebarOpen && (
             <button
@@ -291,132 +240,55 @@ const Sidebar = ({
           )}
         </div>
 
-        {/* Area Chat History */}
+        {/* Chat Lists */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {isChatsSectionOpen && isSidebarOpen ? (
             <div className="flex-1 overflow-y-auto mt-4 space-y-4 custom-scrollbar">
-              {/* Today */}
               {groupedChats.today.length > 0 && (
                 <div className="space-y-1">
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Today</h3>
-                  {groupedChats.today.map(chat => (
-                    <ChatItem 
-                      key={chat.id}
-                      chat={chat}
-                      currentChatId={currentChatId}
-                      onSelectChat={handleSelectChat}
-                      onDeleteChat={onDeleteChat}
-                      isDeleting={isDeleting}
-                      isStartingNewChat={isStartingNewChat}
-                      handleMoreClick={handleMoreClick}
-                      isSidebarOpen={isSidebarOpen}
-                    />
-                  ))}
+                  {renderChatGroup(groupedChats.today)}
                 </div>
               )}
-
-              {/* Yesterday */}
               {groupedChats.yesterday.length > 0 && (
                 <div className="space-y-1">
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Yesterday</h3>
-                  {groupedChats.yesterday.map(chat => (
-                    <ChatItem 
-                      key={chat.id}
-                      chat={chat}
-                      currentChatId={currentChatId}
-                      onSelectChat={handleSelectChat}
-                      onDeleteChat={onDeleteChat}
-                      isDeleting={isDeleting}
-                      isStartingNewChat={isStartingNewChat}
-                      handleMoreClick={handleMoreClick}
-                      isSidebarOpen={isSidebarOpen}
-                    />
-                  ))}
+                  {renderChatGroup(groupedChats.yesterday)}
                 </div>
               )}
-
-              {/* Last 7 Days */}
               {groupedChats.last7Days.length > 0 && (
                 <div className="space-y-1">
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Previous 7 Days</h3>
-                  {groupedChats.last7Days.map(chat => (
-                    <ChatItem 
-                      key={chat.id}
-                      chat={chat}
-                      currentChatId={currentChatId}
-                      onSelectChat={handleSelectChat}
-                      onDeleteChat={onDeleteChat}
-                      isDeleting={isDeleting}
-                      isStartingNewChat={isStartingNewChat}
-                      handleMoreClick={handleMoreClick}
-                      isSidebarOpen={isSidebarOpen}
-                    />
-                  ))}
+                  {renderChatGroup(groupedChats.last7Days)}
                 </div>
               )}
-
-              {/* Last 30 Days */}
               {groupedChats.last30Days.length > 0 && (
                 <div className="space-y-1">
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Previous 30 Days</h3>
-                  {groupedChats.last30Days.map(chat => (
-                    <ChatItem 
-                      key={chat.id}
-                      chat={chat}
-                      currentChatId={currentChatId}
-                      onSelectChat={handleSelectChat}
-                      onDeleteChat={onDeleteChat}
-                      isDeleting={isDeleting}
-                      isStartingNewChat={isStartingNewChat}
-                      handleMoreClick={handleMoreClick}
-                      isSidebarOpen={isSidebarOpen}
-                    />
-                  ))}
+                  {renderChatGroup(groupedChats.last30Days)}
                 </div>
               )}
-
-              {/* Older chats grouped by month */}
               {groupedChats.older.length > 0 && (
                 <div className="space-y-1">
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">
                     {formatMonthYear(groupedChats.older[0].timestamp)}
                   </h3>
-                  {groupedChats.older.map(chat => (
-                    <ChatItem 
-                      key={chat.id}
-                      chat={chat}
-                      currentChatId={currentChatId}
-                      onSelectChat={handleSelectChat}
-                      onDeleteChat={onDeleteChat}
-                      isDeleting={isDeleting}
-                      isStartingNewChat={isStartingNewChat}
-                      handleMoreClick={handleMoreClick}
-                      isSidebarOpen={isSidebarOpen}
-                    />
-                  ))}
+                  {renderChatGroup(groupedChats.older)}
                 </div>
               )}
 
-              {/* Empty State */}
+              {/* Empty/Loading States */}
               {chatHistory.length === 0 && user && (
-                <p className="p-2 text-xs text-gray-500 text-center">
-                  Belum ada riwayat chat.
-                </p>
+                <p className="p-2 text-xs text-gray-500 text-center">Belum ada riwayat chat.</p>
               )}
               {!user && (
-                <p className="p-2 text-xs text-gray-500 text-center">
-                  Login untuk melihat riwayat chat Anda.
-                </p>
+                <p className="p-2 text-xs text-gray-500 text-center">Login untuk melihat riwayat chat Anda.</p>
               )}
-
-              {/* Loading State */}
               {(isDeleting || isStartingNewChat) && (
                 <div className="p-2 text-center">
                   <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
                     <Loader2 size={12} className="animate-spin" />
-                    <span>
-                      {isStartingNewChat ? 'Memulai chat...' : 'Menghapus...'}
-                    </span>
+                    <span>{isStartingNewChat ? 'Memulai chat...' : 'Menghapus...'}</span>
                   </div>
                 </div>
               )}
@@ -426,7 +298,7 @@ const Sidebar = ({
           )}
         </div>
 
-        {/* Profile Section */}
+        {/* Profile Footer */}
         <div className="mt-8 flex-shrink-0">
           <div className="flex justify-center">
             <button
@@ -435,7 +307,7 @@ const Sidebar = ({
               } text-white rounded-xl shadow-lg transition-all flex items-center ${
                 (isStartingNewChat || isDeleting) ? 'opacity-70 cursor-not-allowed' : ''
               }`}
-              title={user ? `Logged in as ${getUserName()}. NIM: ${getUserNIM()}` : 'Login as Mahasiswa'}
+              title={user ? `Logged in as ${getUserName()}` : 'Login as Mahasiswa'}
               onClick={handleProfileClick}
               disabled={isStartingNewChat || isDeleting}
             >
@@ -458,116 +330,53 @@ const Sidebar = ({
           </div>
         </div>
 
-        {/* CSS untuk custom scrollbar */}
         <style jsx>{`
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #9CA3AF;
-            border-radius: 3px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #6B7280;
-          }
-          .custom-scrollbar {
-            scrollbar-width: thin;
-            scrollbar-color: #9CA3AF transparent;
-          }
+          .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+          .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+          .custom-scrollbar::-webkit-scrollbar-thumb { background: #9CA3AF; border-radius: 3px; }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6B7280; }
+          .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #9CA3AF transparent; }
         `}</style>
       </div>
 
-      {/* POPUP DELETE */}
+      {/* Popups */}
       {isPopupVisible && (
         <>
-          <div 
-            className="fixed inset-0 z-40"
-            onClick={handleCloseAllPopups}
-          />
-          <div 
-            className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 p-4 w-48"
-            style={{
-              left: `${popupPosition.x}px`,
-              top: `${popupPosition.y}px`
-            }}
-          >
+          <div className="fixed inset-0 z-40" onClick={handleCloseAllPopups} />
+          <div className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 p-4 w-48" style={{ left: `${popupPosition.x}px`, top: `${popupPosition.y}px` }}>
             <div className="flex items-center gap-3 mb-3 pb-2 border-b border-gray-100">
-              <div className="p-2 bg-red-50 rounded-lg">
-                <Trash2 size={18} className="text-red-500" />
-              </div>
+              <div className="p-2 bg-red-50 rounded-lg"><Trash2 size={18} className="text-red-500" /></div>
               <div>
                 <h3 className="text-sm font-semibold text-gray-800">Hapus Chat</h3>
-                <p className="text-xs text-gray-500">Tindakan ini tidak dapat dibatalkan</p>
+                <p className="text-xs text-gray-500">Tak bisa dibatalkan</p>
               </div>
             </div>
-            <button
-              onClick={handleDeleteFromPopup}
-              disabled={isDeleting || isStartingNewChat}
-              className="w-full py-2 px-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-            >
-              {isDeleting ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Trash2 size={14} />
-              )}
+            <button onClick={handleDeleteFromPopup} disabled={isDeleting || isStartingNewChat} className="w-full py-2 px-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
+              {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
               {isDeleting ? 'Menghapus...' : 'Hapus Chat'}
             </button>
           </div>
         </>
       )}
 
-      {/* POPUP PROFILE */}
       {isProfilePopupVisible && user && (
         <>
-          <div 
-            className="fixed inset-0 z-40"
-            onClick={handleCloseAllPopups}
-          />
-          <div 
-            className="fixed z-50 bg-white rounded-xl shadow-xl border border-gray-200 w-64"
-            style={{
-              left: `${popupPosition.x}px`,
-              top: `${popupPosition.y - 10}px`
-            }}
-          >
+          <div className="fixed inset-0 z-40" onClick={handleCloseAllPopups} />
+          <div className="fixed z-50 bg-white rounded-xl shadow-xl border border-gray-200 w-64" style={{ left: `${popupPosition.x}px`, top: `${popupPosition.y - 10}px` }}>
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-[#172c66] rounded-full flex items-center justify-center">
-                  <User size={20} className="text-white" />
-                </div>
+                <div className="w-10 h-10 bg-[#172c66] rounded-full flex items-center justify-center"><User size={20} className="text-white" /></div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-gray-800 truncate">
-                    {getUserName()}
-                  </h3>
-                  <p className="text-xs text-gray-500 truncate">
-                    {getUserEmail()}
-                  </p>
+                  <h3 className="text-sm font-semibold text-gray-800 truncate">{getUserName()}</h3>
+                  <p className="text-xs text-gray-500 truncate">{getUserEmail()}</p>
                 </div>
               </div>
-              <div className="text-xs text-gray-400">
-                {getUserNIM()}
-              </div>
+              <div className="text-xs text-gray-400">{getUserNIM()}</div>
             </div>
             <div className="p-2">
-              <button
-                onClick={handleLogout}
-                disabled={isStartingNewChat || isDeleting}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
-                  (isStartingNewChat || isDeleting)
-                    ? 'text-gray-400 cursor-not-allowed' 
-                    : 'text-red-600 hover:bg-red-50'
-                }`}
-              >
-                <LogOut size={16} />
-                <span>Log out</span>
+              <button onClick={handleLogout} disabled={isStartingNewChat || isDeleting} className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-red-600 hover:bg-red-50">
+                <LogOut size={16} /> <span>Log out</span>
               </button>
-            </div>
-            <div className="px-4 py-3 bg-gray-50 rounded-b-xl border-t border-gray-100">
-              <div className="flex items-center justify-between">
-              </div>
             </div>
           </div>
         </>
@@ -576,7 +385,7 @@ const Sidebar = ({
   );
 };
 
-// ✅ PERBAIKAN SEDERHANA: Komponen Chat Item
+// ✅ FIX: ChatItem Tanpa Kotak di Tombol Titik Tiga
 const ChatItem = ({ 
   chat, 
   currentChatId, 
@@ -589,69 +398,56 @@ const ChatItem = ({
 }) => {
   
   const handleChatClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (isDeleting || isStartingNewChat) {
-      console.log('⏳ [CHAT ITEM] Chat click skipped - currently loading');
-      return;
-    }
-    
-    if (chat.id === currentChatId) {
-      console.log('⏩ [CHAT ITEM] Chat click skipped - already active chat');
-      return;
-    }
-    
-    console.log('🔍 [CHAT ITEM] Chat clicked:', chat.id);
-    if (onSelectChat) {
-      onSelectChat(chat.id, e);
-    }
+    e.preventDefault(); e.stopPropagation();
+    if (isDeleting || isStartingNewChat) return;
+    if (chat.id === currentChatId) return;
+    if (onSelectChat) onSelectChat(chat.id, e);
   };
 
   const handleMoreButtonClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (isDeleting || isStartingNewChat) {
-      console.log('⏳ [CHAT ITEM] More button click skipped - currently loading');
-      return;
-    }
-    
-    console.log('⚙️ [CHAT ITEM] More button clicked:', chat.id);
-    if (handleMoreClick) {
-      handleMoreClick(chat.id, e);
-    }
+    e.preventDefault(); e.stopPropagation();
+    if (isDeleting || isStartingNewChat) return;
+    if (handleMoreClick) handleMoreClick(chat.id, e);
   };
 
   const isLoading = isDeleting || isStartingNewChat;
   const isActive = currentChatId === chat.id;
 
   return (
-    <div className="flex items-center group">
-      <button
-        onClick={handleChatClick}
-        className={`flex-1 text-left p-2 rounded-lg truncate text-sm transition-colors ${
-          isActive 
-            ? 'bg-gray-200 font-semibold text-gray-800' 
-            : 'hover:bg-gray-100 text-gray-700'
-        } ${
-          isLoading ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
+    // Container utama (Parent) yang memiliki background abu-abu saat aktif
+    <div 
+      onClick={handleChatClick}
+      className={`
+        flex items-center group rounded-lg p-2 transition-colors cursor-pointer relative
+        ${isActive 
+          ? 'bg-gray-200 text-gray-800 font-semibold' 
+          : 'hover:bg-gray-100 text-gray-700'
+        } 
+        ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+      `}
+    >
+      <div 
+        className="flex-1 text-left truncate text-sm"
         title={chat.title}
-        disabled={isLoading}
       >
         {chat.title}
-      </button>
+      </div>
+
       {onDeleteChat && isSidebarOpen && (
         <button
           onClick={handleMoreButtonClick}
-          className={`p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100 ml-1 ${
-            isLoading ? 'opacity-30 cursor-not-allowed' : ''
-          }`}
+          // ✅ PERBAIKAN: Menghapus background color (hover:bg-gray-300)
+          // Sekarang hanya mengubah warna icon saat di-hover (hover:text-black)
+          className={`
+            p-1 rounded-md transition-all ml-1
+            ${isActive ? 'opacity-100 text-gray-600' : 'opacity-0 group-hover:opacity-100 text-gray-400'} 
+            hover:text-black 
+            ${isLoading ? 'cursor-not-allowed' : ''}
+          `}
           title="More options"
           disabled={isLoading}
         >
-          <MoreHorizontal size={14} />
+          <MoreHorizontal size={16} />
         </button>
       )}
     </div>
