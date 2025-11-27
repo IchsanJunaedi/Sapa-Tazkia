@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Bot, Download, Copy, CheckCheck } from 'lucide-react';
 
-// ✅ FUNCTION BARU: Clean content dari teks yang tidak diinginkan
+// ==========================================
+// 🛠️ HELPER FUNCTIONS (FORMATTING)
+// ==========================================
+
+// ✅ 1. Clean content dari teks yang tidak diinginkan
 const cleanMessageContent = (text) => {
+  if (!text) return '';
   return text.replace(/Invalid Date\s*$/, '').trim();
 };
 
-// ✅ FUNCTION BARU: Deteksi dan format teks Arabic
+// ✅ 2. Deteksi dan format teks Arabic
 const formatMessageWithArabic = (text) => {
-  // Regex untuk mendeteksi karakter Arabic
   const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
   
   return text.split('\n').map((line, index) => {
@@ -29,20 +33,16 @@ const formatMessageWithArabic = (text) => {
   });
 };
 
-// ✅ FUNCTION BARU: Format teks dengan bold untuk **teks**
+// ✅ 3. Format teks dengan bold untuk **teks**
 const formatMessageWithBold = (text) => {
-  // Split by lines first
   return text.split('\n').map((line, lineIndex) => {
-    // Skip empty lines
     if (!line.trim()) return <div key={lineIndex} className="h-3"></div>;
     
-    // Process each line for bold formatting
     const parts = [];
     let currentIndex = 0;
     let boldStart = line.indexOf('**');
     
     while (boldStart !== -1) {
-      // Add text before bold
       if (boldStart > currentIndex) {
         parts.push(
           <span key={`${lineIndex}-${currentIndex}`}>
@@ -51,11 +51,9 @@ const formatMessageWithBold = (text) => {
         );
       }
       
-      // Find the end of bold
       const boldEnd = line.indexOf('**', boldStart + 2);
       if (boldEnd === -1) break;
       
-      // Add bold text
       const boldText = line.substring(boldStart + 2, boldEnd);
       parts.push(
         <strong key={`${lineIndex}-bold-${boldStart}`} className="font-semibold text-gray-900">
@@ -63,14 +61,10 @@ const formatMessageWithBold = (text) => {
         </strong>
       );
       
-      // Move current index after the bold section
       currentIndex = boldEnd + 2;
-      
-      // Find next bold section
       boldStart = line.indexOf('**', currentIndex);
     }
     
-    // Add remaining text after last bold
     if (currentIndex < line.length) {
       parts.push(
         <span key={`${lineIndex}-end`}>
@@ -87,25 +81,80 @@ const formatMessageWithBold = (text) => {
   });
 };
 
-// ✅ FUNCTION BARU: Gabungkan kedua formatter dengan cleaning
+// ✅ 4. Gabungkan semua formatter
 const formatMessageContent = (text) => {
-  // First clean the content
+  if (!text) return null;
+
   const cleanedText = cleanMessageContent(text);
-  
-  // Then check if it contains Arabic
   const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
   
   if (arabicRegex.test(cleanedText)) {
     return formatMessageWithArabic(cleanedText);
   }
   
-  // If no Arabic, apply bold formatting
   return formatMessageWithBold(cleanedText);
 };
+
+// ==========================================
+// 💬 MAIN COMPONENT
+// ==========================================
 
 const ChatMessage = ({ message }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
+
+  // State untuk efek mengetik
+  const [displayContent, setDisplayContent] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+
+  // EFFECT: Logika Typing vs Instant Load
+  useEffect(() => {
+    const fullContent = message.content || '';
+    
+    // 1. Jika User, langsung tampilkan
+    if (isUser) {
+      setDisplayContent(fullContent);
+      setIsTyping(false);
+      return;
+    }
+
+    // 2. Cek apakah pesan ini "Baru"
+    const msgTime = new Date(message.createdAt || message.timestamp || Date.now()).getTime();
+    const now = Date.now();
+    const isRecent = (now - msgTime) < 5000; 
+
+    // 3. Jika History Lama -> Langsung tampilkan
+    if (!isRecent) {
+      setDisplayContent(fullContent);
+      setIsTyping(false);
+      return;
+    }
+
+    // 4. Jika Pesan Baru -> Jalankan Efek Mengetik
+    setDisplayContent('');
+    setIsTyping(true);
+
+    let index = 0;
+    
+    // ⚡ PERCEPATAN DI SINI
+    const speed = 10; // Jeda antar update lebih singkat (sebelumnya 20)
+    const charsPerTick = 3; // Muncul 3 karakter sekaligus (biar ngebut)
+
+    const intervalId = setInterval(() => {
+      index += charsPerTick;
+      
+      if (index <= fullContent.length) {
+        setDisplayContent(fullContent.slice(0, index));
+      } else {
+        // Pastikan karakter terakhir ter-render
+        setDisplayContent(fullContent);
+        clearInterval(intervalId);
+        setIsTyping(false);
+      }
+    }, speed);
+
+    return () => clearInterval(intervalId);
+  }, [message.content, message.createdAt, message.timestamp, isUser]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(cleanMessageContent(message.content));
@@ -134,18 +183,18 @@ const ChatMessage = ({ message }) => {
               : 'glass-effect text-gray-800 rounded-tl-sm'
           }`}>
             
-            {/* ✅ PERBAIKAN: Gunakan fungsi format yang sudah dibersihkan */}
             <div className={`
               ${isUser 
-                ? 'font-medium text-[15px] leading-relaxed'  // User
-                : 'font-normal text-[15px] leading-[1.7] tracking-wide'  // AI
+                ? 'font-medium text-[15px] leading-relaxed' 
+                : 'font-normal text-[15px] leading-[1.7] tracking-wide'
               }
             `}>
-              {formatMessageContent(message.content)}
+              {/* Teks yang diformat */}
+              {formatMessageContent(displayContent)}
             </div>
 
-            {/* Copy Button untuk AI Messages */}
-            {!isUser && (
+            {/* Copy Button */}
+            {!isUser && !isTyping && (
               <button
                 onClick={handleCopy}
                 className="glass-effect-copy absolute -bottom-2 -right-2 p-1.5 border border-gray-300 rounded-lg shadow-sm hover:bg-white/50 transition-all duration-300 opacity-0 group-hover:opacity-100 backdrop-blur-sm"
@@ -159,7 +208,7 @@ const ChatMessage = ({ message }) => {
             )}
             
             {/* PDF Download Button */}
-            {message.hasPDF && (
+            {message.hasPDF && !isTyping && (
               <button className="glass-effect-download mt-3 w-full flex items-center justify-center space-x-2 px-4 py-2 bg-white/30 hover:bg-white/40 rounded-lg transition-all duration-300 text-sm font-medium text-gray-700 backdrop-blur-sm border border-white/20">
                 <Download size={16} />
                 <span>Unduh Nilai Semester 2 (PDF)</span>
@@ -169,7 +218,7 @@ const ChatMessage = ({ message }) => {
           
           {/* Timestamp */}
           <p className={`text-xs text-gray-400 mt-2 ${isUser ? 'text-right' : 'text-left'}`}>
-            {new Date(message.createdAt).toLocaleTimeString('id-ID', {
+            {new Date(message.createdAt || message.timestamp || Date.now()).toLocaleTimeString('id-ID', {
               hour: '2-digit',
               minute: '2-digit'
             })}
@@ -177,7 +226,7 @@ const ChatMessage = ({ message }) => {
         </div>
       </div>
 
-      {/* ✅ CSS untuk Glass Effect */}
+      {/* CSS Styles */}
       <style jsx>{`
         .glass-effect {
           background: rgba(255, 255, 255, 0.25);
