@@ -1,150 +1,155 @@
-INFORMASI UTAMA: FATWA DSN-MUI NO 07 TENTANG PEMBIAYAAN MUDHARABAH (QIRADH)
+INFORMASI UTAMA: FATWA DSN-MUI NO 09 TENTANG PEMBIAYAAN IJARAH
 
 Identitas Dokumen Fatwa
 
-Nomor Fatwa: 07/DSN-MUI/IV/2000.
+Nomor Fatwa: 09/DSN-MUI/IV/2000
 
-Tentang: Pembiayaan Mudharabah (Qiradh).
+Tentang: Pembiayaan Ijarah
 
-Lembaga Penerbit: Dewan Syari'ah Nasional Majelis Ulama Indonesia (DSN-MUI).
+Lembaga Penerbit: Dewan Syari'ah Nasional Majelis Ulama Indonesia (DSN-MUI)
 
-Tanggal Ditetapkan: 4 April 2000 (29 Dzulhijjah 1420 H).
+Tanggal Ditetapkan: 13 April 2000 (08 Muharram 1421 H)
 
-Tempat Ditetapkan: Jakarta.
+Tempat Ditetapkan: Jakarta
 
-Ringkasan Isi Fatwa Mudharabah (Untuk AI)
+Penandatangan: Prof. KH. Ali Yafie (Ketua), Drs. H.A. Nazri Adlani (Sekretaris)
 
-Fatwa ini mengatur tentang akad Mudharabah, yaitu akad kerjasama usaha antara dua pihak di mana pihak pertama (Shahibul Maal/LKS) menyediakan seluruh modal (100%), sedangkan pihak kedua (Mudharib/Nasabah) bertindak sebagai pengelola.
-Poin Penting Fatwa Mudharabah:
+Ringkasan Eksekutif (Untuk AI)
 
-Pembagian Keuntungan: Dibagi sesuai kesepakatan (nisbah) dalam kontrak.
+Fatwa ini mengatur tentang akad Ijarah, yaitu akad pemindahan hak guna (manfaat) atas suatu barang atau jasa dalam waktu tertentu dengan pembayaran sewa/upah (ujrah), tanpa diikuti dengan pemindahan kepemilikan barang itu sendiri.
 
-Kerugian: Kerugian finansial ditanggung sepenuhnya oleh LKS (Pemilik Dana), kecuali jika akibat kelalaian/kesalahan pengelola (Mudharib).
+Poin-Poin Kunci:
 
-Peran LKS: LKS tidak ikut campur dalam manajemen teknis, tapi berhak melakukan pengawasan.
+Definisi: Sewa-menyewa barang atau jasa dengan imbalan (ujrah).
 
-Jaminan: Pada dasarnya tidak ada jaminan, namun LKS boleh meminta jaminan untuk mengantisipasi penyimpangan (wanprestasi) dari Mudharib.
+Rukun: Ada penyewa, pemberi sewa, barang/jasa (manfaat), dan harga sewa.
 
-DETAIL LENGKAP HUKUM DAN DALIL FATWA MUDHARABAH (TEXT ASLI)
+Kewajiban LKS (Bank): Menyediakan barang, menanggung biaya pemeliharaan materiil, menjamin jika barang cacat.
 
-1. Landasan Dalil Al-Qur'an tentang Mudharabah
+Kewajiban Nasabah: Membayar sewa, menjaga barang, menanggung biaya pemeliharaan ringan/operasional.
 
-Berikut adalah ayat-ayat Al-Qur'an yang menjadi dasar hukum akad Mudharabah:
+Kerusakan: Nasabah tidak bertanggung jawab atas kerusakan barang kecuali karena kelalaian atau pelanggaran kontrak.
 
-QS. al-Nisa' [4]: 29
+DETAIL LENGKAP ISI FATWA (TEXT ASLI SESUAI DOKUMEN)
 
-يَا أَيُّهَا الَّذِينَ آمَنُوا لَا تَأْكُلُوا أَمْوَالَكُمْ بَيْنَكُمْ بِالْبَاطِلِ إِلَّا أَنْ تَكُوْنَ تِجَارَةً عَنْ تَرَاضٍ مِنْكُمْ....
+DEWAN SYARI'AH NASIONAL MAJELIS ULAMA INDONESIA
 
-Artinya: "Hai orang yang beriman! Janganlah kalian saling memakan (mengambil) harta sesamamu dengan jalan yang batil, kecuali dengan jalan perniagaan yang berlaku dengan sukarela di antaramu...".
+MENIMBANG
 
-QS. al-Ma'idah [5]: 1
+a. Bahwa kebutuhan masyarakat untuk memperoleh manfaat suatu barang sering memerlukan pihak lain melalui akad ijarah, yaitu akad pemindahan hak guna (manfaat) atas suatu barang dalam waktu tertentu dengan pembayaran sewa (ujrah), tanpa diikuti dengan pemindahan kepemilikan barang itu sendiri.
+b. Bahwa kebutuhan masyarakat untuk memperoleh jasa pihak lain guna melakukan pekerjaan tertentu melalui akad ijarah dengan pembayaran upah (ujrah/fee).
+c. Bahwa kebutuhan akan ijarah kini dapat dilayani oleh lembaga keuangan syari'ah (LKS) melalui akad pembiayaan ijarah.
+d. Bahwa agar akad tersebut sesuai dengan ajaran Islam, DSN memandang perlu menetapkan fatwa tentang akad ijarah untuk dijadikan pedoman oleh LKS.
 
-يَا أَيُّهَا الَّذِينَ آمَنُوا أَوْفُوا بِالْعُقُودِ ..
+MENGINGAT
 
-Artinya: "Hai orang yang beriman! Penuhilah akad-akad itu...."
+1. Firman Allah QS. az-Zukhruf [43]: 32
 
-QS. al-Baqarah [2]: 283
+أَهُمْ يَقْسِمُوْنَ رَحْمَتَ رَبِّكَ، نَحْنُ قَسَمْنَا بَيْنَهُمْ مَعِيشَتَهُمْ فِي الْحَيَاةِ الدُّنْيَا، وَرَفَعْنَا بَعْضَهُمْ فَوْقَ بَعْضٍ دَرَجَاتٍ لِيَتَّخِذَ بَعْضُهُمْ بَعْضًا سُخْرِيًّا، وَرَحْمَتُ رَبِّكَ خَيْرٌ مِمَّا يَجْمَعُوْنَ.
 
-.. فَإِنْ أَمِنَ بَعْضُكُمْ بَعْضًا فَلْيُؤَدِّ الَّذِي اؤْتُمِنَ أَمَانَتَهُ، وَلْيَتَّقِ اللَّهَ رَبَّهُ ..
+Artinya: "Apakah mereka yang membagi-bagikan rahmat Tuhanmu? Kami telah menentukan antara mereka penghidupan mereka dalam kehidupan dunia, dan Kami telah meninggikan sebagian mereka atas sebagian yang lain beberapa derajat, agar sebagian mereka dapat mempergunakan sebagian yang lain. Dan rahmat Tuhanmu lebih baik dari apa yang mereka kumpulkan."
 
-Artinya: "...Maka, jika sebagian kamu mempercayai sebagian yang lain, hendaklah yang dipercayai itu menunaikan amanatnya dan hendaklah ia bertakwa kepada Allah Tuhannya...".
+2. Firman Allah QS. al-Baqarah [2]: 233
 
-2. Landasan Dalil Hadis tentang Mudharabah
+... وَإِنْ أَرَدْتُمْ أَنْ تَسْتَرْضِعُوا أَوْلَادَكُمْ فَلَا جُنَاحَ عَلَيْكُمْ إِذَا سَلَّمْتُمْ مَا آتَيْتُمْ بِالْمَعْرُوْفِ، وَاتَّقُوا الله ، وَاعْلَمُوا أَنَّ اللَّهَ بِمَا تَعْمَلُونَ بَصِيرٌ.
 
-Berikut adalah hadis-hadis Nabi SAW yang menjadi dasar hukum kerja sama usaha (Mudharabah/Qiradh):
+Artinya: "...Dan jika kamu ingin anakmu disusukan oleh orang lain, tidak dosa bagimu apabila kamu memberikan pembayaran menurut yang patut. Bertaqwalah kepada Allah; dan ketahuilah bahwa Allah Maha Melihat apa yang kamu kerjakan."
 
-Hadis Riwayat Thabrani (Kisah Abbas bin Abdul Muthallib)
+3. Firman Allah QS. al-Qashash [28]: 26
 
-كَانَ سَيِّدُنَا الْعَبَّاسُ بْنُ عَبْدِ الْمُطَلِّبِ إِذَا دَفَعَ الْمَالَ مُضَارَبَةُ اشْتَرَطَ على صاحبه أَنْ لَا يَسْلُكَ بِه بَحْرًا، وَلَا يَنْزِلَ بِهِ وَادِيًا، وَلَا يَشْتَرِيَ بِهِ دَابَّةٌ ذَاتَ كَبِدِ رَطْبَةِ، فَإِنْ فَعَلَ ذَلِكَ ضَمِنَ، فَبَلَغَ شَرْطُهُ رَسُولَ اللهِ صَلَّى اللهُ عَلَيْهِ وَآلِهِ وَسَلَّمَ فَأَجَازَهُ (رواه الطبراني في الأوسط عن ابن عباس).
+قَالَتْ إِحْدَاهُمَا يَا أَبَتِ اسْتَأْجِرْهُ، إِنَّ خَيْرَ مَنِ اسْتَأْجَرْتَ الْقَوِيُّ الأمين.
 
-Artinya: "Abbas bin Abdul Muthallib jika menyerahkan harta sebagai mudharabah, ia mensyaratkan kepada mudharib-nya agar tidak mengarungi lautan dan tidak menuruni lembah, serta tidak membeli hewan ternak. Jika persyaratan itu dilanggar, ia (mudharib) harus menanggung resikonya. Ketika persyaratan yang ditetapkan Abbas itu didengar Rasulullah, beliau membenarkannya."
+Artinya: "Salah seorang dari kedua wanita itu berkata, 'Hai ayahku! Ambillah ia sebagai orang yang bekerja (pada kita), karena sesungguhnya orang yang paling baik yang kamu ambil untuk bekerja (pada kita) adalah orang yang kuat lagi dapat dipercaya."
 
-Hadis Riwayat Ibnu Majah (Tiga Keberkahan)
+4. Hadis Nabi riwayat Ibn Majah dari Ibnu Umar
 
-أَنَّ النَّبِيَّ صَلَّى اللهُ عَلَيْهِ وَآلِهِ وَسَلَّمَ قَالَ: ثَلَاثُ فِيهِنَّ الْبَرَكَةُ : الْبَيْعُ إِلَى أَجَلٍ، وَالْمُقَارَضَةُ، وَخَلْطُ الْبُرِّ بِالشَّعِيْرِ لِلْبَيْتِ لَا لِلْبَيْعِ (رواه ابن ماجه عن صهيب)
+أَعْطُوا الأَخِيرَ أَجْرَهُ قَبْلَ أَنْ يَجفَّ عَرَقُهُ.
 
-Artinya: "Nabi bersabda, 'Ada tiga hal yang mengandung berkah: jual beli tidak secara tunai, muqaradhah (mudharabah), dan mencampur gandum dengan jewawut untuk keperluan rumah tangga, bukan untuk dijual."
+Artinya: "Berikanlah upah pekerja sebelum keringatnya kering."
 
-Hadis Riwayat Tirmizi (Perjanjian/Syarat)
+5. Hadis Nabi riwayat 'Abd ar-Razzaq dari Abu Hurairah dan Abu Sa'id al-Khudri
+
+مَنِ اسْتَأْجَرَ أَجِيْرًا فَلْيُعْلِمْهُ أَجْرَهُ.
+
+Artinya: "Barang siapa mempekerjakan pekerja, beritahukanlah upahnya."
+
+6. Hadis Nabi riwayat Abu Daud dari Sa`d Ibn Abi Waqqash
+
+كُنَّا نُكْرِي الْأَرْضَ بِمَا عَلَى السَّوَاقِي مِنَ الزَّرْعِ وَمَا سَعِدَ بِالْمَاءِ مِنْهَا، فَنَهَانَا رَسُولُ اللَّهِ صَلَّى اللَّهُ عَلَيْهِ وَآلِهِ وَسَلَّمَ عَنْ ذَلِكَ وَأَمَرَنَا أَنْ نُكْرِيَهَا بِذَهَبٍ أَوْ فِضَّةٍ.
+
+Artinya: "Kami pernah menyewankan tanah dengan (bayaran) hasil pertaniannya; maka, Rasulullah melarang kami melakukan hal tersebut dan memerintahkan agar kami menyewakannya dengan emas atau perak."
+
+7. Hadis Nabi riwayat Tirmidzi dari 'Amr bin 'Auf
 
 الصُّلْحُ جَائِرٌ بَيْنَ الْمُسْلِمِينَ إِلَّا صُلْحًا حَرَّمَ حَلَالًا أَوْ أَحَلَّ حَرَامًا وَالْمُسْلِمُونَ عَلَى شُرُوطِهِمْ إِلَّا شَرْطًا حَرَّمَ حَلَالًا أَوْ أَحَلَّ حَرَامًا.
 
 Artinya: "Perdamaian dapat dilakukan di antara kaum muslimin kecuali perdamaian yang mengharamkan yang halal atau menghalalkan yang haram; dan kaum muslimin terikat dengan syarat-syarat mereka kecuali syarat yang mengharamkan yang halal atau menghalalkan yang haram."
 
-Hadis Riwayat Ibnu Majah (Larangan Bahaya)
+MEMPERHATIKAN
 
-لاَ ضَرَرَ وَلاَ ضِرَارَ
+Ijma ulama tentang kebolehan melakukan akad sewa menyewa.
 
-Artinya: "Tidak boleh membahayakan diri sendiri maupun orang lain."
+Kaidah Fiqh:
 
-3. Ijma, Qiyas, dan Kaidah Fiqh Mudharabah
+الْأَصْلُ فِي الْمُعَامَلَاتِ الإِبَاحَةُ إِلَّا أَنْ يَدُلُّ دَلِيْلٌ عَلَى تَحْرِيمِهَا.
 
-Ijma: Diriwayatkan sejumlah sahabat menyerahkan harta anak yatim sebagai mudharabah dan tak ada seorang pun mengingkari mereka.
+Artinya: "Pada dasarnya, semua bentuk muamalah boleh dilakukan kecuali ada dalil yang mengharamkannya."
 
-Qiyas: Transaksi mudharabah diqiyaskan kepada transaksi musaqah.
+دَرْءُ الْمَفَاسِدِ مُقَدَّمٌ عَلَى جَلْبِ الْمَصَالِحِ
 
-Kaidah Fiqh: "Pada dasarnya, semua bentuk muamalah boleh dilakukan kecuali ada dalil yang mengharamkannya."
+Artinya: "Menghindarkan mafsadat (kerusakan, bahaya) harus didahulukan atas mendatangkan kemaslahatan."
 
-4. Ketentuan Pertama: Ketentuan Pembiayaan
+MEMUTUSKAN
 
-Definisi: Pembiayaan Mudharabah adalah pembiayaan yang disalurkan oleh LKS kepada pihak lain untuk suatu usaha yang produktif.
+Menetapkan: FATWA TENTANG PEMBIAYAAN IJARAH
 
-Porsi Modal: LKS sebagai shahibul maal membiayai 100% kebutuhan proyek. Pengusaha sebagai mudharib bertindak sebagai pengelola.
+Pertama: Rukun dan Syarat Ijarah
 
-Kesepakatan: Jangka waktu, cara pengembalian, dan pembagian keuntungan ditentukan berdasarkan kesepakatan.
+Sighat Ijarah, yaitu ijab dan qabul berupa pernyataan dari kedua belah pihak yang berakad (berkontrak), baik secara verbal atau dalam bentuk lain.
 
-Hak LKS: Mudharib bebas melakukan usaha yang syariah; LKS tidak ikut campur manajemen tapi berhak melakukan pembinaan dan pengawasan.
+Pihak-pihak yang berakad: terdiri atas pemberi sewa/pemberi jasa dan penyewa/pengguna jasa.
 
-Bentuk Dana: Jumlah dana harus dinyatakan jelas dalam bentuk tunai dan bukan piutang.
+Obyek akad ijarah adalah:
+a. manfaat barang dan sewa; atau
+b. manfaat jasa dan upah.
 
-Risiko Kerugian: LKS menanggung semua kerugian finansial, kecuali jika mudharib melakukan kesalahan disengaja, lalai, atau menyalahi perjanjian.
+Kedua: Ketentuan Obyek Ijarah
 
-Jaminan: Pada prinsipnya tidak ada jaminan, namun LKS dapat meminta jaminan untuk mengantisipasi penyimpangan/pelanggaran akad oleh mudharib.
+Obyek ijarah adalah manfaat dari penggunaan barang dan/atau jasa.
 
-Regulasi LKS: Kriteria pengusaha, prosedur pembiayaan, dan mekanisme pembagian keuntungan diatur oleh LKS dengan memperhatikan fatwa DSN.
+Manfaat barang atau jasa harus bisa dinilai dan dapat dilaksanakan dalam kontrak.
 
-Biaya Operasional: Biaya operasional dibebankan kepada mudharib.
+Manfaat barang atau jasa harus yang bersifat dibolehkan (tidak diharamkan).
 
-Ganti Rugi: Dalam hal penyandang dana (LKS) tidak melakukan kewajiban atau melakukan pelanggaran terhadap kesepakatan, mudharib berhak mendapat ganti rugi atau biaya yang telah dikeluarkan.
+Kesanggupan memenuhi manfaat harus nyata dan sesuai dengan syari'ah.
 
-5. Ketentuan Kedua: Rukun dan Syarat Pembiayaan
+Manfaat harus dikenali secara spesifik sedemikian rupa untuk menghilangkan jahalah (ketidaktahuan) yang akan mengakibatkan sengketa.
 
-Pihak: Penyedia dana dan pengelola harus cakap hukum.
+Spesifikasi manfaat harus dinyatakan dengan jelas, termasuk jangka waktunya. Bisa juga dikenali dengan spesifikasi atau identifikasi fisik.
 
-Ijab Qabul: Harus dinyatakan jelas, menunjukkan tujuan kontrak, dan dituangkan secara tertulis.
+Sewa atau upah adalah sesuatu yang dijanjikan dan dibayar nasabah kepada LKS sebagai pembayaran manfaat. Sesuatu yang dapat dijadikan harga dalam jual beli dapat pula dijadikan sewa atau upah dalam Ijarah.
 
-Modal:
+Pembayaran sewa atau upah boleh berbentuk jasa (manfaat lain) dari jenis yang sama dengan obyek kontrak.
 
-Harus diketahui jumlah dan jenisnya.
+Kelenturan (flexibility) dalam menentukan sewa atau upah dapat diwujudkan dalam ukuran waktu, tempat dan jarak.
 
-Dapat berbentuk uang atau barang yang dinilai (pada waktu akad).
+Ketiga: Kewajiban LKS dan Nasabah dalam Pembiayaan Ijarah
 
-Tidak dapat berbentuk piutang.
+Kewajiban LKS sebagai pemberi manfaat barang atau jasa:
+a. Menyediakan barang yang disewakan atau jasa yang diberikan.
+b. Menanggung biaya pemeliharaan barang.
+c. Menjamin bila terdapat cacat pada barang yang disewakan.
 
-Dibayarkan kepada mudharib (bertahap atau tunai).
+Kewajiban nasabah sebagai penerima manfaat barang atau jasa:
+a. Membayar sewa atau upah dan bertanggung jawab untuk menjaga keutuhan barang serta menggunakannya sesuai kontrak.
+b. Menanggung biaya pemeliharaan barang yang sifatnya ringan (tidak materiil).
+c. Jika barang yang disewa rusak, bukan karena pelanggaran dari penggunaan yang dibolehkan, juga bukan karena kelalaian pihak penerima manfaat dalam menjaganya, ia tidak bertanggung jawab atas kerusakan tersebut.
 
-Keuntungan:
+Keempat: Perselisihan
 
-Harus diperuntukkan bagi kedua pihak.
+Jika salah satu pihak tidak menunaikan kewajibannya atau jika terjadi perselisihan di antara para pihak, maka penyelesaiannya dilakukan melalui Badan Arbitrasi Syari'ah setelah tidak tercapai kesepakatan melalui musyawarah.
 
-Bagian keuntungan (nisbah) harus diketahui dan dinyatakan dalam bentuk persentase (bukan jumlah pasti) dari keuntungan.
+Ditetapkan di: Jakarta
+Tanggal: 08 Muharram 1421 H / 13 April 2000 M
 
-Perubahan nisbah harus berdasarkan kesepakatan.
-
-Kegiatan Usaha:
-
-Hak eksklusif mudharib tanpa campur tangan LKS (kecuali pengawasan).
-
-LKS tidak boleh mempersempit tindakan pengelola yang menghalangi pencapaian keuntungan.
-
-Pengelola tidak boleh menyalahi hukum Syari'ah.
-
-6. Ketentuan Ketiga: Beberapa Ketentuan Hukum Pembiayaan
-
-Mudharabah boleh dibatasi pada periode tertentu.
-
-Kontrak tidak boleh dikaitkan (mu'allaq) dengan kejadian masa depan yang belum pasti.
-
-Tidak ada ganti rugi (karena akad amanah), kecuali akibat kesalahan disengaja atau kelalaian pengelola.
-
-Penyelesaian perselisihan dilakukan melalui Badan Arbitrasi Syari'ah jika musyawarah gagal.
+DEWAN SYARI'AH NASIONAL MAJELIS ULAMA INDONESIA
