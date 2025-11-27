@@ -125,7 +125,7 @@ const handleRateLimitError = (error) => {
   
   // Add suggestion for authenticated users
   if (userType === 'guest') {
-    userMessage += ' Daftar akun untuk mendapatkan limit yang lebih tinggi.';
+    userMessage += 'Maaf, limit sesi saat ini telah mencapai batas. Silakan coba lagi nanti.';
   }
   
   const rateLimitError = new Error(userMessage);
