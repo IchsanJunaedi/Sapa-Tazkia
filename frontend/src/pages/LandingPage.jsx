@@ -645,19 +645,19 @@ const LandingPage = () => {
     const userShortName = getUserName();
     
     const greetingsForUser = [
-      `Hi ${userShortName}, Good to see you!`,
-      `Welcome back, ${userShortName}!`,
-      `Hello ${userShortName}, ready to chat?`,
-      `Hi ${userShortName}, how can I help you today?`,
-      `Great to have you here, ${userShortName}!`
+    `Assalamu'alaikum, ${userShortName}!`,
+    `Ahlan wa sahlan, ${userShortName}!`,
+    `Bismillah, ${userShortName}! Apa yang bisa kita kerjakan hari ini?`,
+    `Assalamu'alaikum wa rahmatullah, ${userShortName}! Senang berjumpa dengan Anda.`,
+    `Marhaban, ${userShortName}!`,
     ];
 
     const greetingsForGuest = [
-      'Where should we begin?',
-      'Hello! How can I assist you today?',
-      'Welcome to Sapa Tazkia! How can I help?',
-      'Ready to get started? What would you like to know?',
-      'Hi there! What brings you here today?'
+    `Assalamu'alaikum! Selamat datang di Sapa Tazkia. Ada yang bisa kami bantu?`,
+    `Ahlan wa sahlan! Di mana sebaiknya kita mulai perbincangan ini?`,
+    `Bismillah, mari kita mulai! Apa yang ingin Anda ketahui hari ini?`,
+    `Assalamu'alaikum. Senang Anda berkunjung! Apa yang membawa Anda ke sini hari ini?`,
+    `Marhaban! Kami siap membantu. Silakan beritahu kami kebutuhan Anda.`,
     ];
     
     const availableGreetings = user ? greetingsForUser : greetingsForGuest;
