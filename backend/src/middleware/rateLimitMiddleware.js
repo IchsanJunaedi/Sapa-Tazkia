@@ -1,126 +1,98 @@
 const rateLimitService = require('../services/rateLimitService');
-const redisService = require('../services/redisService');
+const { getClientIp } = require('request-ip'); // Pastikan install: npm install request-ip
 
-// Fallback config
-const rateLimitConfig = {
-  guest: { requestsPerMinute: 10 },
-  user: { requestsPerMinute: 30 },
-  premium: { requestsPerMinute: 100 },
-  ip: { requestsPerMinute: 20 }
-};
-
-// SIMPLE rate limit middleware - tanpa nested callbacks
-const rateLimitMiddleware = (userType = 'guest') => {
+/**
+ * Middleware Utama Rate Limit
+ * @param {string|null} forcedType - Paksa tipe ('guest', 'user', 'premium'). Jika null, otomatis deteksi.
+ */
+const rateLimitMiddleware = (forcedType = null) => {
   return async (req, res, next) => {
+    // 1. Cek Kill Switch dari ENV
     if (process.env.RATE_LIMIT_ENABLED === 'false') {
       return next();
     }
 
     try {
-      const userId = req.user?.id || null;
-      const ipAddress = req.ip || req.connection.remoteAddress;
+      // 2. Identifikasi Identitas (IP & UserID)
+      // Menggunakan library request-ip agar akurat di balik proxy/hosting
+      const ipAddress = getClientIp(req) || req.ip || '127.0.0.1';
+      const userId = req.user?.id || null; // Asumsi req.user di-set oleh Auth Middleware
+
+      // 3. Tentukan Tipe User Secara Cerdas
+      // Jika forcedType diisi (misal: 'guest'), pakai itu.
+      // Jika tidak, cek apakah ada userId? Jika ya -> 'user', Jika tidak -> 'guest'.
+      let userType = forcedType;
       
-      const result = await rateLimitService.checkRateLimit(userId, ipAddress, userType);
-
-      if (!result.allowed) {
-        // Set headers dan langsung return response
-        res.set({
-          'X-RateLimit-Limit': result.limit,
-          'X-RateLimit-Remaining': result.remaining || 0,
-          'X-RateLimit-Reset': result.resetTime,
-          'Retry-After': result.retryAfter
-        });
-
-        return res.status(429).json({
-          success: false,
-          error: 'rate_limit_exceeded',
-          message: `Rate limit exceeded. Try again in ${result.retryAfter} seconds`,
-          retry_after: result.retryAfter,
-          limit: result.limit,
-          reset_time: result.resetTime
-        });
+      if (!userType) {
+        if (userId) {
+          // Logika tambahan: Cek role premium jika ada
+          userType = (req.user.isPremium || req.user.role === 'premium') ? 'premium' : 'user';
+        } else {
+          userType = 'guest';
+        }
       }
 
-      // Set headers untuk successful requests
+      // 4. Panggil Service (Otak Utama)
+      // Kita tidak perlu logic Redis manual di sini, biarkan Service yang menghitung Atomic
+      const result = await rateLimitService.checkRateLimit(userId, ipAddress, userType);
+
+      // 5. Set Response Headers (Standard RFC 6585)
+      // Memberi info ke frontend sisa limit mereka
       res.set({
         'X-RateLimit-Limit': result.limit,
         'X-RateLimit-Remaining': result.remaining,
-        'X-RateLimit-Reset': result.resetTime
+        'X-RateLimit-Reset': Math.ceil(result.resetTime / 1000),
+        'X-RateLimit-Policy': userType // Info tambahan kebijakan yang dipakai
       });
 
+      // 6. Eksekusi Blokir jika limit habis
+      if (!result.allowed) {
+        res.set('Retry-After', result.retryAfter);
+        
+        return res.status(429).json({
+          success: false,
+          error: 'rate_limit_exceeded',
+          message: `Too many requests. Please try again in ${result.retryAfter} seconds.`,
+          data: {
+            retry_after: result.retryAfter,
+            limit: result.limit,
+            reset_time: result.resetTime
+          }
+        });
+      }
+
+      // 7. Lanjut jika aman
       next();
+
     } catch (error) {
-      // Jika ada error di rate limit service, continue tanpa rate limiting
-      console.warn('⚠️ [RATE LIMIT] Service error, continuing without rate limit:', error.message);
+      console.error('⚠️ [MIDDLEWARE] Rate Limit Error:', error.message);
+      // Fail-open: Jangan blokir user gara-gara sistem limit error. Biarkan lewat.
       next();
     }
   };
 };
 
-// Simple IP rate limit - STANDALONE, tidak nested
-const ipRateLimit = async (req, res, next) => {
-  if (process.env.RATE_LIMIT_ENABLED === 'false') {
-    return next();
-  }
+// ==========================================
+// PRE-CONFIGURED MIDDLEWARES
+// ==========================================
 
-  try {
-    const ipAddress = req.ip || req.connection.remoteAddress;
-    const ipKey = `ip_limit:${ipAddress}`;
-    
-    const requestCount = await redisService.incr(ipKey);
-    
-    if (requestCount === 1) {
-      try {
-        await redisService.set(ipKey, 1, 60000); // Simple set with expiry
-      } catch (error) {
-        // Ignore expiry errors
-      }
-    }
-    
-    const ipLimit = rateLimitConfig.ip.requestsPerMinute;
-    
-    if (requestCount > ipLimit) {
-      return res.status(429).json({
-        success: false,
-        error: 'ip_rate_limit_exceeded',
-        message: 'IP rate limit exceeded. Please try again in 60 seconds.',
-        retry_after: 60
-      });
-    }
-    
-    // Set headers dan continue
-    res.set({
-      'X-RateLimit-Limit': ipLimit,
-      'X-RateLimit-Remaining': Math.max(0, ipLimit - requestCount),
-      'X-RateLimit-User-Type': 'ip'
-    });
-    
-    next();
-  } catch (error) {
-    // Jika Redis error, continue tanpa IP limiting
-    console.warn('⚠️ [RATE LIMIT] IP limit failed, continuing:', error.message);
-    next();
-  }
-};
-
-// Simple specialized middlewares
+// 1. Middleware Standar
 const guestRateLimit = rateLimitMiddleware('guest');
 const userRateLimit = rateLimitMiddleware('user');
 const premiumRateLimit = rateLimitMiddleware('premium');
 
-// COMBINATION middlewares - SEQUENTIAL, tidak nested
-const enhancedGuestRateLimit = [ipRateLimit, guestRateLimit];
-const aiSpecificRateLimit = [ipRateLimit, (req, res, next) => {
-  if (req.user) {
-    if (req.user.isPremium || req.user.role === 'premium') {
-      return premiumRateLimit(req, res, next);
-    } else {
-      return userRateLimit(req, res, next);
-    }
-  } else {
-    return guestRateLimit(req, res, next);
-  }
-}];
+// 2. IP Rate Limit (Compatibility)
+// Kita arahkan ke 'guest' karena guest limit dasarnya berbasis IP
+const ipRateLimit = rateLimitMiddleware('guest');
+
+// 3. Dynamic AI Middleware
+// Middleware pintar yang otomatis menyesuaikan limit berdasarkan status login user
+const aiSpecificRateLimit = rateLimitMiddleware(null); // Null artinya auto-detect
+
+// 4. Enhanced Guest (Array Compatibility)
+// Karena logic kita sudah atomic, kita tidak perlu array middleware bertumpuk.
+// Cukup satu middleware guest yang solid.
+const enhancedGuestRateLimit = guestRateLimit;
 
 module.exports = {
   rateLimitMiddleware,
@@ -128,6 +100,6 @@ module.exports = {
   userRateLimit,
   premiumRateLimit,
   ipRateLimit,
-  enhancedGuestRateLimit, // Array of middlewares
-  aiSpecificRateLimit     // Array of middlewares
+  enhancedGuestRateLimit,
+  aiSpecificRateLimit
 };
