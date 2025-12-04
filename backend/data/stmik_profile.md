@@ -1,120 +1,49 @@
-INFORMASI UTAMA: STMIK TAZKIA (SEKOLAH TINGGI MANAJEMEN INFORMATIKA DAN KOMPUTER)
+INFORMASI UTAMA: PROFIL STMIK TAZKIA
 
-Identitas dan Kontak Institusi
+1. Identitas Institusi
+Nama Resmi: STMIK TAZKIA (Sekolah Tinggi Manajemen Informatika dan Komputer Tazkia).
+Julukan: Kampus Luar Biasa!
+Naungan: Yayasan Tazkia Cendikia.
+Lokasi: Jalan Raya Dramaga Km.7, Kel. Margajaya, Kec. Bogor Barat, Bogor.
+Kontak: 0851-2312-3119 (WhatsApp) | Website: stmik.tazkia.ac.id.
 
-Nama Institusi: STMIK TAZKIA (Sekolah Tinggi Manajemen Informatika dan Komputer Tazkia).
+2. Tentang STMIK Tazkia
+Perguruan tinggi IT di Bogor yang didirikan oleh Prof. Dr. Muhammad Syafi’i Antonio, M.Ec.
+Filosofi: "Tazkia" berarti tumbuh dan berkembang dengan bersih.
+Fokus: Mencetak lulusan yang unggul dalam teknologi (Hard Skill) dan berkarakter mulia/SMILE (Soft Skill).
 
-Slogan: Perguruan tinggi yang unggul dalam bidang teknologi informasi yang mencetak lulusan Berkompeten dan Berkarakter Mulia.
+3. Keunggulan Kampus
+- Masa Studi Singkat (3.5 Tahun): Lulus lebih cepat, siap kerja.
+- Metode Hybrid & Fleksibel: Cocok untuk pekerja/wirausaha.
+- Penyaluran Kerja: Kerjasama industri untuk magang dan karir.
+- Kurikulum Terkini: Fokus pada AI, Cyber Security, dan Bisnis Digital.
 
-Julukan Kampus: Kampus Luar Biasa!
+4. Visi & Misi
+Visi:
+Menjadi perguruan tinggi unggul bidang teknologi informasi yang mencetak lulusan berkompeten dan berkarakter mulia.
+Misi:
+- Pendidikan berkualitas standar internasional.
+- Riset teknologi bermanfaat bagi NKRI.
+- Pengabdian masyarakat.
+- Lingkungan inklusif dan Life Long Learning.
 
-Alamat Kampus: Jalan Raya Dramaga Km.7, Kel. Margajaya, Kec. Bogor Barat, Bogor, Jawa Barat.
+5. DAFTAR PROGRAM STUDI (S1)
+STMIK Tazkia memiliki 2 Program Studi Sarjana unggulan:
 
-Website Resmi: stmik.tazkia.ac.id.
+A. S1 Sistem Informasi (Information Systems)
+Fokus: Manajemen data, analisis bisnis, dan pengembangan solusi digital.
+- Konsentrasi: Project Management, Machine Learning, Data Analytic, Business Information System.
+- Mata Kuliah Kunci: Analisis Data, Pengembangan Perangkat Lunak, Manajemen Proyek TI.
+- Prospek Karir: System Analyst, Software Developer, UI/UX Designer, Data Analyst.
 
-Hotline/WhatsApp: 0851-2312-3119.
+B. S1 Teknik Informatika (Informatics Engineering)
+Fokus: Rekayasa perangkat lunak, infrastruktur, dan kecerdasan buatan (AI).
+- Konsentrasi: Cyber Security, Artificial Intelligence (AI), Web Development, Software Engineering.
+- Mata Kuliah Kunci: Algoritma & Struktur Data, AI, Keamanan Siber (Cyber Security), Sistem Operasi.
+- Prospek Karir: Cybersecurity Specialist, AI Engineer, Cloud Engineer, DevOps Engineer, Software Engineer.
 
-Instagram: @stmiktazkia_official.
-
-Tentang STMIK Tazkia
-
-STMIK Tazkia merupakan perguruan tinggi IT di Bogor di bawah naungan Yayasan Tazkia Cendikia (didirikan oleh Prof. Dr. Muhammad Syafi’i Antonio, M.Ec.).
-Nama "Tazkia" berarti "tumbuh dan berkembang dengan bersih", mencerminkan komitmen untuk membangun generasi unggul, kompeten, dan berkarakter mulia.
-
-Ringkasan Daftar Program Studi STMIK (S1)
-
-STMIK Tazkia menawarkan 2 Program Studi Sarjana (S1) unggulan:
-
-Sistem Informasi (Information Systems) - Fokus pada manajemen data dan bisnis digital.
-
-Teknik Informatika (Informatics Engineering) - Fokus pada rekayasa perangkat lunak dan AI.
-
-Visi & Misi STMIK Tazkia
-
-Visi: Menjadi perguruan tinggi yang unggul dalam bidang teknologi informasi yang mencetak lulusan berkompeten dan berkarakter mulia.
-
-Misi Utama:
-
-Menyelenggarakan pendidikan berkualitas standar internasional.
-
-Riset teknologi bermanfaat bagi NKRI dan dunia.
-
-Pengabdian masyarakat untuk kesejahteraan.
-
-Tata kelola kampus dengan iklim Life Long Learning.
-
-Lingkungan inklusif tanpa memandang latar belakang ekonomi.
-
-Kerjasama kemitraan nasional dan internasional.
-
-Keunggulan Kampus dan Fasilitas Akademik
-
-Kenapa kuliah di STMIK Tazkia?
-
-Masa Studi Singkat (3,5 Tahun): Lulus lebih cepat, hemat waktu, siap kerja.
-
-Metode Belajar Hybrid: Kombinasi luring (tatap muka) dan daring (online) yang fleksibel.
-
-Waktu Belajar Fleksibel: Cocok untuk mahasiswa yang bekerja atau berwirausaha.
-
-Program Penyaluran Kerja: Kerjasama industri untuk magang dan penempatan kerja.
-
-Berkarakter Mulia: Keseimbangan antara Hard Skill (IT) dan Soft Skill (Akhlak/SMILE).
-
-DETAIL LENGKAP PROGRAM STUDI & KEGIATAN STMIK
-
-1. Program Studi: S1 Sistem Informasi
-
-Institusi: STMIK Tazkia.
-
-Fokus Utama: Menggabungkan teknologi informasi dengan manajemen bisnis.
-
-Konsentrasi Keahlian: Project Management, Machine Learning, Data Analytic, Business Information System.
-
-Deskripsi Program: Dirancang untuk menciptakan solusi efektif dalam dunia digital. Membekali mahasiswa dengan skill teknis (coding/data) dan manajerial (bisnis).
-
-Mata Kuliah Kunci: Pengembangan Perangkat Lunak, Analisis Data, Jaringan Komputer, Manajemen Proyek TI.
-
-Prospek Karir (Peluang Kerja):
-
-System Analyst.
-
-Software Developer.
-
-UI/UX Designer.
-
-Data Analyst.
-
-2. Program Studi: S1 Teknik Informatika
-
-Institusi: STMIK Tazkia.
-
-Fokus Utama: Penerapan ilmu komputer, rekayasa perangkat lunak, dan infrastruktur teknologi.
-
-Konsentrasi Keahlian: Cyber Security, Artificial Intelligence (AI), Web Development, Software Engineering.
-
-Deskripsi Program: Fokus pada perancangan dan pengelolaan sistem software/hardware. Mengombinasikan teori komputasi, algoritma, dan coding untuk memecahkan masalah kompleks.
-
-Mata Kuliah Kunci: Struktur Data & Algoritma, Pemrograman Lanjut, Sistem Operasi, Kecerdasan Buatan (AI), Keamanan Siber.
-
-Prospek Karir (Peluang Kerja):
-
-Cybersecurity Specialist.
-
-AI Engineer.
-
-Cloud Engineer.
-
-DevOps Engineer.
-
-Software Engineer.
-
-Berita & Kegiatan Terkini
-
-Peluncuran UKM CyberForce (24 Juli 2025): UKM Keamanan Siber pertama di STMIK (Ketua: Fadilah Balfas).
-
-Seminar "Mental Health Issues" (26 Juli 2025): Oleh BEM STMIK (Pemateri: Shanaya Balghis Riyona).
-
-Training Sales Force Officer (17 Maret 2025): Pelatihan bisnis produk Tazkia Group.
-
-BEM "Kabinet Inspiratif Istiqomah": Presiden Fikri Pristyono Taufiqrrohman (Dilantik 19 Des 2024).
+6. Berita & Kegiatan Mahasiswa Terkini
+- UKM CyberForce: Unit Kegiatan Mahasiswa keamanan siber pertama (Diluncurkan 24 Juli 2025).
+- Seminar Mental Health: Diselenggarakan BEM STMIK (26 Juli 2025).
+- BEM "Kabinet Inspiratif Istiqomah": Presiden Fikri Pristyono T.
+- Training Sales Force: Pelatihan bisnis produk Tazkia Group.
