@@ -21,6 +21,8 @@ let guestRateLimit;
 let userRateLimit;
 let premiumRateLimit;
 let ipRateLimit;
+// ✅ TAMBAH IMPORT: Import middleware auto-detect dari module
+let aiSpecificRateLimitMiddleware;
 
 try {
   const rateLimitModule = require('../middleware/rateLimitMiddleware');
@@ -29,6 +31,8 @@ try {
   userRateLimit = rateLimitModule.userRateLimit;
   premiumRateLimit = rateLimitModule.premiumRateLimit;
   ipRateLimit = rateLimitModule.ipRateLimit;
+  // ✅ TAMBAH IMPORT: Import middleware auto-detect
+  aiSpecificRateLimitMiddleware = rateLimitModule.aiSpecificRateLimit;
   
   console.log('✅ [RATE LIMIT] Enhanced rate limiter loaded successfully');
 } catch (error) {
@@ -45,6 +49,7 @@ try {
   userRateLimit = fallbackRateLimiter;
   premiumRateLimit = fallbackRateLimiter;
   ipRateLimit = fallbackRateLimiter;
+  aiSpecificRateLimitMiddleware = fallbackRateLimiter; // Tambah fallback untuk auto-detect
 }
 
 /**
@@ -53,33 +58,33 @@ try {
  * ============================================================================
  */
 
-// ✅ CUSTOM RATE LIMIT: Strategi khusus untuk routes AI
-const aiSpecificRateLimit = (req, res, next) => {
-  // Skip rate limiting jika dimatikan di environment
-  if (process.env.RATE_LIMIT_ENABLED === 'false') {
-    return next();
-  }
-
-  // Terapkan IP-based rate limiting terlebih dahulu
-  ipRateLimit(req, res, (ipError) => {
-    if (ipError) {
-      return next(ipError);
-    }
-
-    // Terapkan user-specific rate limiting berdasarkan authentication
-    if (req.user) {
-      // User terautentikasi - gunakan user rate limits
-      if (req.user.isPremium || req.user.role === 'premium') {
-        premiumRateLimit(req, res, next);
-      } else {
-        userRateLimit(req, res, next);
-      }
-    } else {
-      // Guest user - gunakan guest rate limits
-      guestRateLimit(req, res, next);
-    }
-  });
-};
+// ❌ HAPUS FUNGSI BUGGY INI (lines 46-67 dalam kode lama):
+// const aiSpecificRateLimit = (req, res, next) => {
+//   // Skip rate limiting jika dimatikan di environment
+//   if (process.env.RATE_LIMIT_ENABLED === 'false') {
+//     return next();
+//   }
+//
+//   // Terapkan IP-based rate limiting terlebih dahulu
+//   ipRateLimit(req, res, (ipError) => {
+//     if (ipError) {
+//       return next(ipError);
+//     }
+//
+//     // Terapkan user-specific rate limiting berdasarkan authentication
+//     if (req.user) {
+//       // User terautentikasi - gunakan user rate limits
+//       if (req.user.isPremium || req.user.role === 'premium') {
+//         premiumRateLimit(req, res, next);
+//       } else {
+//         userRateLimit(req, res, next);
+//       }
+//     } else {
+//       // Guest user - gunakan guest rate limits
+//       guestRateLimit(req, res, next);
+//     }
+//   });
+// };
 
 /**
  * ============================================================================
@@ -167,7 +172,8 @@ const addRateLimitHeaders = (req, res, rateLimitInfo) => {
 // ✅ CHAT ROUTE UTAMA (RAG INTEGRATED) - ENHANCED RATE LIMITING
 router.post('/chat', 
   guestFriendlyAuth, 
-  aiSpecificRateLimit, 
+  // ✅ PERBAIKAN: Ganti dari aiSpecificRateLimit ke aiSpecificRateLimitMiddleware
+  aiSpecificRateLimitMiddleware, 
   asyncHandler(async (req, res, next) => {
     try {
       // ✅ FIX: Langsung panggil controller tanpa manipulasi response
@@ -413,7 +419,8 @@ router.post('/study-recommendations',
 // Test koneksi AI sederhana - GUEST FRIENDLY + RATE LIMITED
 router.post('/test-ai', 
   guestFriendlyAuth, 
-  aiSpecificRateLimit,
+  // ✅ PERBAIKAN: Ganti dari aiSpecificRateLimit ke aiSpecificRateLimitMiddleware
+  aiSpecificRateLimitMiddleware,
   asyncHandler(async (req, res) => {
     const { message } = req.body;
     const testMessage = message || 'Halo, tes koneksi AI';
@@ -497,7 +504,7 @@ router.get('/test-embedding',
 // Test RAG System - GUEST FRIENDLY + RATE LIMITED
 router.post('/test-rag', 
   guestFriendlyAuth, 
-  aiSpecificRateLimit,
+  aiSpecificRateLimitMiddleware, // ✅ PERBAIKAN: Juga ganti di sini
   asyncHandler(async (req, res) => {
     const { message } = req.body;
     const testMessage = message || 'lokasi kampus tazkia';
@@ -637,8 +644,6 @@ router.post('/reset-knowledge',
 );
 
 // ✅ FIX 2: Rate Limit Status Check (Use Controller)
-// Sebelumnya rute ini menggunakan logika inline yang crash (TypeError).
-// Sekarang kita hubungkan langsung ke RateLimitController.
 router.get('/rate-limit-status',
   guestFriendlyAuth,
   rateLimitController.getRateLimitStatus
