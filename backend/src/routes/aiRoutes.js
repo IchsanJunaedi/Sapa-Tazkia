@@ -172,7 +172,7 @@ router.post('/chat',
     try {
       // ✅ FIX: Langsung panggil controller tanpa manipulasi response
       await aiController.sendChat(req, res);  
-      // Tambahkan rate limit info ke response jika ada    
+      // Tambahkan rate limit info ke response jika ada     
     } catch (error) {
       next(error);
     }
@@ -386,8 +386,10 @@ router.post('/ingest',
 
 // ✅ MANAJEMEN PERCAKAPAN (PROTECTED) - NO RATE LIMIT (Read-only operations)
 router.get('/conversations', authMiddleware.requireAuth, aiController.getConversations);
-router.get('/history/:chatId', authMiddleware.requireAuth, aiController.getChatHistory);
-router.delete('/conversations/:chatId', authMiddleware.requireAuth, aiController.deleteConversation);
+
+// ✅ FIX: Ganti :chatId menjadi :id agar sesuai dengan Controller
+router.get('/history/:id', authMiddleware.requireAuth, aiController.getChatHistory);
+router.delete('/conversations/:id', authMiddleware.requireAuth, aiController.deleteConversation);
 
 // ✅ FITUR AKADEMIK (PROTECTED) - ENHANCED RATE LIMITING
 router.post('/analyze-academic', 
@@ -689,7 +691,7 @@ router.get('/', (req, res) => {
       protected: {
         ingest: 'POST /api/ai/ingest (Auth Only)',
         conversations: 'GET /api/ai/conversations (Auth Only)',
-        history: 'GET /api/ai/history/:chatId (Auth Only)',
+        history: 'GET /api/ai/history/:id (Auth Only)', // ✅ Updated documentation
         analyze_academic: 'POST /api/ai/analyze-academic (Auth Only - RATE LIMITED)',
         study_recommendations: 'POST /api/ai/study-recommendations (Auth Only - RATE LIMITED)'
       },
@@ -721,4 +723,4 @@ router.get('/', (req, res) => {
   });
 });
 
-module.exports = router;  
+module.exports = router;
