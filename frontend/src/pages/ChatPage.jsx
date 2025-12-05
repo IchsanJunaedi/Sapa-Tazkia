@@ -123,7 +123,7 @@ const ChatPage = () => {
     });
     
     const [chatHistory, setChatHistory] = useState([]);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
     
     const [showDeleteModal, setShowDeleteModal] = useState(false);
