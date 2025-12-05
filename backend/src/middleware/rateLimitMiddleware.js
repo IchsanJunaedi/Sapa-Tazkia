@@ -1,5 +1,5 @@
 const rateLimitService = require('../services/rateLimitService');
-const { getClientIp } = require('request-ip'); // Pastikan install: npm install request-ip
+const { getClientIp } = require('request-ip'); 
 
 /**
  * Middleware Utama Rate Limit
@@ -7,61 +7,104 @@ const { getClientIp } = require('request-ip'); // Pastikan install: npm install 
  */
 const rateLimitMiddleware = (forcedType = null) => {
   return async (req, res, next) => {
+    // ----------------------------------------------------------------------
     // 1. Cek Kill Switch dari ENV
+    // ----------------------------------------------------------------------
     if (process.env.RATE_LIMIT_ENABLED === 'false') {
       return next();
     }
 
-    try {
-      // 2. Identifikasi Identitas (IP & UserID)
-      // Menggunakan library request-ip agar akurat di balik proxy/hosting
-      const ipAddress = getClientIp(req) || req.ip || '127.0.0.1';
-      const userId = req.user?.id || null; // Asumsi req.user di-set oleh Auth Middleware
+    // ----------------------------------------------------------------------
+    // 1.5. WHITELIST / EXCLUSION PATHS
+    // ----------------------------------------------------------------------
+    const excludedPaths = [
+      '/api/auth',      
+      '/health',        
+      '/favicon.ico'    
+    ];
 
+    const isExcluded = excludedPaths.some(path => req.path.startsWith(path));
+
+    if (isExcluded) {
+      return next(); 
+    }
+
+    try {
+      // ----------------------------------------------------------------------
+      // 2. Identifikasi Identitas (IP & UserID)
+      // ----------------------------------------------------------------------
+      const ipAddress = getClientIp(req) || req.ip || '127.0.0.1';
+      const userId = req.user?.id || null; 
+
+      // ----------------------------------------------------------------------
       // 3. Tentukan Tipe User Secara Cerdas
-      // Jika forcedType diisi (misal: 'guest'), pakai itu.
-      // Jika tidak, cek apakah ada userId? Jika ya -> 'user', Jika tidak -> 'guest'.
+      // ----------------------------------------------------------------------
       let userType = forcedType;
       
       if (!userType) {
         if (userId) {
-          // Logika tambahan: Cek role premium jika ada
           userType = (req.user.isPremium || req.user.role === 'premium') ? 'premium' : 'user';
         } else {
           userType = 'guest';
         }
       }
 
+      // ----------------------------------------------------------------------
+      // ✅ FIX: AMBIL MASTER LIMIT (SOURCE OF TRUTH)
+      // Kita ambil konfigurasi asli (misal: 7000) sebelum mengecek limit.
+      // Ini menjamin angka yang dikirim ke frontend SELALU limit token, bukan limit spam.
+      // ----------------------------------------------------------------------
+      const limitsConfig = rateLimitService.getLimits(userType);
+      const masterTokenLimit = limitsConfig.tokenLimitDaily; // Ini pasti 7000/15000/dll
+
+      // ----------------------------------------------------------------------
       // 4. Panggil Service (Otak Utama)
-      // Kita tidak perlu logic Redis manual di sini, biarkan Service yang menghitung Atomic
+      // ----------------------------------------------------------------------
       const result = await rateLimitService.checkRateLimit(userId, ipAddress, userType);
 
+      // ----------------------------------------------------------------------
       // 5. Set Response Headers (Standard RFC 6585)
-      // Memberi info ke frontend sisa limit mereka
+      // ----------------------------------------------------------------------
+      // ✅ FIX: Gunakan masterTokenLimit jika result.limit tidak ada (kasus error spam)
+      // ✅ FIX: Pastikan remaining tidak undefined (kasus error spam -> anggap remaining aman/pakai yg ada)
+      
+      const responseLimit = result.limit || masterTokenLimit;
+      const responseRemaining = result.remaining !== undefined ? result.remaining : 0; 
+      
       res.set({
-        'X-RateLimit-Limit': result.limit,
-        'X-RateLimit-Remaining': result.remaining,
-        'X-RateLimit-Reset': Math.ceil(result.resetTime / 1000),
-        'X-RateLimit-Policy': userType // Info tambahan kebijakan yang dipakai
+        'X-RateLimit-Limit': responseLimit,         // SELALU 7000
+        'X-RateLimit-Remaining': responseRemaining, 
+        'X-RateLimit-Reset': result.resetTime ? Math.ceil(result.resetTime / 1000) : 0,
+        'X-RateLimit-Policy': userType 
       });
 
+      // ----------------------------------------------------------------------
       // 6. Eksekusi Blokir jika limit habis
+      // ----------------------------------------------------------------------
       if (!result.allowed) {
-        res.set('Retry-After', result.retryAfter);
+        res.set('Retry-After', result.retryAfter || 60);
+        
+        // Logika Status Code:
+        // Jika error karena Spam (jeda sebentar) -> 429
+        // Jika error karena Token Habis (limit harian) -> 429 (sama saja, tapi pesan beda)
         
         return res.status(429).json({
           success: false,
-          error: 'rate_limit_exceeded',
-          message: `Too many requests. Please try again in ${result.retryAfter} seconds.`,
+          error: result.error || 'rate_limit_exceeded',
+          message: result.message || `Too many requests. Please try again in ${result.retryAfter} seconds.`,
           data: {
             retry_after: result.retryAfter,
-            limit: result.limit,
+            // ✅ FIX: Kirim limit 7000 ke frontend, jangan undefined/10
+            limit: responseLimit, 
+            remaining: responseRemaining,
             reset_time: result.resetTime
           }
         });
       }
 
+      // ----------------------------------------------------------------------
       // 7. Lanjut jika aman
+      // ----------------------------------------------------------------------
       next();
 
     } catch (error) {
@@ -76,22 +119,11 @@ const rateLimitMiddleware = (forcedType = null) => {
 // PRE-CONFIGURED MIDDLEWARES
 // ==========================================
 
-// 1. Middleware Standar
 const guestRateLimit = rateLimitMiddleware('guest');
 const userRateLimit = rateLimitMiddleware('user');
 const premiumRateLimit = rateLimitMiddleware('premium');
-
-// 2. IP Rate Limit (Compatibility)
-// Kita arahkan ke 'guest' karena guest limit dasarnya berbasis IP
 const ipRateLimit = rateLimitMiddleware('guest');
-
-// 3. Dynamic AI Middleware
-// Middleware pintar yang otomatis menyesuaikan limit berdasarkan status login user
-const aiSpecificRateLimit = rateLimitMiddleware(null); // Null artinya auto-detect
-
-// 4. Enhanced Guest (Array Compatibility)
-// Karena logic kita sudah atomic, kita tidak perlu array middleware bertumpuk.
-// Cukup satu middleware guest yang solid.
+const aiSpecificRateLimit = rateLimitMiddleware(null); 
 const enhancedGuestRateLimit = guestRateLimit;
 
 module.exports = {
