@@ -9,3 +9,4 @@ geminiService.js
 build
 public
 topicExtractor.js
+redis_data
