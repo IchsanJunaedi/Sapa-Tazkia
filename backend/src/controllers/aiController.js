@@ -18,6 +18,7 @@ const sendChat = async (req, res) => {
     const { message, conversationId, isNewChat } = req.body;
     const userId = req.user?.id || null; 
 
+    // ✅ STRICT AUTH CHECK: Hanya untuk user login
     if (!userId) {
         return res.status(401).json({ success: false, message: "Unauthorized" });
     }
@@ -79,7 +80,6 @@ const sendChat = async (req, res) => {
       try {
         const fallbackRes = await generateAIResponse(cleanMessage, conversationHistory, 'general');
         
-        // Handle jika fallback return object/string
         finalAnswer = typeof fallbackRes === 'object' ? fallbackRes.content : fallbackRes;
         const usageData = typeof fallbackRes === 'object' ? fallbackRes.usage : null;
         
@@ -91,28 +91,69 @@ const sendChat = async (req, res) => {
     }
 
     // =================================================================
-    // 4. ✅ TOKEN TRACKING & DEDUCTION
+    // 4. ✅ TOKEN TRACKING & DEDUCTION (FIXED)
     // =================================================================
+    let currentRemaining = null; 
+
     if (realTokenUsage > 0) {
-        const trackerIdentifier = userId; // Pakai User ID untuk user login
-        // Gunakan IP sebagai secondary key atau log info saja jika mau
+        const trackerIdentifier = userId; 
+        
+        // Track Usage
         await rateLimitService.trackTokenUsage(trackerIdentifier, req.ip, realTokenUsage);
         console.log(`📉 [AI LIMIT] Deducted ${realTokenUsage} tokens for User ${userId}`);
+
+        // Get Latest Balance (User)
+        const quotaStatus = await rateLimitService.getQuotaStatus(trackerIdentifier, 'user');
+        currentRemaining = quotaStatus.remaining;
+        console.log(`📊 [AI LIMIT] Updated User Balance: ${currentRemaining} / ${quotaStatus.limit}`);
     }
     // =================================================================
 
-    // 5. DB SAVE
+    // 5. ✅ DB SAVE - ANTI-GHOSTING & SMART TITLE GENERATION
     currentConversationId = conversationId ? parseInt(conversationId) : null;
-    shouldCreateNewConversation = isNewChat || !conversationId;
+    shouldCreateNewConversation = isNewChat || !currentConversationId;
 
     try {
-        const conversationTitle = cleanMessage.substring(0, 50) + (cleanMessage.length > 50 ? '...' : '');
+        // Default title: Potongan pesan user (Fallback)
+        let conversationTitle = cleanMessage.substring(0, 50) + (cleanMessage.length > 50 ? '...' : '');
+
+        if (!shouldCreateNewConversation) {
+            const existingConv = await prisma.conversation.findFirst({
+                where: { id: currentConversationId, userId: userId }
+            });
+
+            if (!existingConv) {
+                console.warn(`⚠️ [DB] Conversation ID ${currentConversationId} not found. Creating new.`);
+                shouldCreateNewConversation = true; 
+                currentConversationId = null;
+            }
+        }
 
         if (shouldCreateNewConversation) {
+          // 🧠 SMART TITLE GENERATION (FITUR BARU)
+          // Kita minta AI membuat judul pendek berdasarkan pesan user
+          try {
+             // Prompt khusus agar judulnya singkat, padat, dan jelas (Title Case)
+             const titlePrompt = `Buatkan judul percakapan yang sangat singkat (maksimal 4-5 kata), menarik, dan formal berdasarkan pertanyaan ini: "${cleanMessage}". Langsung tulis judulnya saja tanpa tanda kutip. Contoh: "Lokasi Kampus Tazkia" atau "Biaya Kuliah 2025".`;
+             
+             // Gunakan service OpenAI yang sudah ada
+             const generatedTitleRes = await generateAIResponse(titlePrompt, [], 'general');
+             const generatedTitle = typeof generatedTitleRes === 'object' ? generatedTitleRes.content : generatedTitleRes;
+             
+             if (generatedTitle && generatedTitle.length < 60) {
+                 conversationTitle = generatedTitle.replace(/^["']|["']$/g, '').trim(); // Hapus tanda kutip jika ada
+                 console.log(`✨ [AI TITLE] Generated Title: "${conversationTitle}"`);
+             }
+          } catch (titleError) {
+             console.warn('⚠️ Title generation failed, using default:', titleError.message);
+             // Tidak perlu crash, cukup pakai default title
+          }
+
+          // Buat Conversation Baru dengan Judul AI
           const newConversation = await prisma.conversation.create({
             data: {
               userId: userId,
-              title: conversationTitle,
+              title: conversationTitle, // <-- Judul dari AI masuk sini
               messages: {
                 create: [
                   { role: 'user', content: cleanMessage },
@@ -122,28 +163,25 @@ const sendChat = async (req, res) => {
             }
           });
           currentConversationId = newConversation.id;
+          console.log(`✅ [DB] New Conversation Created: ID ${currentConversationId}`);
         } else {
-          const existingConv = await prisma.conversation.findFirst({
-            where: { id: currentConversationId, userId: userId }
+          // Update Existing
+          await prisma.message.createMany({
+            data: [
+              { conversationId: currentConversationId, role: 'user', content: cleanMessage },
+              { conversationId: currentConversationId, role: 'bot', content: finalAnswer }
+            ]
           });
-
-          if (existingConv) {
-            await prisma.message.createMany({
-              data: [
-                { conversationId: currentConversationId, role: 'user', content: cleanMessage },
-                { conversationId: currentConversationId, role: 'bot', content: finalAnswer }
-              ]
-            });
-            
-            // Update timestamp
-            await prisma.conversation.update({
-                where: { id: currentConversationId },
-                data: { updatedAt: new Date() }
-            });
-          }
+          
+          // Update timestamp
+          await prisma.conversation.update({
+              where: { id: currentConversationId },
+              data: { updatedAt: new Date() }
+          });
+          console.log(`✅ [DB] Message saved & Timestamp updated for ID ${currentConversationId}`);
         }
     } catch (dbError) {
-        console.error('❌ DB Save Error:', dbError.message);
+        console.error('❌ [DB SAVE ERROR]:', dbError.message);
     }
 
     // 6. RESPONSE
@@ -153,10 +191,10 @@ const sendChat = async (req, res) => {
       conversationId: currentConversationId,
       timestamp: new Date().toISOString(),
       isNewConversation: shouldCreateNewConversation,
-      // ✅ Usage Data
       usage: {
         tokensUsed: realTokenUsage,
-        policy: 'user' 
+        policy: 'user', 
+        remaining: currentRemaining 
       }
     });
 
@@ -169,18 +207,88 @@ const sendChat = async (req, res) => {
   }
 };
 
-// ... (Sisa fungsi helper export biarkan tetap sama) ...
-// Copy paste fungsi triggerIngestion, getConversations, dll dari file lama Anda ke sini
-// Agar tidak terlalu panjang di chat, saya asumsikan Anda bisa copy paste sisanya.
+// ... (Helper Functions - Dipertahankan) ...
 
 const triggerIngestion = async (req, res) => { /* ... */ };
-const getConversations = async (req, res) => { /* ... */ };
-const getChatHistory = async (req, res) => { /* ... */ };
-const deleteConversation = async (req, res) => { /* ... */ };
-const analyzeAcademicPerformance = async (req, res) => { /* ... */ };
-const getStudyRecommendations = async (req, res) => { /* ... */ };
-const testAI = async (req, res) => { /* ... */ };
-const testOpenAIConnectionHandler = async (req, res) => { /* ... */ };
+
+const getConversations = async (req, res) => { 
+    try {
+        const userId = req.user.id;
+        const conversations = await prisma.conversation.findMany({
+            where: { userId },
+            orderBy: { updatedAt: 'desc' }, // Urutkan dari yang terbaru diupdate
+            take: 20
+        });
+
+        // MAPPING DATA (Fix Sidebar History)
+        const formattedConversations = conversations.map(chat => ({
+            ...chat,
+            timestamp: chat.updatedAt || chat.createdAt, 
+            lastMessage: chat.title 
+        }));
+
+        res.json({ 
+            success: true, 
+            data: formattedConversations, 
+            conversations: formattedConversations 
+        });
+
+    } catch (error) {
+        console.error("❌ [GET CONVERSATIONS ERROR]", error);
+        res.status(500).json({ success: false, message: "Failed to load conversations" });
+    }
+};
+
+const getChatHistory = async (req, res) => { 
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        
+        const chatCheck = await prisma.conversation.findFirst({
+            where: { id: parseInt(id), userId }
+        });
+
+        if (!chatCheck) {
+             return res.status(404).json({ success: false, message: "Chat not found" });
+        }
+
+        const messages = await prisma.message.findMany({
+            where: { conversationId: parseInt(id) },
+            orderBy: { createdAt: 'asc' }
+        });
+        
+        res.json({ 
+            success: true, 
+            data: messages,
+            messages: messages 
+        });
+        
+    } catch (error) {
+        console.error("History Error:", error);
+        res.status(500).json({ success: false, message: "Failed to load history" });
+    }
+};
+
+const deleteConversation = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        await prisma.conversation.deleteMany({
+            where: { id: parseInt(id), userId }
+        });
+        res.json({ success: true, message: "Deleted" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Failed to delete" });
+    }
+};
+
+const analyzeAcademicPerformance = async (req, res) => { res.json({success: true, message: "Feature coming soon"}) };
+const getStudyRecommendations = async (req, res) => { res.json({success: true, message: "Feature coming soon"}) };
+const testAI = async (req, res) => { res.json({success: true, message: "Test OK"}) };
+const testOpenAIConnectionHandler = async (req, res) => { 
+    const result = await testOpenAIConnection();
+    res.json(result);
+};
 
 module.exports = {
   sendChat,
