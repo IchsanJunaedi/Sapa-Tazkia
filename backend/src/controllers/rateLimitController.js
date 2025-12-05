@@ -1,116 +1,92 @@
-// Fallback untuk rate limit service
-let rateLimitService;
-try {
-  rateLimitService = require('../services/rateLimitService');
-} catch (error) {
-  console.warn('⚠️ [RATE LIMIT CONTROLLER] Service not found, using fallback');
-  rateLimitService = {
-    getRateLimitStats: () => Promise.resolve({ allowedRequests: 0, blockedRequests: 0, usingFallback: true }),
-    getServiceStatus: () => ({ redis: false, database: false, config: true })
-  };
-}
+const rateLimitService = require('../services/rateLimitService');
 
 class RateLimitController {
-  async getRateLimitStatus(req, res, next) {
+  
+  /**
+   * Mendapatkan status rate limit saat ini (digunakan oleh Frontend Bar)
+   * GET /api/guest/rate-limit-status
+   * GET /api/user/rate-limit-status
+   */
+  async getRateLimitStatus(req, res) {
     try {
-      const userId = req.user?.id || null;
-      const ipAddress = req.ip;
-      
-      const status = await rateLimitService.checkRateLimit(userId, ipAddress, req.user?.type || 'guest');
-      
+      // 1. Tentukan identitas (User ID atau IP) dengan aman
+      let identifier;
+      let userType;
+
+      if (req.user && req.user.id) {
+        identifier = req.user.id;
+        userType = 'user';
+      } else {
+        // Fallback ke IP Address untuk Guest
+        // req.headers['x-forwarded-for'] berguna jika di belakang proxy (Nginx/Cloudflare)
+        identifier = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.ip || '127.0.0.1';
+        
+        // Bersihkan format IP IPv6 standar localhost (::ffff:127.0.0.1 -> 127.0.0.1)
+        if (typeof identifier === 'string' && identifier.startsWith('::ffff:')) {
+          identifier = identifier.substr(7);
+        }
+        
+        userType = 'guest';
+      }
+
+      // 2. Ambil data dari service 
+      // (Method getQuotaStatus di service sudah kita buat anti-crash sebelumnya)
+      const status = await rateLimitService.getQuotaStatus(identifier, userType);
+
+      // 3. Kirim response sukses ke Frontend
       res.json({
         success: true,
         data: {
-          allowed: status.allowed,
-          limit: status.limit,
-          remaining: status.remaining,
-          resetTime: status.resetTime,
-          retryAfter: status.retryAfter,
-          userType: req.user?.type || 'guest',
-          usingFallback: status.usingFallback || false
+          user_type: userType,
+          window_limits: {
+            remaining: status.remaining,
+            limit: status.limit,
+            reset_time: status.resetTime,
+            allowed: status.remaining > 0
+          }
         }
       });
-    } catch (error) {
-      console.error('❌ [RATE LIMIT] Status error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get rate limit status',
-        message: error.message
-      });
-    }
-  }
 
-  async getRateLimitAnalytics(req, res, next) {
-    try {
-      const { timeRange = '24h' } = req.query;
-      const userId = req.user?.id || null;
+    } catch (error) {
+      console.error('❌ [RATE LIMIT CONTROLLER] Critical Error getting status:', error.message);
       
-      const stats = await rateLimitService.getRateLimitStats(userId, timeRange);
-      
-      res.json({
-        success: true,
+      // ✅ FALLBACK RESPONSE (FIX UTAMA)
+      // Jika terjadi error fatal, jangan kirim 500. Kirim data "aman" agar UI tidak rusak.
+      // Kita anggap user adalah guest dengan kuota penuh sementara waktu.
+      res.json({ 
+        success: false, // Tandai false tapi tetap return 200 OK secara HTTP
+        message: "Fallback status due to server error",
         data: {
-          timeRange,
-          ...stats,
-          totalRequests: stats.allowedRequests + stats.blockedRequests,
-          blockRate: stats.blockedRequests / (stats.allowedRequests + stats.blockedRequests) || 0
+          user_type: 'guest',
+          window_limits: {
+            remaining: 7000, // Tampilkan penuh agar user tidak bingung
+            limit: 7000,
+            reset_time: Date.now() + 86400000, // Reset besok
+            allowed: true 
+          }
         }
       });
-    } catch (error) {
-      console.error('❌ [RATE LIMIT] Analytics error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get rate limit analytics',
-        message: error.message
-      });
     }
   }
 
-  async resetRateLimit(req, res, next) {
-    try {
-      // Only allow admins or the user themselves to reset
-      const { identifier, userType } = req.body;
-      
-      // Implementation for manual reset (admin feature)
-      // This would clear Redis keys and reset counters
-      
-      res.json({
-        success: true,
-        message: 'Rate limit reset successfully (simulated)',
-        note: 'Full reset functionality requires admin privileges'
-      });
-    } catch (error) {
-      console.error('❌ [RATE LIMIT] Reset error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to reset rate limit',
-        message: error.message
-      });
-    }
-  }
+  // --- Opsional: Fitur Health Check Service ---
 
-  // Service status endpoint
-  async getServiceStatus(req, res, next) {
+  async getServiceStatus(req, res) {
     try {
-      const status = rateLimitService.getServiceStatus ? 
-        rateLimitService.getServiceStatus() : 
-        { redis: false, database: false, config: true };
-      
+      const isRedisUp = rateLimitService.isRedisAvailable;
       res.json({
         success: true,
         data: {
-          ...status,
+          service: 'RateLimitService',
+          redis_connected: isRedisUp,
           timestamp: new Date().toISOString()
         }
       });
     } catch (error) {
-      console.error('❌ [RATE LIMIT] Service status error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get service status'
-      });
+      res.status(500).json({ success: false, error: 'Service check failed' });
     }
   }
 }
 
+// Export instance
 module.exports = new RateLimitController();
