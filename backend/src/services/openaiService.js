@@ -9,9 +9,13 @@ const openai = new OpenAI({
 });
 
 /**
- * ============================================================================
+ * ========================================================================
  * 🛡️ GOD MODE PROMPT CONFIGURATION (STRICT ANTI-HALLUCINATION)
- * ============================================================================
+ * ========================================================================
+ *
+ * NOTE:
+ * - Jangan ubah isi prompt ini kecuali paham efeknya pada behaviour AI.
+ * - Untuk pertanyaan "identitas" kita akan BYPASS RAG/context dan jawab fixed reply.
  */
 
 const OPTIMIZED_SYSTEM_PROMPT = `
@@ -61,7 +65,7 @@ PERTANYAAN USER: "{query}"
 INSTRUKSI:
 1. Cek apakah {context} relevan dengan "{query}".
 2. JANGAN gunakan pengetahuan luar (internet/umum) jika {context} kosong.`,
-  
+
   program: `DATA AKADEMIK:
 {context}
 
@@ -102,10 +106,51 @@ const FALLBACK_RESPONSES = {
 };
 
 /**
- * ============================================================================
+ * ========================================================================
  * 🛠️ CORE SERVICE LOGIC
- * ============================================================================
+ * ========================================================================
  */
+
+/** ---------------------------
+ *  Identity override constants
+ *  ---------------------------
+ */
+const IDENTITY_REPLY = `Assalamualaikum! 👋
+
+Kia adalah asisten AI resmi Universitas Tazkia 🤖✨
+Kia membantu informasi terkait kampus, akademik, program studi, dan layanan mahasiswa.
+Insya Allah Kia bantu semaksimal mungkin! 🙏
+
+Barakallahu fiikum 🌟`;
+
+/**
+ * Simple identity/question intent detection.
+ * Expand the list if you see more variations in logs.
+ */
+function isIdentityQuestion(text) {
+  if (!text) return false;
+  const q = text.toLowerCase();
+  const patterns = [
+    "kamu siapa", "siapa kamu", "kia siapa",
+    "nama kamu", "nama mu", "siapa dirimu",
+    "perkenalkan dirimu", "asal kamu", "siapa kia",
+    "kenalan dong", "perkenalkan"
+  ];
+  return patterns.some(p => q.includes(p));
+}
+
+/**
+ * Slightly more robust "small intent classification" for banned topics
+ */
+function isBannedTopicQuestion(text) {
+  if (!text) return false;
+  const q = text.toLowerCase();
+  const banned = [
+    "resep", "cara buat", "nasi goreng", "masak", "film", "artis",
+    "politik", "ibu kota", "luas lingkaran", "tugas sekolah"
+  ];
+  return banned.some(b => q.includes(b));
+}
 
 async function createEmbedding(text) {
   try {
@@ -137,72 +182,98 @@ async function chatCompletion(messages, options = {}) {
   }
 }
 
+// ==============================
+// 🚑 FIXED generateAIResponse
+// - Identity questions bypass RAG/context (fixed reply)
+// - Returns {content, usage}
+// - Keeps validation + fallback
+// ==============================
 async function generateAIResponse(userMessage, conversationHistory = [], customContext = null, options = {}) {
   try {
     const {
-      maxTokens = 600, 
-      temperature = 0.1, 
+      maxTokens = 600,
+      temperature = 0.1,
       userType = 'general',
       questionType = 'general',
       forceContextUsage = false
     } = options;
 
     const modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-    
-    console.log(`🤖 [OPENAI] Generating response for "${questionType}"...`);
 
+    // 1) Identity override: ALWAYS bypass context and return fixed identity reply
+    if (isIdentityQuestion(userMessage)) {
+      return { content: IDENTITY_REPLY, usage: { total_tokens: 0 } };
+    }
+
+    // 2) Quick banned-topic guard: if user clearly asks banned topics, reply politely without RAG
+    if (isBannedTopicQuestion(userMessage)) {
+      return {
+        content:
+          "Afwan, Kia hanya melayani informasi akademik/kampus Tazkia. Untuk topik di luar itu (misal resep/film/soal umum), Kia tidak dapat membantu. Ada yang berkaitan kampus yang bisa Kia bantu?",
+        usage: { total_tokens: 0 }
+      };
+    }
+
+    // Build messages (system + optional context + recent history + user)
     const messages = buildContextEnforcementMessages(
-      userMessage, 
-      conversationHistory, 
-      customContext, 
+      userMessage,
+      conversationHistory,
+      customContext,
       userType,
       questionType,
       forceContextUsage
     );
 
+    // Call OpenAI
     const completion = await openai.chat.completions.create({
       model: modelName,
       messages: messages,
       max_tokens: maxTokens,
       temperature: temperature,
-      presence_penalty: 0.0, 
+      presence_penalty: 0.0,
     });
 
     let aiReply = completion.choices[0].message.content.trim();
 
-    // Validasi Output Layer 2
+    // Validate + enhance (anti-hallucination)
     aiReply = validateAndEnhanceResponse(aiReply, customContext, userMessage, questionType);
-    
-    // ✅ LOGGING TOKEN YANG DIPERBAIKI (PASTI MUNCUL)
+
+    // Grab usage info (if present)
     const usage = completion.usage || { total_tokens: 0, prompt_tokens: 0, completion_tokens: 0 };
+
     console.log('💰 [OPENAI USAGE]', {
       model: modelName,
       inputTokens: usage.prompt_tokens,
       outputTokens: usage.completion_tokens,
-      totalTokens: usage.total_tokens, // Ini yang Anda cari
+      totalTokens: usage.total_tokens,
       responseLength: aiReply.length
     });
 
-    return aiReply;
+    return { content: aiReply, usage };
 
   } catch (error) {
     console.error('❌ [OPENAI] Generation failed:', error);
-    return getSmartFallback(userMessage, customContext, { questionType });
+    // Fallback Return Object
+    return {
+      content: getSmartFallback(userMessage, customContext, { questionType: options.questionType || 'general' }),
+      usage: { total_tokens: 0 }
+    };
   }
 }
 
+
 function buildContextEnforcementMessages(userMessage, conversationHistory, customContext, userType, questionType, forceContextUsage) {
   const messages = [];
-  
+
   let systemPrompt = OPTIMIZED_SYSTEM_PROMPT;
-  
+
   if (customContext) {
     const contextTemplate = CONTEXT_ENFORCEMENT_PROMPTS[questionType] || CONTEXT_ENFORCEMENT_PROMPTS.general;
-    
+
     systemPrompt = contextTemplate
-        .replace('{context}', customContext)
-        .replace('{query}', userMessage);
-    
+      .replace('{context}', customContext)
+      .replace('{query}', userMessage);
+
     if (forceContextUsage) {
       systemPrompt += `\n\n⚠️ **PERINGATAN KERAS:** Gunakan data di atas! Jika pertanyaan User adalah tentang RESEP/MASAKAN/HIBURAN, JANGAN GUNAKAN DATA, TAPI TOLAK PERMINTAAN.`;
     }
@@ -212,11 +283,11 @@ function buildContextEnforcementMessages(userMessage, conversationHistory, custo
     1. Jika pertanyaan adalah sapaan ("Halo", "Assalamualaikum"), jawab ramah.
     2. Jika pertanyaan butuh FAKTA (Biaya, Prodi, Resep, Cara), KATAKAN TIDAK TAHU. JANGAN MENGARANG.`;
   }
-  
+
   messages.push({ role: 'system', content: systemPrompt });
 
-  if (conversationHistory.length > 0) {
-    const recentHistory = conversationHistory.slice(-2); 
+  if (conversationHistory && conversationHistory.length > 0) {
+    const recentHistory = conversationHistory.slice(-3); // sedikit lebih kontekstual
     messages.push(...recentHistory.map(msg => ({
       role: msg.role === 'bot' ? 'assistant' : msg.role,
       content: msg.content
@@ -224,23 +295,23 @@ function buildContextEnforcementMessages(userMessage, conversationHistory, custo
   }
 
   messages.push({ role: 'user', content: userMessage });
-  
+
   return messages;
 }
 
 function extractKeyInformation(context, question) {
   if (!context) return null;
-  
+
   if (context.includes('- ') || context.includes('1. ')) {
     const lines = context.split('\n');
-    const relevantLines = lines.filter(line => 
+    const relevantLines = lines.filter(line =>
       line.trim().length > 0 && (
-        line.includes('- ') || 
-        line.match(/^\d+\./) || 
+        line.includes('- ') ||
+        line.match(/^\d+\./) ||
         line.toLowerCase().includes(extractTopic(question))
       )
     );
-    
+
     if (relevantLines.length > 0) {
       let result = context.substring(0, 600);
       const lastDot = result.lastIndexOf('.');
@@ -254,12 +325,12 @@ function extractKeyInformation(context, question) {
 }
 
 function validateAndEnhanceResponse(response, context, question, questionType) {
-  const lowerRes = response.toLowerCase();
-  
+  const lowerRes = (response || '').toLowerCase();
+
   const forbiddenKeywords = ['tumis', 'siapkan bahan', 'panaskan minyak', 'potong-potong', 'sajikan hangat'];
   if (forbiddenKeywords.some(word => lowerRes.includes(word))) {
-      console.warn('🚨 [OPENAI] Hallucination Detected (Recipe). Blocking output.');
-      return "Afwan Kak, Kia adalah asisten akademik. Kia tidak memiliki kapabilitas untuk memberikan resep masakan atau info di luar topik kampus. Ada yang bisa Kia bantu seputar perkuliahan? 😊";
+    console.warn('🚨 [OPENAI] Hallucination Detected (Recipe). Blocking output.');
+    return "Afwan Kak, Kia adalah asisten akademik. Kia tidak memiliki kapabilitas untuk memberikan resep masakan atau info di luar topik kampus. Ada yang bisa Kia bantu seputar perkuliahan? 😊";
   }
 
   const invalidPhrases = [
@@ -270,7 +341,7 @@ function validateAndEnhanceResponse(response, context, question, questionType) {
   ];
 
   const isInvalid = invalidPhrases.some(p => lowerRes.includes(p));
-  
+
   if (context && isInvalid) {
     const keyInfo = extractKeyInformation(context, question);
     if (keyInfo) {
@@ -282,22 +353,21 @@ function validateAndEnhanceResponse(response, context, question, questionType) {
 }
 
 function getSmartFallback(question, context, options) {
-  const { questionType } = options;
-  
+  const { questionType } = options || {};
   if (context) {
     const keyInfo = extractKeyInformation(context, question);
     if (keyInfo) {
       return `Afwan, informasi singkat yang Kia temukan: ${keyInfo}. Silakan tanya lebih detail ya Kak.`;
     }
   }
-  
+
   const fallbacks = FALLBACK_RESPONSES.noContext;
   return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
 
 function extractTopic(question) {
   const ignore = ['apa', 'saja', 'yang', 'ada', 'di', 'prodi', 'fakultas', 'bagaimana', 'bisa', 'tolong', 'jelaskan', 'kak', 'kia'];
-  return question.toLowerCase().split(' ')
+  return (question || '').toLowerCase().split(' ')
     .filter(w => !ignore.includes(w) && w.length > 3)
     .join(' ') || 'topik ini';
 }
@@ -309,8 +379,8 @@ function generateOfferPhrase(topic, type = 'general') {
 
 function checkContextUsage(response, context) {
   if (!context) return 'none';
-  const keyword = context.substring(0, 20).toLowerCase().split(' ')[0]; 
-  return response.toLowerCase().includes(keyword) ? 'good' : 'weak';
+  const keyword = context.substring(0, 20).toLowerCase().split(' ')[0];
+  return (response || '').toLowerCase().includes(keyword) ? 'good' : 'weak';
 }
 
 async function testOpenAIConnection() {
