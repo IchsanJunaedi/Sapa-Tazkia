@@ -12,12 +12,10 @@ const QDRANT_PORT = process.env.QDRANT_PORT || 6333;
 const COLLECTION_NAME = 'sapa_tazkia_knowledge';
 const VECTOR_SIZE = 1536;
 
-// ✅ OPTIMASI: Kapasitas konteks diperbesar
 const MAX_CHUNK_SIZE = 800;  
 const CHUNK_OVERLAP = 100;   
 const MAX_CONTEXT_CHARS = 4500; 
 
-// Threshold adaptive
 const getAdaptiveThreshold = (query) => {
   if (query.length < 15) return 0.35;
   return 0.28; 
@@ -41,13 +39,11 @@ class RagService {
     const expandedQueries = new Set();
     expandedQueries.add(normalized);
     
-    // Keyword Injection untuk Daftar
     if (normalized.includes('apa aja') || normalized.includes('sebutkan') || normalized.includes('daftar') || normalized.includes('list')) {
         expandedQueries.add(`daftar lengkap program studi ${normalized}`);
         expandedQueries.add(`ringkasan semua jurusan ${normalized}`);
     }
 
-    // Keyword Injection untuk Detail (Sertifikasi/Karir)
     if (normalized.includes('sertifika') || normalized.includes('gelar')) {
         expandedQueries.add(`sertifikasi kompetensi ${normalized}`);
         expandedQueries.add(`gelar lulusan ${normalized}`);
@@ -110,7 +106,7 @@ class RagService {
           const queryVector = await openaiService.createEmbedding(expandedQuery);
           const searchResult = await client.search(COLLECTION_NAME, {
             vector: queryVector,
-            limit: 40, // Tetap 40 agar detail chunk terambil
+            limit: 40, 
             with_payload: true,
             score_threshold: adaptiveThreshold
           });
@@ -139,7 +135,6 @@ class RagService {
 
       console.log(`📊 [RAG] Candidates Found: ${allCandidates.length} docs (Before Reranking)`);
 
-      // ✅ Ambil Top 6
       const finalResults = await this.rerankResults(query, allCandidates, 6);
 
       if (finalResults.length > 0) {
@@ -169,14 +164,12 @@ class RagService {
   async rerankResults(query, searchResults, topN = 6) {
     const queryLower = this.normalizeString(query); 
     
-    // 1. DETEKSI INTENT: LIST
     const isListRequest = queryLower.includes('apa aja') || 
                           queryLower.includes('sebutkan') || 
                           queryLower.includes('daftar') || 
                           queryLower.includes('list') ||
                           (queryLower.includes('prodi') && !queryLower.includes('detail'));
 
-    // 2. DETEKSI INTENT: DETAIL (Sertifikasi, Karir, Kurikulum)
     const isDetailRequest = queryLower.includes('sertifika') || 
                             queryLower.includes('karir') || 
                             queryLower.includes('kerja') || 
@@ -190,28 +183,23 @@ class RagService {
       const titleClean = this.normalizeString(payload.title);
       const contentClean = this.normalizeString(payload.text);
 
-      // Base Boost: Keyword Match
       if (contentClean.includes(queryLower)) score += 0.1;
 
-      // Entity Boost: FEBS vs Humaniora
       if (queryLower.includes('febs') && filename.includes('febs')) score += 0.5; 
       if (queryLower.includes('humaniora') && filename.includes('humaniora')) score += 0.5;
 
-      // ✅ LOGIKA PINTAR BARU:
       if (isListRequest) {
-          // Jika minta LIST -> Boost chunk "Ringkasan"
           if (titleClean.includes('ringkasan') || titleClean.includes('daftar')) {
               score += 0.8; 
           }
       } 
       else if (isDetailRequest) {
-          // Jika minta DETAIL (Sertifikasi/Karir) -> Boost chunk yang mengandung Header tersebut
           if (queryLower.includes('sertifika') && contentClean.includes('sertifikasi')) {
-              score += 0.8; // Jackpot untuk chunk yang punya info sertifikasi
+              score += 0.8; 
               console.log(`   🎯 [RAG] Detail Match Found (Certification): ${payload.title}`);
           }
           if (queryLower.includes('karir') && (contentClean.includes('karir') || contentClean.includes('prospek'))) {
-              score += 0.8; // Jackpot untuk chunk yang punya info karir
+              score += 0.8; 
           }
       }
 
@@ -252,6 +240,7 @@ class RagService {
     return "BERIKUT ADALAH DATA FAKTA:\n\n" + contextParts.join("\n\n---\n\n");
   }
 
+  // ✅ METODE UTAMA: RETURN OBJECT LENGKAP
   async answerQuestion(userMessage, conversationHistory = []) {
     try {
       const startTime = performance.now();
@@ -261,7 +250,8 @@ class RagService {
       let questionType = 'general';
       if (userMessage.toLowerCase().includes('prodi') || userMessage.toLowerCase().includes('jurusan')) questionType = 'program';
 
-      const aiReply = await openaiService.generateAIResponse(
+      // Call OpenAI (Return object {content, usage})
+      const aiResult = await openaiService.generateAIResponse(
         userMessage, 
         conversationHistory, 
         contextString, 
@@ -270,10 +260,22 @@ class RagService {
 
       const duration = ((performance.now() - startTime) / 1000).toFixed(2);
       console.log(`⏱️ [RAG] Total processing time: ${duration}s`);
-      return aiReply;
+      
+      // ✅ [FIX] Return Object: Jawaban + Metadata Usage Asli
+      return {
+        answer: aiResult.content, // Teks jawaban
+        usage: aiResult.usage,    // Data token ASLI dari OpenAI {total_tokens, ...}
+        docsFound: relevantDocs.length
+      };
+
     } catch (error) {
       console.error('❌ [RAG] Answer Error:', error);
-      return "Mohon maaf, sistem sedang mengalami kendala teknis.";
+      // Return error structure
+      return {
+        answer: "Mohon maaf, sistem sedang mengalami kendala teknis.",
+        usage: { total_tokens: 0 }, // Safety fallback
+        docsFound: 0
+      };
     }
   }
 
@@ -295,8 +297,6 @@ class RagService {
       let type = 'general';
       if (title.toLowerCase().includes('prodi') || title.toLowerCase().includes('program')) type = 'program';
 
-      // Simpan chunk tanpa recursive split jika judulnya "Ringkasan" (agar list tidak putus)
-      // ATAU jika judulnya mengandung nama Prodi (agar info sertifikasi tidak putus dari nama prodinya)
       if ((title.toLowerCase().includes('ringkasan') || type === 'program') && trimmed.length < 2000) {
          finalChunks.push({ content: trimmed, title: title, type: 'program' });
       } 
