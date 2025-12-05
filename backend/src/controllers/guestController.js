@@ -1,159 +1,159 @@
-// controllers/guestController.js
-const ragService = require('../services/ragService'); // ✅ IMPORT RAG SERVICE
+const ragService = require('../services/ragService'); 
+const rateLimitService = require('../services/rateLimitService'); 
+const { generateAIResponse } = require('../services/openaiService'); 
 
-// Simpan session guest di memory (bukan database)
 const guestSessions = new Map();
 
 const guestChat = async (req, res) => {
   try {
     const { message, sessionId } = req.body;
+    const ipAddress = req.ip || '127.0.0.1';
 
     if (!message || message.trim() === '') {
-      return res.status(400).json({
-        success: false,
-        message: "Message is required"
-      });
+      return res.status(400).json({ success: false, message: "Message required" });
     }
 
-    // Generate session ID jika belum ada
-    const currentSessionId = sessionId || `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    console.log('👤 [GUEST CONTROLLER] Guest chat request:', {
-      sessionId: currentSessionId,
-      messageLength: message.length
-    });
+    const currentSessionId = sessionId || `guest-${Date.now()}`;
+    console.log(`👤 [GUEST] Chat from IP: ${ipAddress}`);
 
-    // ✅ PERBAIKAN UTAMA: GUNAKAN RAG SERVICE SAMA SEPERTI USER LOGIN
-    const aiResponse = await ragService.answerQuestion(message, []);
+    // 1. RAG Process
+    let ragResult; 
+    let finalAnswer;
+    let usedRAG = false;
+    let realTokenUsage = 0; 
 
-    // Simpan di memory (bukan database)
+    try {
+       // Panggil RAG 
+       ragResult = await ragService.answerQuestion(message, []);
+       
+       finalAnswer = ragResult.answer; 
+       usedRAG = true;
+       
+       // ✅ AMBIL TOKEN ASLI DARI DATA OPENAI
+       realTokenUsage = ragResult.usage ? ragResult.usage.total_tokens : 0;
+
+       // Fallback jika usage tidak ada
+       if (!realTokenUsage) {
+         const inputChars = message.length;
+         const outputChars = finalAnswer ? finalAnswer.length : 0;
+         realTokenUsage = Math.ceil((inputChars + outputChars) / 4) + 1400;
+       }
+
+    } catch (ragError) {
+       console.error("RAG Error:", ragError.message);
+       throw ragError;
+    }
+
+    // =================================================================
+    // 2. ✅ TOKEN TRACKING & REALTIME BALANCE UPDATE
+    // =================================================================
+    let currentRemaining = null; // Variabel untuk menyimpan sisa saldo terbaru
+
+    if (realTokenUsage > 0) {
+        // A. Potong Saldo
+        await rateLimitService.trackTokenUsage(null, ipAddress, realTokenUsage);
+        console.log(`📉 [GUEST LIMIT] Deducted REAL usage: ${realTokenUsage} tokens`);
+
+        // B. ✅ FIX: Ambil Sisa Saldo TERBARU setelah pemotongan
+        // Middleware mengirim saldo "sebelum" dipotong. Kita butuh saldo "sesudah" dipotong.
+        const quotaStatus = await rateLimitService.getQuotaStatus(ipAddress, 'guest');
+        currentRemaining = quotaStatus.remaining;
+        console.log(`📊 [GUEST LIMIT] Updated Balance: ${currentRemaining}`);
+    }
+    // =================================================================
+
+    // Session Management
     if (!guestSessions.has(currentSessionId)) {
-      guestSessions.set(currentSessionId, {
-        messages: [],
-        createdAt: new Date(),
-        lastActivity: new Date()
-      });
+        guestSessions.set(currentSessionId, { messages: [], lastActivity: new Date() });
     }
-
     const session = guestSessions.get(currentSessionId);
-    session.messages.push(
-      { role: 'user', content: message, timestamp: new Date() },
-      { role: 'bot', content: aiResponse, timestamp: new Date() }
-    );
-    session.lastActivity = new Date();
-
-    // Auto cleanup session lama
+    session.messages.push({ role: 'user', content: message }, { role: 'bot', content: finalAnswer });
+    
+    // Auto cleanup
     cleanupOldSessions();
 
-    console.log('✅ [GUEST CONTROLLER] Guest response sent:', {
-      sessionId: currentSessionId,
-      responseLength: aiResponse.length,
-      totalMessages: session.messages.length,
-      usedRAG: true // ✅ INDIKATOR RAG DIGUNAKAN
-    });
-
+    // Response
     res.json({
       success: true,
-      reply: aiResponse,
+      reply: finalAnswer, 
       sessionId: currentSessionId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      // ✅ Kirim data usage DAN remaining terbaru ke frontend
+      // Frontend akan memprioritaskan 'remaining' di sini daripada di Header
+      usage: {
+        tokensUsed: realTokenUsage, 
+        policy: 'guest',
+        remaining: currentRemaining // <-- KUNCI PERBAIKANNYA
+      }
     });
 
   } catch (error) {
-    console.error('❌ [GUEST CONTROLLER] Guest Chat Error:', error);
+    console.error('❌ [GUEST ERROR]', error.message);
     
-    // Error handling untuk RAG Service
-    if (error.message.includes('OPENAI_API_KEY')) {
-      return res.status(500).json({
-        success: false,
-        message: "Sistem AI sedang dalam perbaikan. Silakan coba lagi nanti."
-      });
-    } else if (error.message.includes('rate_limit')) {
-      return res.status(429).json({
-        success: false,
-        message: "Terlalu banyak permintaan. Silakan tunggu sebentar."
-      });
-    } else if (error.message.includes('Qdrant')) {
-      // Fallback ke OpenAI langsung jika RAG error
-      console.log('🔄 [GUEST CONTROLLER] RAG error, falling back to direct OpenAI');
-      try {
-        const { generateAIResponse } = require('../services/openaiService');
-        const fallbackResponse = await generateAIResponse(message);
-        
-        return res.json({
-          success: true,
-          reply: fallbackResponse,
-          sessionId: currentSessionId,
-          timestamp: new Date().toISOString(),
-          fallback: true // ✅ INDIKATOR FALLBACK MODE
-        });
-      } catch (fallbackError) {
-        console.error('❌ [GUEST CONTROLLER] Fallback also failed:', fallbackError);
-      }
+    // Fallback Logic (Direct OpenAI)
+    if (error.message.includes('Qdrant') || error.message.includes('fetch')) {
+        try {
+            const fallbackResponse = await generateAIResponse(message, [], 'general');
+            
+            const replyText = typeof fallbackResponse === 'object' ? fallbackResponse.content : fallbackResponse;
+            const usageData = typeof fallbackResponse === 'object' ? fallbackResponse.usage : null;
+            
+            let fallbackTokens = 0;
+            if (usageData) {
+                fallbackTokens = usageData.total_tokens;
+            } else {
+                fallbackTokens = Math.ceil((message.length + replyText.length) / 4);
+            }
+
+            let fallbackRemaining = null;
+
+            if (fallbackTokens > 0) {
+                await rateLimitService.trackTokenUsage(null, req.ip, fallbackTokens);
+                // Ambil saldo terbaru juga di sini
+                const quotaStatus = await rateLimitService.getQuotaStatus(req.ip, 'guest');
+                fallbackRemaining = quotaStatus.remaining;
+            }
+
+            return res.json({
+                success: true,
+                reply: replyText,
+                sessionId: req.body.sessionId || `guest-${Date.now()}`,
+                fallback: true,
+                usage: { 
+                    tokensUsed: fallbackTokens, 
+                    policy: 'guest',
+                    remaining: fallbackRemaining // <-- Kirim sisa saldo terbaru
+                }
+            });
+        } catch (e) { console.error("Fallback error", e); }
     }
-    
-    // Generic error response
-    res.status(500).json({
-      success: false,
-      message: "Chat service error",
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Terjadi kesalahan, silakan coba lagi.'
-    });
+
+    if (error.message.includes('rate_limit')) {
+        return res.status(429).json({ success: false, message: "Terlalu banyak permintaan." });
+    }
+
+    res.status(500).json({ success: false, message: "System Error" });
   }
 };
 
+// ... (fungsi getter lain tidak berubah) ...
 const getGuestConversation = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    
-    console.log('📜 [GUEST CONTROLLER] Get guest conversation:', sessionId);
-
-    if (!guestSessions.has(sessionId)) {
-      console.log('ℹ️ [GUEST CONTROLLER] Session not found:', sessionId);
-      return res.json({
-        success: true,
-        messages: []
-      });
-    }
-
+    if (!guestSessions.has(sessionId)) return res.json({ success: true, messages: [] });
     const session = guestSessions.get(sessionId);
-    
-    // Update last activity
     session.lastActivity = new Date();
-
-    console.log('✅ [GUEST CONTROLLER] Guest conversation retrieved:', {
-      sessionId: sessionId,
-      messageCount: session.messages.length
-    });
-
-    res.json({
-      success: true,
-      messages: session.messages
-    });
-
+    res.json({ success: true, messages: session.messages });
   } catch (error) {
-    console.error('❌ [GUEST CONTROLLER] Get Guest Conversation Error:', error);
-    res.status(500).json({
-      success: false,
-      message: "Error getting conversation",
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: "Error getting conversation" });
   }
 };
 
-// ✅ NEW: Get guest session info
 const getGuestSessionInfo = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    
-    if (!guestSessions.has(sessionId)) {
-      return res.status(404).json({
-        success: false,
-        message: "Session not found"
-      });
-    }
-
+    if (!guestSessions.has(sessionId)) return res.status(404).json({ success: false, message: "Session not found" });
     const session = guestSessions.get(sessionId);
-    
     res.json({
       success: true,
       data: {
@@ -164,68 +164,30 @@ const getGuestSessionInfo = async (req, res) => {
         ageInMinutes: Math.round((new Date() - session.createdAt) / (1000 * 60))
       }
     });
-
   } catch (error) {
-    console.error('❌ [GUEST CONTROLLER] Get Session Info Error:', error);
-    res.status(500).json({
-      success: false,
-      message: "Error getting session info",
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: "Error info" });
   }
 };
 
-// ✅ NEW: Clear guest session
 const clearGuestSession = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    
-    if (guestSessions.has(sessionId)) {
-      guestSessions.delete(sessionId);
-      console.log('🧹 [GUEST CONTROLLER] Guest session cleared:', sessionId);
-    }
-
-    res.json({
-      success: true,
-      message: "Guest session cleared successfully"
-    });
-
+    if (guestSessions.has(sessionId)) guestSessions.delete(sessionId);
+    res.json({ success: true, message: "Cleared" });
   } catch (error) {
-    console.error('❌ [GUEST CONTROLLER] Clear Session Error:', error);
-    res.status(500).json({
-      success: false,
-      message: "Error clearing session",
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: "Error clearing" });
   }
 };
 
-// Cleanup session yang sudah lama
 const cleanupOldSessions = () => {
   const now = new Date();
-  const MAX_AGE = 2 * 60 * 60 * 1000; // 2 jam
-  
-  let cleanedCount = 0;
-  
+  const MAX_AGE = 2 * 60 * 60 * 1000; 
   for (const [sessionId, session] of guestSessions.entries()) {
-    if (now - session.lastActivity > MAX_AGE) {
-      guestSessions.delete(sessionId);
-      cleanedCount++;
-    }
-  }
-
-  if (cleanedCount > 0) {
-    console.log(`🧹 [GUEST CONTROLLER] Cleaned ${cleanedCount} old guest sessions`);
+    if (now - session.lastActivity > MAX_AGE) guestSessions.delete(sessionId);
   }
 };
 
-// Run cleanup setiap 30 menit
 setInterval(cleanupOldSessions, 30 * 60 * 1000);
-
-// Log session stats periodically
-setInterval(() => {
-  console.log(`📊 [GUEST CONTROLLER] Active guest sessions: ${guestSessions.size}`);
-}, 60 * 60 * 1000); // Setiap 1 jam
 
 module.exports = {
   guestChat,
