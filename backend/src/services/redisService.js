@@ -1,39 +1,42 @@
 const Redis = require('ioredis');
 
-// ✅ PAKAI LOGGER YANG SUDAH DIBUAT, dengan fallback
+// ✅ LOGGER SETUP
 let logger;
 try {
   logger = require('../utils/logger');
 } catch (error) {
-  // Fallback jika file logger tidak ada
   logger = {
     info: (...args) => console.log(`[${new Date().toISOString()}] ℹ️ [REDIS]`, ...args),
     error: (...args) => console.error(`[${new Date().toISOString()}] 🔴 [REDIS ERROR]`, ...args),
     warn: (...args) => console.warn(`[${new Date().toISOString()}] ⚠️ [REDIS WARN]`, ...args),
     debug: (...args) => { 
-      if (process.env.RATE_LIMIT_DEBUG === 'true') {
-        console.log(`[${new Date().toISOString()}] 🔍 [REDIS DEBUG]`, ...args);
-      }
+      if (process.env.RATE_LIMIT_DEBUG === 'true') console.log(`[${new Date().toISOString()}] 🔍 [REDIS DEBUG]`, ...args);
     }
   };
 }
 
 class RedisService {
   constructor() {
-    this.isConnected = false;
+    this.client = null;
+    this.isConnected = false; // Status visual saja, jangan dipakai untuk blocking logika utama
+    this.initialize();
+  }
+
+  initialize() {
+    const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
     
     try {
-      this.client = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-        retryDelayOnFailover: 100,
+      this.client = new Redis(redisUrl, {
+        retryStrategy: (times) => Math.min(times * 50, 2000),
         maxRetriesPerRequest: 3,
-        lazyConnect: true // ✅ Important: jangan auto-connect
+        enableReadyCheck: false,
+        lazyConnect: false 
       });
-      
+
       this.initEventListeners();
       logger.info('Redis service initialized');
     } catch (error) {
       logger.error('Failed to initialize Redis service:', error.message);
-      this.client = null;
     }
   }
 
@@ -42,12 +45,16 @@ class RedisService {
 
     this.client.on('connect', () => {
       this.isConnected = true;
-      logger.info('Redis client connected');
+      logger.info('✅ Redis client connected successfully');
     });
 
     this.client.on('error', (err) => {
-      this.isConnected = false;
-      logger.error('Redis error:', err.message);
+      // Jangan set isConnected false permanen di sini agar bisa auto-reconnect
+      if (err.code === 'ECONNREFUSED') {
+        // console.warn('⚠️ [REDIS] Connection refused...'); 
+      } else {
+        logger.error('Redis error:', err.message);
+      }
     });
 
     this.client.on('close', () => {
@@ -56,233 +63,142 @@ class RedisService {
     });
   }
 
-  async set(key, value, expiryMs = null) {
-    try {
-      if (!this.client) {
-        throw new Error('Redis client not available');
-      }
-
-      if (expiryMs) {
-        return await this.client.set(key, JSON.stringify(value), 'PX', expiryMs);
-      }
-      return await this.client.set(key, JSON.stringify(value));
-    } catch (error) {
-      logger.error('Redis set error:', error.message);
-      throw error;
-    }
-  }
+  // =================================================================
+  // 1. CORE OPERATIONS
+  // =================================================================
 
   async get(key) {
+    // ❌ HAPUS check !this.isConnected agar tidak memblokir saat startup
     try {
-      if (!this.client) {
-        return null;
-      }
-
+      if (!this.client) return null;
       const data = await this.client.get(key);
-      return data ? JSON.parse(data) : null;
+      return data; 
     } catch (error) {
-      logger.error('Redis get error:', error.message);
-      return null; // Return null instead of throwing for get operations
+      logger.error(`Redis get error [${key}]:`, error.message);
+      return null;
     }
   }
 
-  async incr(key) {
+  async set(key, value, expireSeconds = null) {
     try {
-      if (!this.client) {
-        return 1; // Fallback value
+      if (!this.client) return;
+      const valString = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      
+      if (expireSeconds) {
+        await this.client.set(key, valString, 'EX', expireSeconds);
+      } else {
+        await this.client.set(key, valString);
       }
-      return await this.client.incr(key);
     } catch (error) {
-      logger.error('Redis incr error:', error.message);
-      return 1; // Fallback value
-    }
-  }
-
-  async decr(key) {
-    try {
-      if (!this.client) {
-        return 0; // Fallback value
-      }
-      return await this.client.decr(key);
-    } catch (error) {
-      logger.error('Redis decr error:', error.message);
-      return 0; // Fallback value
-    }
-  }
-
-  // ✅ TAMBAHKAN METHOD expire YANG MISSING
-  async expire(key, seconds) {
-    try {
-      if (!this.client) {
-        return 0; // Fallback: return 0 (failed)
-      }
-      const result = await this.client.expire(key, seconds);
-      logger.debug(`Redis expire ${key} for ${seconds}s: ${result}`);
-      return result;
-    } catch (error) {
-      logger.error('Redis expire error:', error.message);
-      return 0; // Return 0 (failed) sebagai fallback
-    }
-  }
-
-  async exists(key) {
-    try {
-      if (!this.client) {
-        return 0; // Fallback: return 0 (not exists)
-      }
-      return await this.client.exists(key);
-    } catch (error) {
-      logger.error('Redis exists error:', error.message);
-      return 0; // Fallback: return 0 (not exists)
+      logger.error(`Redis set error [${key}]:`, error.message);
     }
   }
 
   async del(key) {
     try {
-      if (!this.client) {
-        return 0; // Fallback: return 0 (not deleted)
-      }
+      if (!this.client) return 0;
       return await this.client.del(key);
     } catch (error) {
-      logger.error('Redis del error:', error.message);
-      return 0; // Fallback: return 0 (not deleted)
+      logger.error(`Redis del error [${key}]:`, error.message);
+      return 0;
     }
   }
 
-  // ✅ TAMBAHKAN METHOD pipeline YANG MISSING
-  async pipeline(operations) {
+  async exists(key) {
     try {
-      if (!this.client) {
-        logger.warn('Redis pipeline: client not available');
-        return [];
-      }
+      if (!this.client) return 0;
+      return await this.client.exists(key);
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  // =================================================================
+  // 2. COUNTER OPERATIONS (CRITICAL FOR RATE LIMIT)
+  // =================================================================
+
+  async incr(key) {
+    try {
+      if (!this.client) return 1;
+      return await this.client.incr(key);
+    } catch (error) {
+      logger.error(`Redis incr error [${key}]:`, error.message);
+      return 1;
+    }
+  }
+
+  // ✅ METHOD PENTING: incrBy (Agar tidak error saat potong token banyak)
+  async incrBy(key, amount) {
+    try {
+      if (!this.client) return amount;
+      const val = parseInt(amount);
+      if (isNaN(val)) return 0;
       
-      const pipeline = this.client.pipeline();
-      operations.forEach(([operation, ...args]) => {
-        if (pipeline[operation]) {
-          pipeline[operation](...args);
-        }
-      });
-      const results = await pipeline.exec();
-      logger.debug(`Redis pipeline executed ${operations.length} operations`);
-      return results;
+      const result = await this.client.incrby(key, val);
+      return result;
     } catch (error) {
-      logger.error('Redis pipeline error:', error.message);
-      return []; // Return empty array sebagai fallback
+      logger.error(`Redis incrBy error [${key}]:`, error.message);
+      return amount; 
     }
   }
 
-  // ✅ TAMBAHKAN METHOD keys YANG MISSING
-  async keys(pattern) {
+  async decr(key) {
     try {
-      if (!this.client) {
-        return []; // Fallback: empty array
-      }
-      return await this.client.keys(pattern);
+      if (!this.client) return 0;
+      return await this.client.decr(key);
     } catch (error) {
-      logger.error('Redis keys error:', error.message);
-      return []; // Fallback: empty array
+      return 0;
     }
   }
 
-  // ✅ TAMBAHKAN METHOD multi YANG MISSING
-  async multi(operations) {
+  // =================================================================
+  // 3. EXPIRY & TTL OPERATIONS
+  // =================================================================
+
+  async expire(key, seconds) {
     try {
-      if (!this.client) {
-        logger.warn('Redis multi: client not available');
-        return [];
-      }
-      
-      const multi = this.client.multi();
-      operations.forEach(([operation, ...args]) => {
-        if (multi[operation]) {
-          multi[operation](...args);
-        }
-      });
-      const results = await multi.exec();
-      logger.debug(`Redis multi executed ${operations.length} operations`);
-      return results;
+      if (!this.client) return 0;
+      return await this.client.expire(key, seconds);
     } catch (error) {
-      logger.error('Redis multi error:', error.message);
-      return [];
+      logger.error(`Redis expire error [${key}]:`, error.message);
+      return 0;
     }
   }
 
-  // Health check
+  // ✅ METHOD PENTING: TTL (Agar Frontend tahu kapan reset)
+  async ttl(key) {
+    try {
+      if (!this.client) return -1;
+      return await this.client.ttl(key);
+    } catch (error) {
+      return -1;
+    }
+  }
+
+  // =================================================================
+  // 4. UTILITY / HEALTH
+  // =================================================================
+
   async healthCheck() {
     try {
-      if (!this.client) {
-        return false;
-      }
+      if (!this.client) return false;
       await this.client.ping();
-      this.isConnected = true;
+      this.isConnected = true; // Update status jika ping berhasil
       return true;
-    } catch (error) {
+    } catch (e) {
       this.isConnected = false;
       return false;
     }
   }
 
-  // Get connection status
-  getStatus() {
-    return {
-      connected: this.isConnected,
-      clientInitialized: !!this.client
-    };
-  }
-
-  // Graceful shutdown
   async disconnect() {
-    try {
-      if (this.client) {
-        await this.client.quit();
-        logger.info('Redis client disconnected gracefully');
-      }
-    } catch (error) {
-      logger.error('Redis disconnect error:', error.message);
-    }
-  }
-
-  // ✅ TAMBAHKAN METHOD BATCH UNTUK RATE LIMITING
-  async batchIncrement(keysWithExpiry) {
-    try {
-      if (!this.client) {
-        return []; // Fallback
-      }
-
-      const pipeline = this.client.pipeline();
-      keysWithExpiry.forEach(({ key, expiryMs }) => {
-        pipeline.incr(key);
-        if (expiryMs) {
-          pipeline.expire(key, Math.ceil(expiryMs / 1000));
-        }
-      });
-      
-      return await pipeline.exec();
-    } catch (error) {
-      logger.error('Redis batchIncrement error:', error.message);
-      return [];
-    }
-  }
-
-  // ✅ SIMPLE INCREMENT WITH EXPIRE (untuk rate limiting)
-  async incrWithExpire(key, expirySeconds) {
-    try {
-      if (!this.client) {
-        return 1; // Fallback
-      }
-
-      const result = await this.client.multi()
-        .incr(key)
-        .expire(key, expirySeconds)
-        .exec();
-      
-      return result ? result[0][1] : 1; // Return the increment result
-    } catch (error) {
-      logger.error('Redis incrWithExpire error:', error.message);
-      return 1; // Fallback
+    if (this.client) {
+      await this.client.quit();
+      this.isConnected = false;
+      logger.info('Redis connection closed gracefully');
     }
   }
 }
 
+// Export sebagai Singleton
 module.exports = new RedisService();
