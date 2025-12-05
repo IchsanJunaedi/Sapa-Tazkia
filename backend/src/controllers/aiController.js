@@ -244,8 +244,22 @@ const getChatHistory = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
         
+        // ✅ PERBAIKAN: Validasi ID sebelum query ke database
+        // Pastikan ID ada dan bisa diubah menjadi angka
+        if (!id) {
+            return res.status(400).json({ success: false, message: "ID Conversation diperlukan" });
+        }
+
+        const conversationId = parseInt(id);
+
+        // Jika ID bukan angka (misal: "abc" atau undefined), stop proses agar Prisma tidak error
+        if (isNaN(conversationId)) {
+            return res.status(400).json({ success: false, message: "ID Conversation harus berupa angka valid" });
+        }
+
+        // Query menggunakan ID yang sudah dipastikan angka (conversationId)
         const chatCheck = await prisma.conversation.findFirst({
-            where: { id: parseInt(id), userId }
+            where: { id: conversationId, userId }
         });
 
         if (!chatCheck) {
@@ -253,7 +267,7 @@ const getChatHistory = async (req, res) => {
         }
 
         const messages = await prisma.message.findMany({
-            where: { conversationId: parseInt(id) },
+            where: { conversationId: conversationId },
             orderBy: { createdAt: 'asc' }
         });
         
