@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const aiController = require('../controllers/aiController');
+// ✅ FIX 1: Import Rate Limit Controller yang sudah diperbaiki
+const rateLimitController = require('../controllers/rateLimitController'); 
 const ragService = require('../services/ragService');
 const openaiService = require('../services/openaiService');
 const fs = require('fs');
@@ -632,37 +634,12 @@ router.post('/reset-knowledge',
   })
 );
 
-// Rate Limit Status Check - PUBLIC
+// ✅ FIX 2: Rate Limit Status Check (Use Controller)
+// Sebelumnya rute ini menggunakan logika inline yang crash (TypeError).
+// Sekarang kita hubungkan langsung ke RateLimitController.
 router.get('/rate-limit-status',
   guestFriendlyAuth,
-  asyncHandler(async (req, res) => {
-    try {
-      const rateLimitService = require('../services/rateLimitService');
-      const userId = req.user?.id || null;
-      const ipAddress = req.ip;
-      const userType = req.user ? (req.user.isPremium ? 'premium' : 'user') : 'guest';
-      
-      const status = await rateLimitService.checkRateLimit(userId, ipAddress, userType);
-      const bucketStatus = await rateLimitService.checkTokenBucket(userId, ipAddress, userType);
-      
-      res.json({
-        success: true,
-        data: {
-          user_type: userType,
-          authenticated: !!req.user,
-          window_limits: status,
-          token_bucket: bucketStatus,
-          adaptive_limits: await rateLimitService.getAdaptiveLimit(userType)
-        }
-      });
-    } catch (error) {
-      console.error('Error getting rate limit status:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get rate limit status'
-      });
-    }
-  })
+  rateLimitController.getRateLimitStatus
 );
 
 /**
