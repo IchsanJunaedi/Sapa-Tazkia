@@ -2,60 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
-import { sendMessageToAI } from '../api/aiService';
+import { sendMessageToAI } from '../api/aiService'; // ✅ Import dari aiService
 import { Plus, ArrowUp, MoreHorizontal, Trash2 } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Sidebar from '../components/layout/SideBar';
-import ChatMessage from '../components/chat/ChatMessage';
-
-// --- Komponen ChatWindow --- (TIDAK BERUBAH)
-const ChatWindow = ({ messages, isLoading, userName, isGuest = false }) => {
-  if (messages.length === 0 && !isLoading) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500">
-        <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center m-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500">
-            <path d="M4 14s1.5-1 4-1 4 1 4 1v3H4z" />
-            <path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
-            <path d="M10 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
-          </svg>
-        </div>
-        <h2 className="text-lg font-semibold text-gray-700">
-          {isGuest ? 'Selamat datang di Mode Tamu!' : (userName ? `Selamat datang, ${userName}!` : 'Mulai percakapan')}
-        </h2>
-        <p className="text-sm">Tanyakan apa saja tentang STMIK Tazkia</p>
-        {isGuest && (
-          <p className="text-xs text-blue-500 mt-2">Login untuk menyimpan riwayat chat</p>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 p-4 md:p-8 space-y-4">
-      {messages.map((msg, index) => (
-        <ChatMessage 
-          key={msg.id || index} 
-          message={msg}
-        />
-      ))}
-
-      {isLoading && (
-        <div className="flex justify-start">
-          <div className="max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl mr-auto">
-            <div className="p-3 text-gray-800 rounded-3xl">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+import ChatWindow from '../components/chat/ChatWindow'; // Pastikan path benar
+import RateLimitStatus from '../components/common/RateLimitStatus'; // ✅ [NEW] Import Status
 
 // --- Komponen ChatInput --- (TIDAK BERUBAH)
 const ChatInput = ({ onSend, disabled }) => {
@@ -125,7 +77,7 @@ const ChatInput = ({ onSend, disabled }) => {
     );
 };
 
-// --- Komponen Utama ChatPage --- (DIPERBAIKI)
+// --- Komponen Utama ChatPage ---
 const ChatPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -133,9 +85,10 @@ const ChatPage = () => {
 
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null); // ✅ [NEW] State untuk Error Rate Limit
     const [isStartingNewChat, setIsStartingNewChat] = useState(false);
     
-    // ✅ 1. IS GUEST INITIALIZATION
+    // 1. IS GUEST INITIALIZATION
     const [isGuest, setIsGuest] = useState(() => {
         if (location.state && typeof location.state.isGuest !== 'undefined') {
             return location.state.isGuest;
@@ -150,13 +103,10 @@ const ChatPage = () => {
         return !!storageGuest;
     });
 
-    // ✅ 2. CURRENT CHAT ID INITIALIZATION (CRUCIAL FIX)
-    // Jika ada initialMessage dari LandingPage, PAKSA return NULL (New Chat)
-    // Jangan baca localStorage jika ini adalah chat baru dari Landing Page
+    // 2. CURRENT CHAT ID INITIALIZATION
     const [currentChatId, setCurrentChatId] = useState(() => {
-        // Cek jika ini pemicu dari Landing Page
         if (location.state?.initialMessage || location.state?.fromLandingPage) {
-            console.log('🚀 [CHAT PAGE] Initializing New Chat from Landing Page (Ignoring Storage)');
+            console.log('🚀 [CHAT PAGE] Initializing New Chat from Landing Page');
             return null; 
         }
 
@@ -189,8 +139,7 @@ const ChatPage = () => {
         hasUserInitiatedNewChat: false
     });
 
-    // ✅ 3. IS NEW CHAT INITIALIZATION
-    // Sama seperti currentChatId, jika dari Landing Page, paksa TRUE
+    // 3. IS NEW CHAT INITIALIZATION
     const [isNewChat, setIsNewChat] = useState(() => {
         if (location.state?.initialMessage || location.state?.fromLandingPage) {
             return true;
@@ -211,7 +160,6 @@ const ChatPage = () => {
     // Save state ke localStorage
     useEffect(() => {
         if (isGuest) {
-            console.log('💾 [CHAT PAGE] Guest mode - skipping localStorage save');
             return;
         }
 
@@ -262,7 +210,6 @@ const ChatPage = () => {
 
     const loadChatHistory = useCallback(async (forceReload = false) => {
         if (isGuest) {
-            console.log('🔍 [CHAT PAGE] Guest mode active, skipping chat history load');
             setChatHistory([]);
             return;
         }
@@ -272,9 +219,7 @@ const ChatPage = () => {
         }
 
         try {
-            console.log('🔍 [CHAT PAGE] Loading chat history for user:', user.id);
             const response = await api.get('/api/ai/conversations');
-            console.log('✅ [CHAT PAGE] Chat history loaded:', response.data.conversations);
             setChatHistory(response.data.conversations || []);
         } catch (error) {
             console.error('❌ [CHAT PAGE] Error loading chat history:', error);
@@ -307,6 +252,7 @@ const ChatPage = () => {
             setCurrentChatId(null);
             setMessages([]);
             setIsNewChat(true);
+            setError(null); // Reset error jika chat dihapus
         }
 
         try {
@@ -321,7 +267,7 @@ const ChatPage = () => {
                 logout();
                 navigate('/');
             } else {
-                alert('Gagal menghapus chat. Data dikembalikan.');
+                alert('Gagal menghapus chat.');
             }
         } finally {
             setIsDeleting(false);
@@ -335,7 +281,7 @@ const ChatPage = () => {
         setChatToDelete(null);
     };
 
-    // ✅ 4. HANDLE AI MESSAGE UPDATED (FORCE NEW CHAT PARAMETER)
+    // 4. HANDLE AI MESSAGE UPDATED (FORCE NEW CHAT PARAMETER)
     const handleAIMessage = useCallback(async (messageText, isGuestMode = false, isInitialMessage = false, forceNewChat = false) => {
         if (initializationRef.current.hasUserInitiatedNewChat && isInitialMessage) {
             initializationRef.current.hasUserInitiatedNewChat = false;
@@ -343,20 +289,13 @@ const ChatPage = () => {
         }
 
         setIsLoading(true);
+        setError(null); // ✅ Reset error sebelum mengirim
 
         try {
-            // Logika baru: Jika forceNewChat = true, abaikan currentChatId
             const effectiveCurrentChatId = forceNewChat ? null : currentChatId;
-            // Jika forceNewChat = true, maka shouldCreateNewChat otomatis true
             const shouldCreateNewChat = forceNewChat || (!effectiveCurrentChatId && isNewChat);
             
-            console.log('🤖 [CHAT PAGE] Sending to AI:', { 
-                messageText, 
-                isGuestMode, 
-                shouldCreateNewChat,
-                effectiveCurrentChatId,
-                forceNewChat
-            });
+            console.log('🤖 [CHAT PAGE] Sending to AI...');
 
             const response = await sendMessageToAI(
                 messageText, 
@@ -388,16 +327,24 @@ const ChatPage = () => {
             }
 
         } catch (error) {
-            console.error('❌ [CHAT PAGE] Error sending message to AI:', error);
-            const errorMessage = {
-                id: Date.now() + 1,
-                content: 'Maaf, terjadi kesalahan saat mengirim pesan. Silakan coba lagi.',
-                sender: 'ai',
-                role: 'bot',
-                timestamp: new Date().toISOString(),
-                isError: true
-            };
-            setMessages(prev => [...prev, errorMessage]);
+            console.error('❌ [CHAT PAGE] Error sending message:', error);
+            
+            // ✅ [NEW] Deteksi Spesifik Rate Limit Error
+            // Jika error code = rate_limit_exceeded atau status 429
+            if (error.status === 429 || error.code === 'rate_limit_exceeded') {
+                setError(error); // Lempar error object lengkap ke ChatWindow
+            } else {
+                // Untuk error generic (koneksi putus, server error 500), tetap tampilkan sebagai chat
+                const errorMessage = {
+                    id: Date.now() + 1,
+                    content: 'Maaf, terjadi kesalahan pada sistem. Silakan coba sesaat lagi.',
+                    sender: 'ai',
+                    role: 'bot',
+                    timestamp: new Date().toISOString(),
+                    isError: true
+                };
+                setMessages(prev => [...prev, errorMessage]);
+            }
         } finally {
             setIsLoading(false);
             if (isInitialMessage) {
@@ -412,14 +359,8 @@ const ChatPage = () => {
             return;
         }
 
-        if (!isGuest) {
-            const currentToken = localStorage.getItem('token');
-            if (!currentToken || currentToken.length < 20) {
-                logout();
-                navigate('/');
-                return;
-            }
-        }
+        // Reset Error saat user mencoba kirim pesan baru
+        setError(null); 
 
         const userMessage = {
             id: Date.now(),
@@ -435,7 +376,6 @@ const ChatPage = () => {
     };
 
     const handleNewChat = useCallback(() => {
-        console.log('🔄 [CHAT PAGE] Starting new chat - USER INITIATED');
         initializationRef.current.hasUserInitiatedNewChat = true;
         initializationRef.current.hasProcessedInitialState = true; 
         
@@ -443,6 +383,7 @@ const ChatPage = () => {
         setMessages([]);
         setCurrentChatId(null);
         setIsNewChat(true);
+        setError(null); // ✅ Reset error
         
         if (window.history.replaceState) {
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -455,7 +396,6 @@ const ChatPage = () => {
                 localStorage.removeItem('chatpage_state');
             }
             setIsStartingNewChat(false);
-            console.log('✅ [CHAT PAGE] New chat state reset complete');
         }, 200);
     }, [isGuest]);
 
@@ -463,11 +403,11 @@ const ChatPage = () => {
         if (isStartingNewChat) return;
         if (!chatId || chatId === currentChatId || !user || isGuest) return;
 
-        console.log('🔍 [CHAT PAGE] Selecting chat:', chatId);
         setCurrentChatId(chatId);
         setIsNewChat(false);
         setIsLoading(true);
         setMessages([]);
+        setError(null); // ✅ Reset error
 
         try {
             const response = await api.get(`/api/ai/history/${chatId}`);
@@ -499,7 +439,7 @@ const ChatPage = () => {
         console.log('Settings clicked');
     };
 
-    // ✅ EFFECT INISIALISASI (DIPERBAIKI)
+    // EFFECT INISIALISASI
     useEffect(() => {
         if (initializationRef.current.hasProcessedInitialState || 
             initializationRef.current.isProcessingInitialMessage ||
@@ -509,24 +449,21 @@ const ChatPage = () => {
 
         const processInitialState = async () => {
             const locationState = location.state;
-            console.log('🎯 [CHAT PAGE] Processing location state:', locationState);
 
             if (locationState && typeof locationState.isGuest !== 'undefined') {
                  if (locationState.isGuest !== isGuest) {
-                     setIsGuest(locationState.isGuest);
+                      setIsGuest(locationState.isGuest);
                  }
             }
 
             if (locationState?.initialMessage && locationState?.fromLandingPage) {
-                console.log('🚨 [CHAT PAGE] Processing initial message from LandingPage:', locationState.initialMessage);
-                
                 initializationRef.current.isProcessingInitialMessage = true;
                 initializationRef.current.hasProcessedInitialState = true;
                 
-                // Reset State
                 setMessages([]);
                 setCurrentChatId(null);
                 setIsNewChat(true);
+                setError(null);
                 
                 const userMessage = {
                     id: Date.now(),
@@ -538,15 +475,12 @@ const ChatPage = () => {
                 };
 
                 setMessages([userMessage]);
-                console.log('✅ [CHAT PAGE] User message set, calling AI...');
                 
-                // ✅ Pass TRUE sebagai parameter ke-4 (forceNewChat)
-                // Ini memastikan AI service menerima perintah membuat chat baru
                 await handleAIMessage(
                     locationState.initialMessage, 
                     !!locationState.isGuest, 
                     true, 
-                    true // <--- FORCE NEW CHAT
+                    true 
                 );
                 
                 if (window.history.replaceState) {
@@ -574,7 +508,6 @@ const ChatPage = () => {
             }
 
             initializationRef.current.hasProcessedInitialState = true;
-            console.log('✅ [CHAT PAGE] Default initialization completed');
         };
 
         const timeoutId = setTimeout(() => {
@@ -584,13 +517,13 @@ const ChatPage = () => {
         return () => clearTimeout(timeoutId);
     }, [location.state, isGuest, handleSelectChat, handleAIMessage]);
 
-    // ✅ EFFECT LOAD HISTORY
+    // EFFECT LOAD HISTORY
     useEffect(() => {
         if (isAuthenticated && user && user.id) {
             if (isGuest) {
                 const locationIsGuest = location.state?.isGuest;
                 if (locationIsGuest === false || locationIsGuest === undefined) {
-                     setIsGuest(false);
+                      setIsGuest(false);
                 }
             }
             loadChatHistory();
@@ -598,26 +531,12 @@ const ChatPage = () => {
     }, [isAuthenticated, user, isGuest, loadChatHistory, location.state]);
 
     useEffect(() => {
-        console.log('🔍 [CHAT PAGE] STATE UPDATE', {
-            messagesCount: messages.length,
-            currentChatId,
-            isNewChat,
-            isGuest,
-            user: user ? `User ${user.id}` : 'No user',
-            hasProcessedInitialState: initializationRef.current.hasProcessedInitialState,
-            isProcessingInitialMessage: initializationRef.current.isProcessingInitialMessage,
-            hasUserInitiatedNewChat: initializationRef.current.hasUserInitiatedNewChat,
-            isStartingNewChat: isStartingNewChat,
-            chatHistoryCount: chatHistory.length
-        });
-    }, [messages, currentChatId, isNewChat, isGuest, user, chatHistory, isStartingNewChat]);
-
-    useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
-    }, [messages, isLoading]);
+    }, [messages, isLoading, error]);
 
+    // ✅ TAMPILAN LOADING (DIKEMBALIKAN UTUH)
     if (loading && !isGuest) {
         return (
             <div className="flex h-screen bg-[#fbf9f6] items-center justify-center">
@@ -631,6 +550,7 @@ const ChatPage = () => {
         );
     }
 
+    // ✅ TAMPILAN REDIRECT (DIKEMBALIKAN UTUH)
     if (!isAuthenticated && !isGuest) {
         return (
             <div className="flex h-screen bg-[#fbf9f6] items-center justify-center">
@@ -646,6 +566,13 @@ const ChatPage = () => {
 
     return (
         <div className="flex h-screen bg-amber-50 font-sans overflow-hidden">
+            
+            {/* ✅ PERBAIKAN UTAMA: Kirim data 'isGuest' ke komponen ini */}
+            <RateLimitStatus 
+                isGuestMode={isGuest} 
+                userName={user ? getUserName() : 'Mahasiswa'} 
+            />
+
             <ConfirmationModal
                 isOpen={showDeleteModal}
                 onClose={handleCancelDelete}
@@ -673,7 +600,7 @@ const ChatPage = () => {
                 isStartingNewChat={isStartingNewChat}
             />
 
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden relative">
                 <nav className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 flex-shrink-0">
                     <div className="flex items-center">
                         <button 
@@ -699,7 +626,6 @@ const ChatPage = () => {
                                     ref={menuButtonRef}
                                     onClick={handleMenuToggle}
                                     className="p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-80 hover:opacity-100"
-                                    title="More options"
                                 >
                                     <MoreHorizontal size={18} />
                                 </button>
@@ -730,12 +656,16 @@ const ChatPage = () => {
                             isLoading={isLoading}
                             userName={user ? getUserName() : null}
                             isGuest={isGuest}
+                            error={error}
                         />
                     </div>
                 </div>
 
                 <div className="flex-shrink-0">
-                    <ChatInput onSend={handleSendMessage} disabled={isLoading || isDeleting || isStartingNewChat} />
+                    <ChatInput 
+                        onSend={handleSendMessage} 
+                        disabled={isLoading || isDeleting || isStartingNewChat || (error && (error.status === 429 || error.code === 'rate_limit_exceeded'))} 
+                    />
                 </div>
             </div>
         </div>
