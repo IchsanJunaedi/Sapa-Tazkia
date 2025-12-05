@@ -1,173 +1,167 @@
 const redisService = require('./redisService');
-
-// ==========================================
-// 1. CONFIGURATION LOADING (DIRECT FROM ENV)
-// ==========================================
-const getEnvInt = (key, defaultValue) => parseInt(process.env[key] || defaultValue);
-
-const rateLimitConfig = {
-  // CONFIGURATION UNTUK GUEST (Tamu)
-  guest: {
-    requestsPerMinute: getEnvInt('RATE_LIMIT_GUEST_PER_MINUTE', 5), 
-    requestsPerHour: getEnvInt('RATE_LIMIT_GUEST_PER_HOUR', 20),
-    requestsPerDay: getEnvInt('RATE_LIMIT_GUEST_PER_DAY', 50),
-    windowMs: getEnvInt('RATE_LIMIT_WINDOW_MS', 60000),
-  },
-  
-  // CONFIGURATION UNTUK USER (Login)
-  user: {
-    requestsPerMinute: getEnvInt('RATE_LIMIT_USER_PER_MINUTE', 20),
-    requestsPerHour: getEnvInt('RATE_LIMIT_USER_PER_HOUR', 100),
-    requestsPerDay: getEnvInt('RATE_LIMIT_USER_PER_DAY', 500),
-    windowMs: 60000,
-  }
-};
-
-console.log(`✅ [RATE LIMIT] Config Loaded. Guest Limit: ${rateLimitConfig.guest.requestsPerMinute}/min`);
-
-// ==========================================
-// 2. PRISMA SETUP (FAIL-SAFE)
-// ==========================================
-let prisma;
-let hasRateLimitLogModel = false;
-
-try {
-  const { PrismaClient } = require('@prisma/client');
-  prisma = new PrismaClient();
-  
-  if (prisma.rateLimitLog && typeof prisma.rateLimitLog.create === 'function') {
-    hasRateLimitLogModel = true;
-  }
-} catch (error) {
-  prisma = null; // Silent fallback jika DB error
-}
+const config = require('../config/rateLimitConfig'); 
 
 class RateLimitService {
   constructor() {
-    this.config = rateLimitConfig;
+    this.config = config;
     this.isRedisAvailable = true;
-    this.initializeService();
+    this.checkRedisHealth();
   }
 
-  async initializeService() {
+  async checkRedisHealth() {
     try {
       this.isRedisAvailable = await redisService.healthCheck();
-      if (this.isRedisAvailable) {
-        console.log('✅ [RATE LIMIT] Redis connection verified');
-      } else {
-        console.warn('⚠️ [RATE LIMIT] Redis not available, using memory fallback');
-      }
-    } catch (error) {
+      if (this.isRedisAvailable) console.log('✅ [RATE LIMIT] Redis Connected');
+    } catch (e) {
       this.isRedisAvailable = false;
+      console.warn('⚠️ [RATE LIMIT] Redis Down, switching to fail-safe');
     }
   }
 
-  generateKey(identifier, type, window) {
-    return `rate_limit:${type}:${identifier}:${window}`;
+  // Helper untuk membuat key harian
+  getDailyKey(identifier) {
+    const dateStr = new Date().toISOString().split('T')[0]; 
+    return `${this.config.redis.tokenPrefix}${dateStr}:${identifier}`;
   }
 
-  // ==========================================
-  // 3. CORE LOGIC (ATOMIC & OPTIMIZED)
-  // ==========================================
+  getLimits(userType) {
+    return this.config[userType] || this.config.guest;
+  }
+
+  /**
+   * 1. CHECKER (Middleware)
+   */
   async checkRateLimit(userId, ipAddress, userType = 'guest') {
-    // Fallback ke Memory jika Redis mati
-    if (!this.isRedisAvailable) {
-      return this.memoryFallbackCheck(userType);
-    }
+    if (!this.isRedisAvailable) return { allowed: true }; 
 
-    const now = Date.now();
-    const windows = [
-      { name: 'minute', ms: 60000 },
-      { name: 'hour', ms: 3600000 },
-      { name: 'day', ms: 86400000 }
-    ];
-
-    // Otomatis pilih config berdasarkan userType ('guest' atau 'user')
-    const limits = this.config[userType] || this.config.guest;
     const identifier = userId || ipAddress;
+    const limits = this.getLimits(userType); 
+    
+    // A. SPAM CHECK
+    const spamKey = `spam_protect:${identifier}`;
+    const currentSpamCount = await redisService.incr(spamKey);
+    if (currentSpamCount === 1) await redisService.expire(spamKey, 60);
 
-    try {
-      for (const window of windows) {
-        const key = this.generateKey(identifier, userType, window.name);
-        
-        // Ambil limit yang sesuai (misal: requestsPerMinute)
-        const limitProp = `requestsPer${window.name.charAt(0).toUpperCase() + window.name.slice(1)}`;
-        const windowLimit = limits[limitProp];
-
-        // ⚠️ ATOMIC OPERATION (KUNCI UTAMA):
-        // Kita INCR dulu. Redis langsung nambah angka & balikin hasil terbaru.
-        // Tidak ada celah "Race Condition" di sini.
-        const currentCount = await redisService.incr(key);
-
-        // Jika ini request pertama, set waktu kadaluarsa (TTL)
-        if (currentCount === 1) {
-          await redisService.expire(key, Math.ceil(window.ms / 1000));
-        }
-
-        // Cek apakah melewasi batas
-        if (currentCount > windowLimit) {
-          // Log ke DB (Fire-and-forget, jangan await agar cepat)
-          this.logRateLimitHit(identifier, userType, window.name, true);
-          
-          return {
-            allowed: false,
-            limit: windowLimit,
-            remaining: 0,
-            resetTime: now + window.ms,
-            retryAfter: Math.ceil(window.ms / 1000), 
-            window: window.name,
-            usingFallback: false
-          };
-        }
-      }
-
-      // Jika lolos semua loop, berarti aman
-      const minuteLimit = limits.requestsPerMinute;
-      
+    if (currentSpamCount > limits.spamLimitPerMinute) {
       return {
-        allowed: true,
-        limit: minuteLimit,
-        remaining: Math.max(0, minuteLimit - 1), // Estimasi sisa
-        resetTime: now + 60000,
-        retryAfter: null,
-        window: 'minute',
-        usingFallback: false
+        allowed: false,
+        error: 'rate_limit_exceeded',
+        message: 'Mohon pelan-pelan, terlalu banyak request dalam waktu singkat.',
+        retryAfter: 60
       };
-
-    } catch (error) {
-      console.error('❌ [RATE LIMIT] Redis Error:', error.message);
-      return this.memoryFallbackCheck(userType);
     }
-  }
 
-  // Mode darurat jika Redis mati
-  memoryFallbackCheck(userType) {
-    const limits = this.config[userType] || this.config.guest;
+    // B. TOKEN QUOTA CHECK
+    const usageKey = this.getDailyKey(identifier);
+    const currentUsage = await redisService.get(usageKey) || 0;
+    const remainingTokens = limits.tokenLimitDaily - parseInt(currentUsage);
+
+    // Hitung waktu reset (TTL)
+    let resetTime = Date.now();
+    const ttl = await redisService.ttl(usageKey);
+    
+    if (ttl > 0) {
+       // Jika kunci sudah ada, gunakan sisa waktunya (Fixed Window)
+       resetTime += ttl * 1000;
+    } else {
+       // Jika kunci belum ada (user baru/reset), targetkan 12 jam dari sekarang
+       resetTime += 43200000; 
+    }
+
+    if (remainingTokens <= 0) {
+      return {
+        allowed: false,
+        error: 'rate_limit_exceeded', 
+        message: `Kuota harian habis.`,
+        retryAfter: 3600, 
+        limit: limits.tokenLimitDaily,
+        remaining: 0,
+        resetTime: resetTime
+      };
+    }
+
     return {
       allowed: true,
-      limit: limits.requestsPerMinute,
-      remaining: 1, 
-      resetTime: Date.now() + 60000,
-      usingFallback: true,
-      note: 'Memory fallback - Strict limit disabled'
+      limit: limits.tokenLimitDaily,
+      remaining: remainingTokens,
+      resetTime: resetTime
     };
   }
 
-  async logRateLimitHit(identifier, userType, window, wasBlocked) {
-    if (!prisma || !hasRateLimitLogModel) return;
-    
-    // Logging async tanpa mengganggu performa utama
-    prisma.rateLimitLog.create({
-      data: {
-        userId: identifier.includes('user') ? identifier : null,
-        ipAddress: identifier.includes('.') || identifier.includes(':') ? identifier : null,
-        endpoint: '/api/chat',
-        method: 'POST',
-        statusCode: wasBlocked ? 429 : 200,
-        wasBlocked,
-        timestamp: new Date()
+  /**
+   * 2. TRACKER (Controller)
+   * Memotong saldo token.
+   */
+  async trackTokenUsage(userId, ipAddress, tokenUsed) {
+    if (!this.isRedisAvailable || !tokenUsed) return;
+
+    const identifier = userId || ipAddress;
+    const usageKey = this.getDailyKey(identifier);
+
+    try {
+      // Tambah penggunaan token
+      await redisService.incrBy(usageKey, tokenUsed);
+      
+      // ✅ LOGIKA BARU: FIXED WINDOW (Jendela Tetap)
+      // Kita cek dulu TTL (Time To Live) kunci ini.
+      const currentTTL = await redisService.ttl(usageKey);
+
+      // Jika TTL == -1, artinya kunci ini BARU saja dibuat oleh perintah incrBy di atas
+      // (atau belum punya expiry). Maka kita set expiry-nya sekarang.
+      // Jika TTL > 0, artinya kunci sudah punya expiry (timer sedang berjalan), JANGAN DIUBAH.
+      
+      if (currentTTL === -1) {
+          // Set tepat 12 jam (43200 detik) TANPA MARGIN tambahan
+          // Agar reset terjadi tepat 12 jam dari chat pertama
+          await redisService.expire(usageKey, 43200); 
+          console.log(`⏱️ [TOKEN TIMER] Timer dimulai: Reset dalam 12 jam untuk ${identifier}`);
       }
-    }).catch(() => {}); // Abaikan error logging
+      
+      console.log(`📊 [TOKEN TRACK] ${identifier} used ${tokenUsed} tokens.`);
+    } catch (error) {
+      console.error('❌ [TOKEN TRACK] Error updating Redis:', error.message);
+    }
+  }
+
+  /**
+   * 3. GET STATUS (Controller Status)
+   */
+  async getQuotaStatus(identifier, userType = 'guest') {
+    const limits = this.getLimits(userType);
+    
+    const defaultResponse = {
+        limit: limits.tokenLimitDaily,
+        remaining: limits.tokenLimitDaily,
+        resetTime: Date.now() + 43200000, // Default 12 jam
+        userType: userType
+    };
+
+    if (!this.isRedisAvailable) return defaultResponse;
+
+    try {
+        const usageKey = this.getDailyKey(identifier);
+        const currentUsage = await redisService.get(usageKey) || 0;
+        const remaining = Math.max(0, limits.tokenLimitDaily - parseInt(currentUsage));
+        
+        const ttl = await redisService.ttl(usageKey);
+        
+        let resetTime = Date.now();
+        if (ttl > 0) {
+            resetTime += ttl * 1000;
+        } else {
+            resetTime += 43200000; // 12 Jam default view
+        }
+
+        return {
+            limit: limits.tokenLimitDaily,
+            remaining: remaining,
+            resetTime: resetTime,
+            userType: userType
+        };
+    } catch (error) {
+        console.error("❌ [RATE LIMIT SERVICE] Error getting status:", error.message);
+        return defaultResponse; 
+    }
   }
 }
 
