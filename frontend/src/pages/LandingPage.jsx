@@ -506,7 +506,10 @@ const LandingPage = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [initialModalStep, setInitialModalStep] = useState(0);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // ✅ PERBAIKAN: Ubah default state menjadi true agar sidebar terbuka saat load
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
+
   const [message, setMessage] = useState('');
   const [greeting, setGreeting] = useState('');
   
