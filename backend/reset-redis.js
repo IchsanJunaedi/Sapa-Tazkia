@@ -1,27 +1,41 @@
-// Nama file: reset-redis.js
-require('dotenv').config(); // Load password dari .env jika ada
-const Redis = require('ioredis'); // Kita pinjam library yang udah ada
+const fs = require('fs');
+const path = require('path');
 
-// Konfigurasi koneksi (mengambil dari .env atau default)
-const redis = new Redis({
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: process.env.REDIS_PORT || 6379,
-  password: process.env.REDIS_PASSWORD || undefined,
-});
+// 1. CARI FILE .ENV (Coba di folder backend dulu, lalu root)
+const backendEnvPath = path.resolve(__dirname, 'backend', '.env');
+const rootEnvPath = path.resolve(__dirname, '.env');
+
+if (fs.existsSync(backendEnvPath)) {
+  require('dotenv').config({ path: backendEnvPath });
+  console.log(`📂 Memuat konfigurasi dari: ${backendEnvPath}`);
+} else {
+  require('dotenv').config({ path: rootEnvPath });
+  console.log(`📂 Memuat konfigurasi dari: ${rootEnvPath}`);
+}
+
+const Redis = require('ioredis');
+
+// 2. KONFIGURASI (Sesuai dengan Backend)
+const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+
+console.log(`🔌 Menghubungkan ke Redis: ${redisUrl}`);
+
+const redis = new Redis(redisUrl);
 
 async function clearRedis() {
   try {
-    console.log('🧹 Sedang membersihkan Redis...');
+    console.log('⏳ Sedang menghapus semua data rate limit...');
     
-    // Perintah sakti untuk menghapus semua data
+    // Gunakan flushdb (hapus database saat ini) atau flushall (hapus semua DB)
+    // flushall lebih aman untuk memastikan bersih total
     await redis.flushall();
     
-    console.log('✅ SUKSES! Redis sudah bersih total (0 count).');
-    console.log('🚀 Sekarang kamu bisa tes limit 5x lagi dari awal.');
+    console.log('✅ SUKSES! Redis telah dibersihkan.');
+    console.log('🔄 Semua kuota Token & Spam limit kembali ke 0.');
+    
   } catch (error) {
-    console.error('❌ Gagal:', error.message);
+    console.error('❌ GAGAL:', error.message);
   } finally {
-    // Tutup koneksi biar script berhenti
     redis.quit();
   }
 }
