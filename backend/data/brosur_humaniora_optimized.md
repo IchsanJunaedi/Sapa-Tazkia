@@ -36,26 +36,6 @@ Film Media & Broadcasting (Perfilman & Penyiaran).
 
 Commercial Law (Hukum Ekonomi Syariah).
 
-Fasilitas Kampus Fakultas Humaniora
-
-Masjid Tazkia.
-
-Creative Studio (Studio Kreatif untuk Broadcasting/Film).
-
-Investment Lab & Business Incubator.
-
-Sharia Banking Lab.
-
-Perpustakaan (Library).
-
-Ruang Peradilan Semu (Moot Court) untuk praktik mahasiswa Hukum.
-
-Apartemen & Asrama Mahasiswa (Student Apartment/Boarding House).
-
-International Room & Executive Meeting Room.
-
-Sport Arena.
-
 Beasiswa dan Mitra Strategis Humaniora
 
 Penyedia Beasiswa:

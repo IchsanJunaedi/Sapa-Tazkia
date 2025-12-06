@@ -4,6 +4,7 @@ INFORMASI UTAMA: PROFIL UNIVERSITAS TAZKIA (ABOUT US)
 Nama Institusi: Universitas Tazkia.
 Nama Lama: STEI Tazkia.
 Naungan: Yayasan Tazkia Cendekia (Akta No. 5, 11 Maret 1999).
+Website: tazkia.ac.id
 
 2. Tagline
 Pioneer in Islamic Economics, Digital Business and Halal Industry.
@@ -12,11 +13,11 @@ Pioneer in Islamic Economics, Digital Business and Halal Industry.
 Mempromosikan ekonomi murni (Tazkia) bagi umat melalui inovasi produktif dan pendidikan generasi Muslim yang kompeten dalam bisnis namun tetap menjaga kemurnian spiritual (Tazkiyyah).
 
 4. Lokasi Kampus Tazkia
-Universitas Tazkia (Kampus Utama):
+Universitas Tazkia (Kampus Utama) - SENTUL:
 Jl. Ir. H. Djuanda No. 78 Sentul City, Bogor 16810, Indonesia.
 Telp: +62 (21) 87962291-93.
 
-STMIK Tazkia:
+STMIK Tazkia - DRAMAGA:
 Jl. Raya Dramaga Km.7 Dramaga, Bogor 16680, Indonesia.
 Telp: +62 (251) 8421076.
 
@@ -67,8 +68,11 @@ Makna Warna:
 - Ruang Serbaguna
 - Sport Arena & Asrama Mahasiswa
 - Masjid Tazkia
+- Creative Studio (Studio Kreatif untuk Broadcasting/Film).
 
-9. DAFTAR FAKULTAS DAN PROGRAM STUDI (S1)
+
+
+9. DAFTAR FAKULTAS DAN PROGRAM STUDI (S1) DI UNIVERSITAS TAZKIA (SENTUL)
 Universitas Tazkia memiliki dua fakultas utama yang menaungi berbagai program studi sarjana:
 
 A. Fakultas Ekonomi dan Bisnis Syariah (FEBS)
@@ -91,6 +95,9 @@ Program Studi:
 5. Film Media & Broadcasting (Perfilman & Penyiaran) - Gelar S.I.Kom.
 6. Commercial Law (Hukum Ekonomi Syariah / Muamalah) - Gelar S.H.
 
-C. Sekolah Tinggi Terafiliasi
-Selain Universitas (Sentul), terdapat institusi teknologi khusus:
+---
+
+C. INFORMASI TAMBAHAN: SEKOLAH TINGGI TERAFILIASI BIDANG IT
+Selain Universitas Tazkia di Sentul, terdapat Sekolah Tinggi Teknologi:
 - **STMIK Tazkia (Kampus Dramaga):** Menyediakan prodi S1 Teknik Informatika dan S1 Sistem Informasi.
+  ***(DETAIL PROGRAM STUDI DI STMIK TAZKIA DAPAT DILIHAT DI DOKUMEN stmik_profile.md)***
