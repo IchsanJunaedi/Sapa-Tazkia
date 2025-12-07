@@ -1,0 +1,42 @@
+[
+  {
+    "id": "fatwa-murabahah-definisi",
+    "category": "FATWA DSN-MUI NO 04: MURABAHAH",
+    "topic": "Definisi & Konsep Dasar",
+    "type": "general",
+    "semantic_content": "Identitas Fatwa:\nNomor: 04/DSN-MUI/IV/2000.\nTentang: Murabahah (Jual Beli).\nTanggal: 1 April 2000.\n\nDefinisi Murabahah:\nAkad jual beli suatu barang dengan menegaskan harga belinya kepada pembeli dan pembeli membayarnya dengan harga yang lebih sebagai laba (margin keuntungan).\n\nPoin Penting:\n1. Transparansi: Bank WAJIB memberitahu harga pokok & biaya secara jujur.\n2. Mekanisme: Bank beli barang dulu secara sah, baru jual ke nasabah.\n3. Utang: Nasabah wajib melunasi sesuai kesepakatan.",
+    "keywords": ["definisi", "pengertian", "apa itu murabahah", "margin", "laba", "keuntungan", "transparansi", "dsn mui", "nomor 04"]
+  },
+  {
+    "id": "fatwa-murabahah-dalil",
+    "category": "FATWA DSN-MUI NO 04: MURABAHAH",
+    "topic": "Dalil Al-Qur'an & Hadis",
+    "type": "general",
+    "semantic_content": "Landasan Hukum Murabahah:\n\n1. Al-Qur'an:\n- QS. An-Nisa [4]: 29 ('Jangan memakan harta dengan jalan batil, kecuali perniagaan...').\n- QS. Al-Baqarah [2]: 275 ('Allah menghalalkan jual beli & mengharamkan riba').\n- QS. Al-Ma'idah [5]: 1 ('Penuhilah akad-akad itu').\n\n2. Hadis Nabi SAW:\n- 'Jual beli itu harus suka sama suka (antaradhin).'\n- 'Menunda pembayaran bagi orang mampu adalah kezaliman.'\n- 'Rasulullah menghalalkan 'urban (uang muka).'",
+    "keywords": ["dalil", "dasar hukum", "ayat", "alquran", "hadis", "riwayat", "qs an nisa", "qs al baqarah", "riba", "haram"]
+  },
+  {
+    "id": "fatwa-murabahah-mekanisme",
+    "category": "FATWA DSN-MUI NO 04: MURABAHAH",
+    "topic": "Mekanisme & Syarat Transaksi",
+    "type": "general",
+    "semantic_content": "Ketentuan Umum & Mekanisme Murabahah:\n\n1. Syarat Barang: Tidak diharamkan syariah & harus sah milik Bank sebelum dijual ke nasabah.\n2. Kewajiban Bank:\n- Membeli barang yang diperlukan nasabah atas nama bank sendiri.\n- Menyampaikan jika pembelian dilakukan secara utang.\n- Memberitahu harga pokok + margin keuntungan secara jujur.\n3. Akad Wakalah: Jika bank mewakilkan nasabah membeli barang, akad Murabahah baru boleh dilakukan SETELAH barang secara prinsip menjadi milik bank.",
+    "keywords": ["mekanisme", "cara kerja", "syarat", "wakalah", "wakil", "milik bank", "prosedur", "barang"]
+  },
+  {
+    "id": "fatwa-murabahah-uang-muka",
+    "category": "FATWA DSN-MUI NO 04: MURABAHAH",
+    "topic": "Aturan Uang Muka ('Urbun)",
+    "type": "general",
+    "semantic_content": "Ketentuan Uang Muka ('Urbun):\n1. Bank BOLEH meminta uang muka saat kesepakatan awal.\n2. Jika Nasabah Batal Membeli:\n- Uang muka dipotong sebesar kerugian riil yang dialami bank.\n- Jika uang muka KURANG dari kerugian, nasabah wajib lunasi sisa kekurangannya.\n- Jika uang muka LEBIH dari kerugian, sisa uang muka dikembalikan ke nasabah.\n3. Jika Nasabah Jadi Membeli: Uang muka dihitung sebagai bagian pembayaran.",
+    "keywords": ["uang muka", "dp", "down payment", "urbun", "tanda jadi", "batal", "kerugian", "potongan"]
+  },
+  {
+    "id": "fatwa-murabahah-utang-sanksi",
+    "category": "FATWA DSN-MUI NO 04: MURABAHAH",
+    "topic": "Utang, Penundaan & Sanksi",
+    "type": "general",
+    "semantic_content": "Ketentuan Pembayaran & Sanksi:\n\n1. Pelunasan: Nasabah yang mampu TIDAK DIBENARKAN menunda utang.\n2. Sanksi (Denda): Bank boleh memberi sanksi pada nasabah MAMPU yang menunda-nunda pembayaran (karena itu kezaliman).\n3. Percepatan Pelunasan: Jika nasabah menjual barang sebelum lunas, ia tidak wajib melunasi seketika, tapi tetap wajib selesaikan utang sesuai kesepakatan.\n4. Kondisi Bangkrut (Pailit): Jika nasabah dinyatakan pailit/tidak sanggup, Bank HARUS memberi penangguhan (rescheduling) sampai ia sanggup kembali.",
+    "keywords": ["utang", "cicilan", "angsuran", "telat bayar", "macet", "sanksi", "denda", "bangkrut", "pailit", "tidak mampu", "penangguhan"]
+  }
+]
