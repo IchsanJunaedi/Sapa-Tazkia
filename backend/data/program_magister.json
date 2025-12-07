@@ -1,0 +1,23 @@
+[
+  {
+    "id": "magister-identitas",
+    "category": "PROGRAM PASCASARJANA (S2)",
+    "topic": "Identitas & Fokus Program",
+    "type": "general",
+    "semantic_content": "Identitas Program Pascasarjana:\nInstitusi: Universitas Tazkia.\nJenjang Pendidikan: Magister (S2).\n\nFokus Utama:\nPendalaman ilmu ekonomi, bisnis, hukum, dan teknologi keuangan berbasis Syariah.",
+    "keywords": ["s2", "magister", "pascasarjana", "graduate", "master", "gelar", "lanjut studi"]
+  },
+  {
+    "id": "magister-daftar-prodi",
+    "category": "PROGRAM PASCASARJANA (S2)",
+    "topic": "Daftar Program Studi & Konsentrasi S2",
+    "type": "program",
+    "semantic_content": "Daftar Konsentrasi dan Program Studi Magister (S2) Universitas Tazkia:\n\n1. Islamic Wealth Management (Manajemen Kekayaan Islam).\n2. Islamic Business Management (Manajemen Bisnis Syariah).\n3. Islamic Economics and Policy (IEP) - Ekonomi dan Kebijakan Islam.\n4. Islamic Economics Law Studies (IELS) - Studi Hukum Ekonomi Islam.\n5. Islamic Banking and Digital Finance (IBDF) - Perbankan Syariah & Keuangan Digital.\n6. Islamic Fintech & Data Analyst (Teknologi Finansial Syariah & Analis Data).\n7. Islamic Auditing and Public Accounting (Audit Syariah dan Akuntansi Publik).",
+    "keywords": [
+      "jurusan s2", "prodi s2", "konsentrasi",
+      "wealth management", "fintech", "data analyst", 
+      "iep", "iels", "ibdf", 
+      "audit", "akuntansi", "hukum ekonomi syariah", "perbankan digital"
+    ]
+  }
+]
