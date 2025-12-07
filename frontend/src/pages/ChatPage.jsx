@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom'; // ✅ [FIX] Tambah useParams
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
-import { sendMessageToAI } from '../api/aiService'; // ✅ Import dari aiService
+import { sendMessageToAI } from '../api/aiService'; 
 import { Plus, ArrowUp, MoreHorizontal, Trash2 } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Sidebar from '../components/layout/SideBar';
-import ChatWindow from '../components/chat/ChatWindow'; // Pastikan path benar
-import RateLimitStatus from '../components/common/RateLimitStatus'; // ✅ [NEW] Import Status
+import ChatWindow from '../components/chat/ChatWindow'; 
+import RateLimitStatus from '../components/common/RateLimitStatus'; 
 
 // --- Komponen ChatInput --- (TIDAK BERUBAH)
 const ChatInput = ({ onSend, disabled }) => {
@@ -81,11 +81,16 @@ const ChatInput = ({ onSend, disabled }) => {
 const ChatPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    // ✅ [FIX] Ambil ID dari URL. 
+    // PENTING: Pastikan di Route definisinya pakai :chatId (misal path="/chat/:chatId"). 
+    // Jika di route pakai :id, ganti 'chatId' dibawah menjadi 'id'.
+    const { chatId } = useParams(); 
+    
     const { user, logout, loading, isAuthenticated } = useAuth();
 
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null); // ✅ [NEW] State untuk Error Rate Limit
+    const [error, setError] = useState(null); 
     const [isStartingNewChat, setIsStartingNewChat] = useState(false);
     
     // 1. IS GUEST INITIALIZATION
@@ -105,6 +110,9 @@ const ChatPage = () => {
 
     // 2. CURRENT CHAT ID INITIALIZATION
     const [currentChatId, setCurrentChatId] = useState(() => {
+        // ✅ [FIX] Prioritaskan ID dari URL jika ada
+        if (chatId) return chatId;
+
         if (location.state?.initialMessage || location.state?.fromLandingPage) {
             console.log('🚀 [CHAT PAGE] Initializing New Chat from Landing Page');
             return null; 
@@ -136,11 +144,15 @@ const ChatPage = () => {
     const initializationRef = useRef({
         hasProcessedInitialState: false,
         isProcessingInitialMessage: false,
-        hasUserInitiatedNewChat: false
+        hasUserInitiatedNewChat: false,
+        hasRestoredFromUrl: false // ✅ [FIX] Ref baru untuk mencegah double fetch
     });
 
     // 3. IS NEW CHAT INITIALIZATION
     const [isNewChat, setIsNewChat] = useState(() => {
+        // ✅ [FIX] Jika ada chatId di URL, berarti BUKAN new chat
+        if (chatId) return false;
+
         if (location.state?.initialMessage || location.state?.fromLandingPage) {
             return true;
         }
@@ -232,6 +244,49 @@ const ChatPage = () => {
         }
     }, [user, logout, navigate, isGuest]);
 
+    // ✅ [FIX] EMERGENCY BRIDGE EFFECT (RESTORE FROM URL)
+    // Effect ini khusus menangani Refresh Page saat ada ID di URL
+    useEffect(() => {
+        // Cek apakah ada chatId di URL, user sudah login, bukan tamu, dan belum diproses
+        if (chatId && isAuthenticated && !isGuest && !initializationRef.current.hasRestoredFromUrl) {
+            
+            // Cek jika messages kosong (tanda refresh) ATAU ID di URL beda dengan state
+            if (messages.length === 0 || currentChatId !== chatId) {
+                console.log(`🔄 [CHAT PAGE] Restoring chat from URL: ${chatId}`);
+                
+                // Set flag agar tidak loop
+                initializationRef.current.hasRestoredFromUrl = true;
+                
+                // Update State Manual
+                setCurrentChatId(chatId);
+                setIsNewChat(false);
+                setIsLoading(true);
+                setError(null);
+
+                // Fetch Langsung (Bypass handleSelectChat untuk menghindari logic return)
+                api.get(`/api/ai/history/${chatId}`)
+                    .then(response => {
+                        if (response.data && Array.isArray(response.data.messages)) {
+                            setMessages(response.data.messages);
+                        } else {
+                            setMessages([]);
+                        }
+                    })
+                    .catch(err => {
+                        console.error("❌ Failed to restore chat from URL:", err);
+                        // Opsional: Jika not found, redirect ke new chat
+                        if(err.response?.status === 404) {
+                             navigate('/chat', { replace: true });
+                        }
+                    })
+                    .finally(() => {
+                        setIsLoading(false);
+                    });
+            }
+        }
+    }, [chatId, isAuthenticated, isGuest, messages.length, currentChatId, navigate]);
+
+
     const handleDeleteClick = (chatId) => {
         setChatToDelete(chatId);
         setShowDeleteModal(true);
@@ -289,7 +344,7 @@ const ChatPage = () => {
         }
 
         setIsLoading(true);
-        setError(null); // ✅ Reset error sebelum mengirim
+        setError(null); 
 
         try {
             const effectiveCurrentChatId = forceNewChat ? null : currentChatId;
@@ -319,6 +374,8 @@ const ChatPage = () => {
                 
                 if (shouldCreateNewChat) {
                     setIsNewChat(false);
+                    // ✅ [FIX] Update URL tanpa refresh halaman agar jika di-refresh user tetap disitu
+                    navigate(`/chat/${response.conversationId}`, { replace: true });
                 }
                 
                 setTimeout(() => {
@@ -329,12 +386,9 @@ const ChatPage = () => {
         } catch (error) {
             console.error('❌ [CHAT PAGE] Error sending message:', error);
             
-            // ✅ [NEW] Deteksi Spesifik Rate Limit Error
-            // Jika error code = rate_limit_exceeded atau status 429
             if (error.status === 429 || error.code === 'rate_limit_exceeded') {
-                setError(error); // Lempar error object lengkap ke ChatWindow
+                setError(error); 
             } else {
-                // Untuk error generic (koneksi putus, server error 500), tetap tampilkan sebagai chat
                 const errorMessage = {
                     id: Date.now() + 1,
                     content: 'Maaf, terjadi kesalahan pada sistem. Silakan coba sesaat lagi.',
@@ -351,7 +405,7 @@ const ChatPage = () => {
                 initializationRef.current.isProcessingInitialMessage = false;
             }
         }
-    }, [currentChatId, loadChatHistory, isNewChat]);
+    }, [currentChatId, loadChatHistory, isNewChat, navigate]); // Tambah navigate ke dependency
 
     const handleSendMessage = async (messageText) => {
         if (!isGuest && (!isAuthenticated || !user)) {
@@ -383,11 +437,10 @@ const ChatPage = () => {
         setMessages([]);
         setCurrentChatId(null);
         setIsNewChat(true);
-        setError(null); // ✅ Reset error
+        setError(null); 
         
-        if (window.history.replaceState) {
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
+        // ✅ [FIX] Reset URL ke root chat saat New Chat
+        navigate('/chat', { replace: true });
         
         initializationRef.current.isProcessingInitialMessage = false;
         
@@ -397,7 +450,7 @@ const ChatPage = () => {
             }
             setIsStartingNewChat(false);
         }, 200);
-    }, [isGuest]);
+    }, [isGuest, navigate]);
 
     const handleSelectChat = useCallback(async (chatId) => {
         if (isStartingNewChat) return;
@@ -407,7 +460,10 @@ const ChatPage = () => {
         setIsNewChat(false);
         setIsLoading(true);
         setMessages([]);
-        setError(null); // ✅ Reset error
+        setError(null); 
+
+        // ✅ [FIX] Update URL agar sinkron dengan chat yang dipilih
+        navigate(`/chat/${chatId}`, { replace: false });
 
         try {
             const response = await api.get(`/api/ai/history/${chatId}`);
@@ -536,7 +592,7 @@ const ChatPage = () => {
         }
     }, [messages, isLoading, error]);
 
-    // ✅ TAMPILAN LOADING (DIKEMBALIKAN UTUH)
+    // ✅ TAMPILAN LOADING
     if (loading && !isGuest) {
         return (
             <div className="flex h-screen bg-[#fbf9f6] items-center justify-center">
@@ -550,7 +606,7 @@ const ChatPage = () => {
         );
     }
 
-    // ✅ TAMPILAN REDIRECT (DIKEMBALIKAN UTUH)
+    // ✅ TAMPILAN REDIRECT
     if (!isAuthenticated && !isGuest) {
         return (
             <div className="flex h-screen bg-[#fbf9f6] items-center justify-center">
@@ -567,7 +623,6 @@ const ChatPage = () => {
     return (
         <div className="flex h-screen bg-amber-50 font-sans overflow-hidden">
             
-            {/* ✅ PERBAIKAN UTAMA: Kirim data 'isGuest' ke komponen ini */}
             <RateLimitStatus 
                 isGuestMode={isGuest} 
                 userName={user ? getUserName() : 'Mahasiswa'} 
