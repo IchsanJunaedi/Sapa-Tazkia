@@ -1,0 +1,50 @@
+[
+  {
+    "id": "profile-identitas-lokasi",
+    "category": "PROFIL UNIVERSITAS TAZKIA",
+    "topic": "Identitas & Lokasi Kampus",
+    "type": "general",
+    "semantic_content": "Identitas Institusi:\nNama: Universitas Tazkia (Nama Lama: STEI Tazkia).\nRektor: Prof. Dr. M. Syafii Antonio, M.Ec.\nNaungan: Yayasan Tazkia Cendekia (Akta No. 5, 11 Maret 1999).\nWebsite: tazkia.ac.id\nTagline: Pioneer in Islamic Economics, Digital Business and Halal Industry.\n\nLokasi Kampus:\n1. Kampus Utama (Sentul): Jl. Ir. H. Djuanda No. 78 Sentul City, Bogor 16810. Telp: +62 (21) 87962291-93.\n2. Kampus Dramaga (STMIK): Jl. Raya Dramaga Km.7 Dramaga, Bogor 16680. Telp: +62 (251) 8421076.\n\nTujuan Utama: Mempromosikan ekonomi murni (Tazkia) bagi umat dan pendidikan generasi Muslim kompeten bisnis yang menjaga kemurnian spiritual.",
+    "keywords": ["rektor", "pimpinan", "ketua", "syafii antonio", "alamat", "lokasi", "sentul", "dramaga", "kontak", "identitas", "profil", "yayasan"]
+  },
+  {
+    "id": "profile-nilai-tazkia",
+    "category": "PROFIL UNIVERSITAS TAZKIA",
+    "topic": "Nilai Utama (TAZKIA Value)",
+    "type": "general",
+    "semantic_content": "Nilai-Nilai Utama (TAZKIA Value):\nT (Tawheed): Landasan Tauhid, tidak ada tuhan selain Allah SWT.\nA (Amanah): Terpercaya dan bertanggung jawab.\nZ (Zero defects): Berorientasi pada kualitas tanpa cacat (quality-oriented).\nK (Knowledge-based): Berbasis ilmu pengetahuan dan kompetensi.\nI (Innovation-oriented): Berorientasi pada inovasi dan Istiqamah.\nA (Achievement): Berprestasi melalui kerja sama tim (teamwork).",
+    "keywords": ["nilai", "value", "budaya", "karakter", "tauhid", "amanah", "prinsip"]
+  },
+  {
+    "id": "profile-visi-misi",
+    "category": "PROFIL UNIVERSITAS TAZKIA",
+    "topic": "Visi & Misi",
+    "type": "general",
+    "semantic_content": "Visi Universitas Tazkia:\nMenjadi universitas terkemuka dalam mengembangkan ilmu pengetahuan dan teknologi berdasarkan Nilai-nilai TAZKIA untuk membangun ekosistem industri halal yang kompetitif secara global.\n\nMisi:\n1. Pendidikan Global: Memadukan semangat komunitas dunia dan akademik.\n2. Karakter Unggul: Membentuk cendekiawan & profesional berdaya saing global.\n3. Ekosistem Halal: Mendukung pertumbuhan Industri Halal.\n4. Riset: Mengembangkan pengetahuan melalui penelitian berkualitas.\n5. Sinergi: Menjalin kemitraan strategis nasional & internasional.",
+    "keywords": ["visi", "misi", "tujuan", "cita-cita", "global", "industri halal", "riset"]
+  },
+  {
+    "id": "profile-filosofi-logo",
+    "category": "PROFIL UNIVERSITAS TAZKIA",
+    "topic": "Filosofi Logo",
+    "type": "general",
+    "semantic_content": "Filosofi Logo Universitas Tazkia:\n\n1. Makna Bentuk (Berlian):\nMencerminkan ekonomi ideal: Mayoritas kelas menengah, dipimpin sedikit elit kaya, dan sedikit kaum kurang mampu.\n\n2. Makna Simbol Huruf Arab 'Ta' (ت):\n- 'Ta' Pertama: Pertumbuhan yang didasarkan pada kemurnian.\n- 'Ta' Kedua: Tarbiyah (pendidikan/regenerasi berkualitas).\n\n3. Makna Warna:\n- Biru: Kecerdasan, stabilitas, ukhuwwah, integritas.\n- Oranye: Inovasi, dinamisme, masa depan cerah.",
+    "keywords": ["logo", "lambang", "arti", "makna", "filosofi", "warna", "berlian", "huruf ta"]
+  },
+  {
+    "id": "profile-fasilitas",
+    "category": "FASILITAS KAMPUS",
+    "topic": "Fasilitas Kampus",
+    "type": "general",
+    "semantic_content": "Fasilitas Kampus Universitas Tazkia:\n- Perpustakaan Tazkia University\n- Inkubator Bisnis\n- Ruang Kelas Modern\n- Investment Corner\n- Lab Komunikasi Penyiaran Islam\n- Klinik Tazkia University\n- Lab Pengadilan Semu (Moot Court)\n- Ruang Serbaguna\n- Sport Arena & Asrama Mahasiswa\n- Masjid Tazkia\n- Creative Studio (Broadcasting/Film)",
+    "keywords": ["fasilitas", "gedung", "lab", "perpustakaan", "asrama", "masjid", "sarana", "prasarana"]
+  },
+  {
+    "id": "profile-daftar-prodi",
+    "category": "AKADEMIK",
+    "topic": "Daftar Fakultas & Program Studi",
+    "type": "program",
+    "semantic_content": "Daftar Fakultas dan Program Studi (S1) Universitas Tazkia:\n\nA. Fakultas Ekonomi dan Bisnis Syariah (FEBS):\n1. Digital Business (S.M)\n2. Hajj & Umroh Management (S.M)\n3. AI & Data Analytics (S.Kom)\n4. Islamic Finance & Fintech (S.E)\n5. Halal Industry (S.E)\n6. Accounting & Auditing (S.Ak)\n\nB. Fakultas Humaniora (Pendidikan, Hukum, & Komunikasi):\n1. Pendidikan Al-Qur'an & Hadits (S.Pd)\n2. Journalism & Content Creation (S.I.Kom)\n3. Islamic Family Law / Ahwal Syakhshiyyah (S.H)\n4. Public Relation & Digital Communication (S.I.Kom)\n5. Film Media & Broadcasting (S.I.Kom)\n6. Commercial Law / Hukum Ekonomi Syariah (S.H)\n\nInfo Tambahan: STMIK Tazkia (Dramaga) menyediakan prodi Teknik Informatika & Sistem Informasi.",
+    "keywords": ["jurusan", "prodi", "program studi", "fakultas", "febs", "humaniora", "sarjana", "s1", "gelar"]
+  }
+]
