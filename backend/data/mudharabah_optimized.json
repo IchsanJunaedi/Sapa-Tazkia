@@ -1,0 +1,42 @@
+[
+  {
+    "id": "fatwa-mudharabah-definisi",
+    "category": "FATWA DSN-MUI NO 07: MUDHARABAH",
+    "topic": "Definisi & Konsep Dasar (100% Modal)",
+    "type": "general",
+    "semantic_content": "Identitas Fatwa:\nNomor: 07/DSN-MUI/IV/2000.\nTentang: Pembiayaan Mudharabah (Qiradh).\nTanggal: 4 April 2000.\n\nDefinisi Mudharabah:\nAkad kerjasama usaha antara dua pihak dimana:\n1. Pihak Pertama (LKS/Shahibul Maal): Menyediakan SELURUH MODAL (100%).\n2. Pihak Kedua (Nasabah/Mudharib): Bertindak sebagai PENGELOLA.\n\nPrinsip Utama:\n- LKS menanggung risiko kerugian finansial.\n- Nasabah mengelola usaha dengan keahliannya.",
+    "keywords": ["definisi", "pengertian", "konsep", "shahibul maal", "pemilik dana", "mudharib", "pengelola", "modal 100 persen"]
+  },
+  {
+    "id": "fatwa-mudharabah-dalil",
+    "category": "FATWA DSN-MUI NO 07: MUDHARABAH",
+    "topic": "Dalil Al-Qur'an & Hadis",
+    "type": "general",
+    "semantic_content": "Landasan Hukum Mudharabah:\n\n1. Al-Qur'an:\n- QS. An-Nisa [4]: 29 (Perniagaan saling ridha).\n- QS. Al-Ma'idah [5]: 1 (Penuhilah akad).\n- QS. Al-Baqarah [2]: 283 (Menunaikan amanat).\n\n2. Hadis Nabi SAW:\n- Kisah Abbas bin Abdul Muthallib: Mensyaratkan mudharib tidak mengarungi lautan/lembah agar aman. Rasulullah membenarkannya.\n- 'Ada tiga hal berkah: Jual beli tidak tunai, Muqaradhah (Mudharabah), dan mencampur gandum untuk rumah tangga.'\n- 'Tidak boleh membahayakan diri sendiri & orang lain (La dharara wala dhirar).'",
+    "keywords": ["dalil", "dasar hukum", "ayat", "alquran", "hadis", "riwayat", "abbas bin abdul muthallib", "muqaradhah"]
+  },
+  {
+    "id": "fatwa-mudharabah-modal",
+    "category": "FATWA DSN-MUI NO 07: MUDHARABAH",
+    "topic": "Syarat & Ketentuan Modal",
+    "type": "general",
+    "semantic_content": "Ketentuan Modal (Rukun Akad):\n1. Jumlah & Jenis: Harus diketahui dengan jelas.\n2. Bentuk: Harus Tunai atau Barang yang dinilai (valuasi) saat akad.\n3. Larangan: Modal TIDAK DAPAT berbentuk Piutang (tagihan).\n4. Penyerahan: Modal dibayarkan kepada Mudharib (bisa bertahap atau tunai).\n5. Porsi: LKS membiayai 100% kebutuhan proyek.",
+    "keywords": ["modal", "syarat modal", "uang", "barang", "piutang", "utang", "tunai", "valuasi"]
+  },
+  {
+    "id": "fatwa-mudharabah-untung-rugi",
+    "category": "FATWA DSN-MUI NO 07: MUDHARABAH",
+    "topic": "Pembagian Keuntungan & Kerugian",
+    "type": "general",
+    "semantic_content": "Mekanisme Profit & Loss Sharing:\n\n1. Keuntungan (Profit):\n- Harus dibagi untuk kedua pihak sesuai kesepakatan (Nisbah/Persentase).\n- TIDAK BOLEH dalam bentuk jumlah pasti (Fixed Amount).\n- Perubahan nisbah harus berdasarkan kesepakatan.\n\n2. Kerugian (Loss):\n- Kerugian Finansial: Ditanggung SEPENUHNYA oleh LKS (Shahibul Maal).\n- Kecuali: Jika kerugian akibat kelalaian, kesalahan disengaja, atau pelanggaran perjanjian oleh Mudharib, maka Mudharib yang menanggung.",
+    "keywords": ["keuntungan", "kerugian", "profit", "loss", "rugi", "laba", "nisbah", "bagi hasil", "persentase", "risiko", "kelalaian"]
+  },
+  {
+    "id": "fatwa-mudharabah-manajemen",
+    "category": "FATWA DSN-MUI NO 07: MUDHARABAH",
+    "topic": "Manajemen, Jaminan & Biaya",
+    "type": "general",
+    "semantic_content": "Aturan Operasional & Manajemen:\n\n1. Hak Pengelola (Mudharib):\n- Hak eksklusif menjalankan usaha tanpa campur tangan teknis LKS.\n- Tidak boleh menyalahi syariah.\n\n2. Hak LKS (Pemilik Dana):\n- Berhak melakukan Pembinaan dan Pengawasan.\n- Tidak boleh mempersempit tindakan pengelola yang wajar.\n\n3. Biaya Operasional: Menurut fatwa ini, biaya operasional dibebankan kepada Mudharib.\n4. Jaminan: LKS BOLEH meminta jaminan (agunan) untuk mengantisipasi penyimpangan/wanprestasi (bukan untuk jaminan keuntungan).",
+    "keywords": ["manajemen", "pengelola", "intervensi", "pengawasan", "biaya operasional", "jaminan", "agunan", "kolateral", "wanprestasi"]
+  }
+]
