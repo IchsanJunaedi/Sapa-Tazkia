@@ -1,0 +1,42 @@
+[
+  {
+    "id": "fatwa-musyarakah-definisi",
+    "category": "FATWA DSN-MUI NO 08: MUSYARAKAH",
+    "topic": "Definisi & Konsep Dasar",
+    "type": "general",
+    "semantic_content": "Identitas Fatwa:\nNomor: 08/DSN-MUI/IV/2000.\nTentang: Pembiayaan Musyarakah (Kerjasama Modal & Kerja).\nTanggal: 13 April 2000.\n\nDefinisi Musyarakah:\nAkad kerjasama antara dua pihak atau lebih untuk suatu usaha tertentu, di mana masing-masing pihak memberikan kontribusi dana (modal) dengan ketentuan keuntungan dan risiko ditanggung bersama.\n\nKonsep Dasar:\n1. Mitra berkontribusi modal dan kerja (bisa diwakilkan).\n2. Keuntungan dibagi proporsional/sesuai kesepakatan.\n3. Kerugian WAJIB dibagi proporsional sesuai porsi modal.",
+    "keywords": ["definisi", "pengertian", "apa itu musyarakah", "konsep", "kerjasama", "dsn mui", "nomor 08"]
+  },
+  {
+    "id": "fatwa-musyarakah-dalil",
+    "category": "FATWA DSN-MUI NO 08: MUSYARAKAH",
+    "topic": "Dalil Al-Qur'an & Hadis",
+    "type": "general",
+    "semantic_content": "Landasan Hukum Musyarakah:\n\n1. Al-Qur'an:\n- QS. Shad [38]: 24 ('...kebanyakan orang bersyarikat itu berbuat zalim... kecuali yang beriman').\n- QS. Al-Ma'idah [5]: 1 ('Penuhilah akad-akad itu').\n\n2. Hadis Nabi SAW:\n- HR. Abu Daud: Allah adalah pihak ketiga dari dua orang bersyarikat selama tidak ada yang berkhianat.\n- HR. Tirmidzi: Kaum muslimin terikat dengan syarat-syarat mereka (kecuali yang mengharamkan halal/sebaliknya).\n\n3. Kaidah Fiqh:\n'Pada dasarnya, semua bentuk muamalah boleh dilakukan kecuali ada dalil yang mengharamkannya.'",
+    "keywords": ["dalil", "dasar hukum", "ayat", "alquran", "hadis", "riwayat", "qs shad", "qs al maidah", "kaidah fiqh"]
+  },
+  {
+    "id": "fatwa-musyarakah-syarat-akad",
+    "category": "FATWA DSN-MUI NO 08: MUSYARAKAH",
+    "topic": "Rukun: Ijab Qabul & Pihak Berakad",
+    "type": "general",
+    "semantic_content": "Ketentuan Akad & Pihak:\n\n1. Ijab & Qabul:\n- Harus dinyatakan eksplisit (tertulis/lisan) menunjukkan tujuan kontrak.\n- Dituangkan secara tertulis/komunikasi modern.\n\n2. Pihak-Pihak (Mitra):\n- Harus cakap hukum.\n- Menyediakan dana dan pekerjaan.\n- Setiap mitra adalah wakil dari mitra lainnya (berhak mengatur aset).\n- DILARANG menggunakan dana musyarakah untuk kepentingan pribadi.",
+    "keywords": ["rukun", "syarat", "ijab qabul", "akad", "mitra", "pihak", "larangan", "kepentingan pribadi"]
+  },
+  {
+    "id": "fatwa-musyarakah-modal-kerja",
+    "category": "FATWA DSN-MUI NO 08: MUSYARAKAH",
+    "topic": "Ketentuan Modal & Kerja",
+    "type": "general",
+    "semantic_content": "Ketentuan Obyek Akad (Modal & Kerja):\n\n1. Modal:\n- Bisa uang tunai, emas, perak, atau Aset Perdagangan (Barang).\n- Jika aset barang, harus dinilai tunai (valuasi) dan disepakati saat akad.\n- Tidak boleh dipinjamkan/dihadiahkan ke pihak lain.\n- LKS (Lembaga Keuangan) BOLEH meminta jaminan untuk menghindari penyimpangan.\n\n2. Kerja:\n- Partisipasi mitra dalam kerja adalah dasar pelaksanaan.\n- Porsi kerja TIDAK harus sama.\n- Mitra yang kerja lebih banyak boleh menuntut bagi hasil lebih besar.",
+    "keywords": ["modal", "uang", "barang", "aset", "jaminan", "kolateral", "kerja", "kontribusi", "valuasi"]
+  },
+  {
+    "id": "fatwa-musyarakah-untung-rugi",
+    "category": "FATWA DSN-MUI NO 08: MUSYARAKAH",
+    "topic": "Ketentuan Keuntungan, Kerugian & Sengketa",
+    "type": "general",
+    "semantic_content": "Aturan Pembagian Hasil & Risiko:\n\n1. Keuntungan (Profit):\n- Harus dikuantifikasi jelas (Nisbah/Persentase), TIDAK BOLEH jumlah pasti (Fixed Amount) di awal.\n- Dibagi secara proporsional atau sesuai kesepakatan dalam akad.\n\n2. Kerugian (Loss):\n- WAJIB dibagi secara proporsional menurut porsi modal masing-masing.\n- TIDAK BOLEH disepakati menyimpang dari porsi modal.\n\n3. Sengketa:\n- Diselesaikan via Badan Arbitrasi Syari'ah jika musyawarah gagal.",
+    "keywords": ["keuntungan", "kerugian", "profit", "loss", "rugi", "laba", "nisbah", "bagi hasil", "persentase", "sengketa", "arbitrasi"]
+  }
+]
