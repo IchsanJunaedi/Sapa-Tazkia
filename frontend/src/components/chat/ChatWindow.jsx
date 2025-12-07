@@ -33,96 +33,44 @@ const formatMessageWithArabic = (text) => {
   });
 };
 
-// 3. Format teks dengan bold dan link WEBSITE SAJA
-const formatMessageWithBoldAndLinks = (text) => {
+// 3. Format teks dengan bold untuk **teks**
+const formatMessageWithBold = (text) => {
   return text.split('\n').map((line, lineIndex) => {
     if (!line.trim()) return <div key={lineIndex} className="h-3"></div>;
     
     const parts = [];
     let currentIndex = 0;
+    let boldStart = line.indexOf('**');
     
-    while (currentIndex < line.length) {
-      // Cari bold terlebih dahulu
-      const boldStart = line.indexOf('**', currentIndex);
-      
-      // Cari link Markdown [teks](url) - HANYA untuk website
-      // Regex: [teks](http://... atau https://...)
-      const markdownLinkRegex = /\[([^\]]+?)\]\((https?:\/\/[^\s)]+)\)/g;
-      markdownLinkRegex.lastIndex = currentIndex;
-      const markdownMatch = markdownLinkRegex.exec(line);
-      
-      // Tentukan mana yang muncul pertama
-      let matchType = 'none';
-      let matchIndex = Infinity;
-      
-      if (boldStart !== -1 && boldStart < matchIndex) {
-        matchType = 'bold';
-        matchIndex = boldStart;
-      }
-      
-      if (markdownMatch !== null && markdownMatch.index < matchIndex) {
-        matchType = 'markdown';
-        matchIndex = markdownMatch.index;
-      }
-      
-      // Teks sebelum match
-      if (matchIndex > currentIndex) {
+    while (boldStart !== -1) {
+      if (boldStart > currentIndex) {
         parts.push(
-          <span key={`${lineIndex}-pre-${currentIndex}`}>
-            {line.substring(currentIndex, matchIndex)}
+          <span key={`${lineIndex}-${currentIndex}`}>
+            {line.substring(currentIndex, boldStart)}
           </span>
         );
       }
       
-      // Proses berdasarkan tipe match
-      if (matchType === 'bold') {
-        const boldEnd = line.indexOf('**', boldStart + 2);
-        if (boldEnd === -1) {
-          parts.push(
-            <span key={`${lineIndex}-bold-open`}>
-              {line.substring(boldStart)}
-            </span>
-          );
-          currentIndex = line.length;
-          break;
-        }
-        
-        const boldText = line.substring(boldStart + 2, boldEnd);
-        parts.push(
-          <strong key={`${lineIndex}-bold-${boldStart}`} className="font-semibold text-gray-900">
-            {boldText}
-          </strong>
-        );
-        
-        currentIndex = boldEnd + 2;
-      } 
-      else if (matchType === 'markdown') {
-        const linkText = markdownMatch[1];
-        const linkUrl = markdownMatch[2];
-        
-        parts.push(
-          <a 
-            key={`${lineIndex}-mdlink-${markdownMatch.index}`}
-            href={linkUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-500 hover:text-blue-600 hover:underline transition-colors duration-200"
-          >
-            {linkText}
-          </a>
-        );
-        
-        currentIndex = markdownMatch.index + markdownMatch[0].length;
-      }
-      else {
-        // Tidak ada match lagi, tambahkan sisa teks
-        parts.push(
-          <span key={`${lineIndex}-remainder`}>
-            {line.substring(currentIndex)}
-          </span>
-        );
-        currentIndex = line.length;
-      }
+      const boldEnd = line.indexOf('**', boldStart + 2);
+      if (boldEnd === -1) break;
+      
+      const boldText = line.substring(boldStart + 2, boldEnd);
+      parts.push(
+        <strong key={`${lineIndex}-bold-${boldStart}`} className="font-semibold text-gray-900">
+          {boldText}
+        </strong>
+      );
+      
+      currentIndex = boldEnd + 2;
+      boldStart = line.indexOf('**', currentIndex);
+    }
+    
+    if (currentIndex < line.length) {
+      parts.push(
+        <span key={`${lineIndex}-end`}>
+          {line.substring(currentIndex)}
+        </span>
+      );
     }
     
     return (
@@ -144,25 +92,7 @@ const formatMessageContent = (text) => {
     return formatMessageWithArabic(cleanedText);
   }
   
-  // Periksa apakah ada link website atau bold dalam teks
-  const markdownLinkRegex = /\[([^\]]+?)\]\((https?:\/\/[^\s)]+)\)/;
-  const hasLinks = markdownLinkRegex.test(cleanedText);
-  const hasBold = cleanedText.includes('**');
-  
-  if (hasLinks || hasBold) {
-    return formatMessageWithBoldAndLinks(cleanedText);
-  }
-  
-  // Format biasa tanpa link atau bold
-  return text.split('\n').map((line, lineIndex) => {
-    if (!line.trim()) return <div key={lineIndex} className="h-3"></div>;
-    
-    return (
-      <div key={lineIndex} className="mb-2 last:mb-0">
-        {line}
-      </div>
-    );
-  });
+  return formatMessageWithBold(cleanedText);
 };
 
 // ==========================================
@@ -315,16 +245,6 @@ const SingleChatMessage = ({ message }) => {
         .regular-text {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
-        
-        /* Styling khusus untuk link dalam pesan user */
-        .bg-blue-500 a {
-          color: #bfdbfe;
-          text-decoration: underline;
-        }
-        
-        .bg-blue-500 a:hover {
-          color: #dbeafe;
-        }
       `}</style>
     </div>
   );
@@ -409,6 +329,11 @@ const ChatWindow = ({ messages, isLoading, error }) => {
   // --- CONTENT STATE (Daftar Pesan) ---
   return (
     <div className="flex flex-col space-y-2 pb-4 w-full"> 
+      {/* ✅ FIX LAYOUT: 
+        Kita hapus semua properti yang bikin 'box' (overflow, height, bg).
+        Sekarang dia murni container flex yang lebar.
+      */}
+      
       {messages.map((msg, index) => (
         <SingleChatMessage key={index} message={msg} />
       ))}
