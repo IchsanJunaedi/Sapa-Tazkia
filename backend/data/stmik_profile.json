@@ -1,0 +1,50 @@
+[
+  {
+    "id": "stmik-identitas-kontak",
+    "category": "PROFIL STMIK TAZKIA",
+    "topic": "Identitas & Kontak Institusi",
+    "type": "general",
+    "semantic_content": "Identitas Resmi:\nNama: STMIK TAZKIA (Sekolah Tinggi Manajemen Informatika dan Komputer Tazkia).\nJulukan: Kampus Luar Biasa!\nNaungan: Yayasan Tazkia Cendikia.\nPendiri: Prof. Dr. Muhammad Syafi’i Antonio, M.Ec.\n\nLokasi & Kontak:\nAlamat: Jalan Raya Dramaga Km.7, Kel. Margajaya, Kec. Bogor Barat, Bogor.\nKontak WhatsApp: 0851-2312-3119.\nWebsite: stmik.tazkia.ac.id.",
+    "keywords": ["alamat", "lokasi", "kontak", "telepon", "wa", "whatsapp", "website", "stmik", "dramaga", "bogor", "syafii antonio"]
+  },
+  {
+    "id": "stmik-tentang-keunggulan",
+    "category": "PROFIL STMIK TAZKIA",
+    "topic": "Tentang & Keunggulan Kampus",
+    "type": "general",
+    "semantic_content": "Tentang STMIK Tazkia:\nFilosofi: 'Tazkia' berarti tumbuh dan berkembang dengan bersih.\nFokus Pendidikan: Mencetak lulusan unggul dalam teknologi (Hard Skill) dan berkarakter mulia/SMILE (Soft Skill).\n\nKeunggulan Kampus:\n1. Masa Studi Singkat (3.5 Tahun): Lulus lebih cepat, siap kerja.\n2. Metode Hybrid & Fleksibel: Cocok untuk pekerja/wirausaha.\n3. Penyaluran Kerja: Kerjasama industri untuk magang dan karir.\n4. Kurikulum Terkini: Fokus pada AI, Cyber Security, dan Bisnis Digital.",
+    "keywords": ["keunggulan", "kelebihan", "durasi", "lama kuliah", "hybrid", "kerja", "magang", "karir", "filosofi", "smile"]
+  },
+  {
+    "id": "stmik-visi-misi",
+    "category": "PROFIL STMIK TAZKIA",
+    "topic": "Visi & Misi",
+    "type": "general",
+    "semantic_content": "Visi STMIK Tazkia:\nMenjadi perguruan tinggi unggul bidang teknologi informasi yang mencetak lulusan berkompeten dan berkarakter mulia.\n\nMisi:\n1. Pendidikan berkualitas standar internasional.\n2. Riset teknologi bermanfaat bagi NKRI.\n3. Pengabdian masyarakat.\n4. Lingkungan inklusif dan Life Long Learning.",
+    "keywords": ["visi", "misi", "tujuan", "cita-cita", "riset", "pengabdian"]
+  },
+  {
+    "id": "stmik-prodi-si",
+    "category": "AKADEMIK STMIK",
+    "topic": "S1 Sistem Informasi (Information Systems)",
+    "type": "program",
+    "semantic_content": "Program Studi: S1 Sistem Informasi (Information Systems)\nFokus Utama: Manajemen data, analisis bisnis, dan pengembangan solusi digital.\n\nKonsentrasi Peminatan:\n- Project Management\n- Machine Learning\n- Data Analytic\n- Business Information System\n\nMata Kuliah Kunci: Analisis Data, Pengembangan Perangkat Lunak, Manajemen Proyek TI.\nProspek Karir: System Analyst, Software Developer, UI/UX Designer, Data Analyst.",
+    "keywords": ["sistem informasi", "si", "is", "manajemen data", "analis", "bisnis", "ui/ux", "prospek kerja", "jurusan", "prodi"]
+  },
+  {
+    "id": "stmik-prodi-ti",
+    "category": "AKADEMIK STMIK",
+    "topic": "S1 Teknik Informatika (Informatics Engineering)",
+    "type": "program",
+    "semantic_content": "Program Studi: S1 Teknik Informatika (Informatics Engineering)\nFokus Utama: Rekayasa perangkat lunak, infrastruktur, dan kecerdasan buatan (AI).\n\nKonsentrasi Peminatan:\n- Cyber Security\n- Artificial Intelligence (AI)\n- Web Development\n- Software Engineering\n\nMata Kuliah Kunci: Algoritma & Struktur Data, AI, Keamanan Siber (Cyber Security), Sistem Operasi.\nProspek Karir: Cybersecurity Specialist, AI Engineer, Cloud Engineer, DevOps Engineer, Software Engineer.",
+    "keywords": ["teknik informatika", "ti", "it", "coding", "cyber security", "ai", "artificial intelligence", "devops", "software engineer", "prospek kerja", "jurusan", "prodi"]
+  },
+  {
+    "id": "stmik-kegiatan-mahasiswa",
+    "category": "KEMAHASISWAAN",
+    "topic": "Berita & Kegiatan Mahasiswa",
+    "type": "general",
+    "semantic_content": "Berita & Kegiatan Mahasiswa Terkini:\n1. UKM CyberForce: Unit Kegiatan Mahasiswa keamanan siber pertama (Diluncurkan 24 Juli 2025).\n2. Seminar Mental Health: Diselenggarakan BEM STMIK (26 Juli 2025).\n3. BEM 'Kabinet Inspiratif Istiqomah': Presiden Fikri Pristyono T.\n4. Training Sales Force: Pelatihan bisnis produk Tazkia Group.",
+    "keywords": ["ukm", "bem", "organisasi", "kegiatan", "acara", "seminar", "cyberforce", "mental health", "presiden mahasiswa"]
+  }
+]
