@@ -1,0 +1,42 @@
+[
+  {
+    "id": "fatwa-ijarah-definisi",
+    "category": "FATWA DSN-MUI NO 09: IJARAH",
+    "topic": "Definisi & Konsep Dasar",
+    "type": "general",
+    "semantic_content": "Identitas Fatwa:\nNomor: 09/DSN-MUI/IV/2000.\nTentang: Pembiayaan Ijarah.\nTanggal: 13 April 2000.\n\nDefinisi Ijarah:\nAkad pemindahan hak guna (manfaat) atas suatu barang atau jasa dalam waktu tertentu dengan pembayaran sewa/upah (ujrah), TANPA diikuti dengan pemindahan kepemilikan barang itu sendiri.\n\nPoin Kunci:\n1. Transaksi ini adalah Sewa-Menyewa (Barang) atau Upah-Mengupah (Jasa).\n2. Tidak ada perpindahan kepemilikan aset kepada penyewa.",
+    "keywords": ["definisi", "pengertian", "apa itu ijarah", "sewa", "jasa", "hak guna", "manfaat", "tanpa kepemilikan"]
+  },
+  {
+    "id": "fatwa-ijarah-dalil",
+    "category": "FATWA DSN-MUI NO 09: IJARAH",
+    "topic": "Dalil Al-Qur'an & Hadis",
+    "type": "general",
+    "semantic_content": "Landasan Hukum Ijarah:\n\n1. Al-Qur'an:\n- QS. Az-Zukhruf [43]: 32 (Derajat sebagian manusia di atas sebagian lain untuk saling mempergunakan).\n- QS. Al-Baqarah [2]: 233 (Upah menyusui anak).\n- QS. Al-Qashash [28]: 26 (Mempekerjakan orang yang kuat & amanah).\n\n2. Hadis Nabi SAW:\n- 'Berikanlah upah pekerja sebelum keringatnya kering.' (HR. Ibnu Majah).\n- 'Barang siapa mempekerjakan pekerja, beritahukanlah upahnya.'\n- Larangan menyewakan tanah dengan bayaran hasil pertanian (harus dengan emas/perak/uang).",
+    "keywords": ["dalil", "dasar hukum", "ayat", "alquran", "hadis", "riwayat", "keringat", "upah", "gaji", "ibnu majah"]
+  },
+  {
+    "id": "fatwa-ijarah-objek-upah",
+    "category": "FATWA DSN-MUI NO 09: IJARAH",
+    "topic": "Objek Akad & Ketentuan Upah",
+    "type": "general",
+    "semantic_content": "Ketentuan Objek & Upah:\n\n1. Objek Ijarah:\n- Manfaat barang dan sewa; atau\n- Manfaat jasa dan upah.\n- Manfaat harus bisa dinilai, dibolehkan syariah (halal), dan dikenali spesifikasinya (untuk hindari sengketa).\n\n2. Ketentuan Sewa/Upah (Ujrah):\n- Harus dijanjikan dan disepakati nilainya.\n- Boleh berbentuk jasa lain (barter manfaat).\n- Bersifat fleksibel (bisa ditentukan berdasarkan ukuran waktu, tempat, atau jarak).",
+    "keywords": ["objek", "manfaat", "upah", "ujrah", "gaji", "biaya sewa", "fleksibilitas", "syarat barang"]
+  },
+  {
+    "id": "fatwa-ijarah-kewajiban-maintenance",
+    "category": "FATWA DSN-MUI NO 09: IJARAH",
+    "topic": "Kewajiban & Biaya Pemeliharaan (Maintenance)",
+    "type": "general",
+    "semantic_content": "Pembagian Kewajiban & Biaya:\n\n1. Kewajiban LKS (Pemberi Sewa/Bank):\n- Menyediakan barang/jasa.\n- Menanggung Biaya Pemeliharaan Aset (Materiil/Berat).\n- Menjamin jika terdapat CACAT pada barang.\n\n2. Kewajiban Nasabah (Penyewa):\n- Membayar sewa/upah.\n- Menjaga keutuhan barang sesuai kontrak.\n- Menanggung Biaya Pemeliharaan Ringan (Operasional/Rutin).\n- TIDAK bertanggung jawab atas kerusakan, KECUALI jika akibat kelalaian (human error) atau pelanggaran kontrak.",
+    "keywords": ["kewajiban", "maintenance", "pemeliharaan", "biaya", "kerusakan", "rusak", "cacat", "tanggung jawab", "servis", "perbaikan"]
+  },
+  {
+    "id": "fatwa-ijarah-sengketa",
+    "category": "FATWA DSN-MUI NO 09: IJARAH",
+    "topic": "Penyelesaian Perselisihan",
+    "type": "general",
+    "semantic_content": "Penyelesaian Sengketa:\nJika salah satu pihak tidak menunaikan kewajiban atau terjadi perselisihan, penyelesaian dilakukan melalui:\n1. Musyawarah untuk mufakat.\n2. Jika gagal, melalui Badan Arbitrasi Syari'ah.",
+    "keywords": ["sengketa", "perselisihan", "konflik", "arbitrasi", "basymas", "musyawarah"]
+  }
+]
