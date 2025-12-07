@@ -1,0 +1,66 @@
+[
+  {
+    "id": "humaniora-info-umum",
+    "category": "FAKULTAS HUMANIORA (PENDIDIKAN, HUKUM & KOMUNIKASI)",
+    "topic": "Identitas, Kontak & Daftar Prodi",
+    "type": "general",
+    "semantic_content": "Identitas Fakultas:\nNama: Fakultas Pendidikan, Hukum, & Komunikasi (Faculty of Education, Law, & Communication).\nDikenal Sebagai: Fakultas Humaniora.\nInstitusi Induk: Universitas Tazkia (Rektor: Prof. Dr. M. Syafii Antonio, M.Ec.).\n\nKontak & Pusat Pendaftaran (Admisi):\nAlamat Kampus: Jl. Ir. H. Djuanda No. 78 Sentul City, Bogor 16810.\nWebsite Pendaftaran (Semua Jurusan): spmb.tazkia.ac.id (Wajib daftar online melalui website).\nHotline Resmi Kampus / Admisi Pusat: 0821-84-800-600 / 0899-54-999-00.\nMedia Sosial: @tazkiaofficial.\n\nDaftar 6 Program Studi (S1) Humaniora:\n1. Al-Qur'an & Hadits Education (Pendidikan Al-Qur'an & Hadits).\n2. Journalism & Content Creation (Jurnalisme & Kreasi Konten).\n3. Islamic Family Law (Hukum Keluarga Islam).\n4. Public Relation & Digital Communication (Humas).\n5. Film Media & Broadcasting (Perfilman).\n6. Commercial Law (Hukum Ekonomi Syariah).",
+    "keywords": ["humaniora", "fakultas pendidikan", "fakultas hukum", "syafii antonio", "alamat", "hotline", "kontak", "website", "spmb", "pendaftaran", "admisi", "pusat"]
+  },
+  {
+    "id": "humaniora-beasiswa-mitra",
+    "category": "FAKULTAS HUMANIORA",
+    "topic": "Beasiswa & Mitra Strategis",
+    "type": "general",
+    "semantic_content": "Peluang Beasiswa Mahasiswa Humaniora:\n- BAZNAS.\n- BSI Maslahat.\n- Maybank Syariah.\n\nMitra Universitas Internasional (Student Exchange/Studi Lanjut):\n- Reitaku University (Jepang).\n- INCEIF (Malaysia).\n- The University of Adelaide (Australia).\n- KU Leuven (Belgia).\n\nMitra Industri & Magang:\n- Regulator: Bank Indonesia, OJK, BPJS, PT Pos Indonesia.\n- Perbankan: BSI, Bank Aceh, Bank Kaltimtara.\n- Sosial: Rumah Zakat.",
+    "keywords": ["beasiswa", "scholarship", "potongan biaya", "mitra", "kerjasama", "magang", "kuliah ke luar negeri", "baznas", "bsi"]
+  },
+  {
+    "id": "humaniora-prodi-quran",
+    "category": "PROGRAM STUDI HUMANIORA",
+    "topic": "Al-Qur'an & Hadits Education",
+    "type": "prodi",
+    "semantic_content": "Program Studi: Al-Qur'an & Hadits Education (S1) / Pendidikan Al-Qur'an & Hadits.\nFakultas: Humaniora (Education Department).\n\nDeskripsi:\nMencetak pendidik Al-Qur'an & Hadits yang menguasai tahsin-tahfizh, metodologi pengajaran modern, dan teknologi pembelajaran.\n\nKeunggulan & Kurikulum:\n- Fokus: Tahsin Tahfizh Mastery, Technology Enhanced Qur'anic Learning.\n- Sertifikasi: Teaching Certificate.\n\nProspek Karir:\nGuru Agama Islam (Sekolah/Madrasah), Mentor Tahfizh, Pengembang Kurikulum Al-Qur'an, Konten Kreator Edukasi Islam.\n\nProfil Alumni: Prisma Gymnastiar (PNS Kemenag), Tsaisa Mausyaila (Guru MIN).",
+    "keywords": ["pendidikan agama islam", "pai", "guru", "ustadz", "tahfizh", "tahsin", "mengajar", "kemenag"]
+  },
+  {
+    "id": "humaniora-prodi-jurnalistik",
+    "category": "PROGRAM STUDI HUMANIORA",
+    "topic": "Journalism & Content Creation",
+    "type": "prodi",
+    "semantic_content": "Program Studi: Journalism & Content Creation (S1) / Jurnalisme & Kreasi Konten.\nFakultas: Humaniora (Islamic Communication Department).\n\nDeskripsi:\nMencetak jurnalis, konten kreator, dan penulis profesional yang menguasai narasi digital multiplatform.\n\nKeunggulan & Kurikulum:\n- Fokus: Islamic Journalism, Storytelling, Photography & Videography, SEO.\n- Sertifikasi: Content Writing & Digital Journalism Certification.\n\nProspek Karir:\nJurnalis/Wartawan, Content Creator, Scriptwriter, Social Media Specialist, Youtuber/Influencer.\n\nProfil Alumni: Ghifary Muhammad (Live Commerce Specialist), Muhammad Sayyid (Influencer 400k+ Followers).",
+    "keywords": ["jurnalistik", "wartawan", "nulis", "konten kreator", "content creator", "youtuber", "media", "berita", "komunikasi"]
+  },
+  {
+    "id": "humaniora-prodi-hki",
+    "category": "PROGRAM STUDI HUMANIORA",
+    "topic": "Islamic Family Law (Hukum Keluarga)",
+    "type": "prodi",
+    "semantic_content": "Program Studi: Islamic Family Law (S1) / Hukum Keluarga Islam (Ahwal Syakhshiyyah).\nFakultas: Humaniora (Law Department).\n\nDeskripsi:\nMencetak pakar hukum untuk kasus perkawinan, warisan (mawaris), dan perlindungan anak.\n\nKeunggulan & Kurikulum:\n- Fokus: Fiqh Keluarga, Hukum Perkawinan & Perceraian, Mediasi Sengketa, Gender & Child Protection.\n- Sertifikasi: Certified Islamic Family Law Assistant.\n\nProspek Karir:\nHakim Pengadilan Agama, Pengacara Keluarga, Penghulu/KUA, Konsultan Waris, Mediator.\n\nProfil Alumni: Rezza Haryo Nugroho (Hakim Mahkamah Agung RI), Nurul Syafitri (PNS Kemenag).",
+    "keywords": ["hukum keluarga", "hki", "as", "ahwal syakhshiyyah", "hakim", "pengadilan agama", "kua", "penghulu", "nikah", "waris", "cerai"]
+  },
+  {
+    "id": "humaniora-prodi-pr",
+    "category": "PROGRAM STUDI HUMANIORA",
+    "topic": "Public Relation & Digital Communication",
+    "type": "prodi",
+    "semantic_content": "Program Studi: Public Relation & Digital Communication (S1) / Humas.\nFakultas: Humaniora (Islamic Communication Department).\n\nDeskripsi:\nMenjadi spesialis Hubungan Masyarakat (Humas/PR) yang jago branding, manajemen krisis, dan komunikasi digital.\n\nKeunggulan & Kurikulum:\n- Fokus: PR Strategy, Crisis Communication, Personal Branding.\n- Sertifikasi: Public Relations Certification.\n\nProspek Karir:\nPR Officer, Jubir Perusahaan, Brand Manager, Social Media Strategist, MC/Public Speaker.\n\nProfil Alumni: Maya Rosmala (Professional MC), Addilah Sakinah (Cinta Quran Foundation).",
+    "keywords": ["pr", "public relation", "humas", "komunikasi", "branding", "mc", "jubir", "sosmed"]
+  },
+  {
+    "id": "humaniora-prodi-film",
+    "category": "PROGRAM STUDI HUMANIORA",
+    "topic": "Film Media & Broadcasting",
+    "type": "prodi",
+    "semantic_content": "Program Studi: Film Media & Broadcasting (S1) / Perfilman & Penyiaran.\nFakultas: Humaniora (Islamic Communication Department).\n\nDeskripsi:\nBelajar produksi film, sinematografi, dan penyiaran (broadcasting) untuk dakwah kreatif.\n\nKeunggulan & Kurikulum:\n- Fokus: Directing (Sutradara), Screenwriting (Naskah), Editing, Cinematography.\n- Sertifikasi: Broadcasting & Video Production.\n\nProspek Karir:\nSutradara Film, Video Editor, Cameraman, Produser TV/YouTube, Broadcaster.\n\nProfil Alumni: Raksa Raga (Fotografer), Rudi Rahmat (Videographer RRI).",
+    "keywords": ["film", "movie", "video", "sutradara", "editor", "kamera", "fotografi", "broadcast", "tv", "penyiaran"]
+  },
+  {
+    "id": "humaniora-prodi-hes",
+    "category": "PROGRAM STUDI HUMANIORA",
+    "topic": "Commercial Law (Hukum Ekonomi Syariah)",
+    "type": "prodi",
+    "semantic_content": "Program Studi: Commercial Law (S1) / Hukum Ekonomi Syariah (Muamalah).\nFakultas: Humaniora (Law Department).\n\nDeskripsi:\nFokus pada hukum bisnis, kontrak syariah, dan legal drafting untuk perusahaan/perbankan.\n\nKeunggulan & Kurikulum:\n- Fokus: Islamic Business Law, Contract Law, Legal Drafting (Buat Kontrak).\n- Sertifikasi: Sharia Business Legal Consultant.\n\nProspek Karir:\nPengacara Bisnis Syariah, Legal Officer Bank/Perusahaan, Konsultan Hukum, Notaris (lanjut S2).\n\nProfil Alumni: Nurul Fadillah (Analis BPJPH), Tiara Salsabila.",
+    "keywords": ["hukum ekonomi syariah", "hes", "muamalah", "hukum bisnis", "pengacara", "lawyer", "legal", "notaris", "bank syariah"]
+  }
+]
