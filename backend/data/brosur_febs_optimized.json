@@ -1,0 +1,58 @@
+[
+  {
+    "id": "febs-info-umum",
+    "category": "FAKULTAS EKONOMI DAN BISNIS SYARIAH (FEBS)",
+    "topic": "Identitas & Daftar Prodi FEBS",
+    "type": "general",
+    "semantic_content": "Identitas Fakultas:\nNama: Fakultas Ekonomi dan Bisnis Syariah (FEBS).\nInstitusi: Universitas Tazkia.\nTagline: Pioneer in Islamic Economics, Digital Business and Halal Industry.\nLokasi: Sentul City, Bogor.\nWebsite: spmb.tazkia.ac.id | Hotline: 0821-84-800-600.\n\nDaftar 6 Program Studi (S1) di FEBS:\n1. Digital Business (Bisnis Digital).\n2. Hajj & Umroh Management (Manajemen Haji & Umroh).\n3. AI & Data Analytics (Kecerdasan Buatan & Analisis Data Keuangan).\n4. Islamic Finance and Fintech (Keuangan Islam & Tekfin).\n5. Halal Industry (Industri Halal).\n6. Accounting & Auditing (Akuntansi & Audit Syariah).\n\nCatatan Fasilitas: Fasilitas kampus merujuk pada dokumen Profil Universitas Tazkia.",
+    "keywords": ["febs", "fakultas ekonomi", "bisnis syariah", "daftar jurusan", "prodi", "alamat", "kontak", "sentul"]
+  },
+  {
+    "id": "febs-prodi-digital-business",
+    "category": "PROGRAM STUDI FEBS",
+    "topic": "Digital Business (Bisnis Digital)",
+    "type": "prodi",
+    "semantic_content": "Program Studi: Digital Business (S1) / Bisnis Digital.\nFakultas: FEBS.\n\nDeskripsi:\nMembangun bisnis digital Islami seperti e-commerce, start-up, dan fintech.\n\nKeunggulan & Kurikulum:\n- Fokus: Digital Marketing & Branding, Islamic E-Commerce.\n- Sertifikasi: Digital Marketing Certification.\n\nProspek Karir:\nIslamic Digital Entrepreneur (Pengusaha Digital), Digital Marketing Manager, Start-up Founder.",
+    "keywords": ["bisnis digital", "digital business", "startup", "e-commerce", "marketing", "pemasaran", "wirausaha", "entrepreneur"]
+  },
+  {
+    "id": "febs-prodi-hajj-umroh",
+    "category": "PROGRAM STUDI FEBS",
+    "topic": "Hajj & Umroh Management",
+    "type": "prodi",
+    "semantic_content": "Program Studi: Hajj & Umroh Management (S1) / Manajemen Haji & Umroh.\nFakultas: FEBS.\n\nDeskripsi:\nManajemen travel haji dan umrah secara profesional dan hospitality.\n\nKeunggulan & Kurikulum:\n- Fokus: Hajj & Umrah Travel Management, Hospitality (Pelayanan).\n- Sertifikasi: Certified Hajj & Umrah Manager (CHUM).\n\nProspek Karir:\nTravel Consultant, Operations Manager Biro Perjalanan, Konsultan Haji Umrah.",
+    "keywords": ["haji", "umroh", "travel", "biro perjalanan", "wisata", "pariwisata", "manajemen", "hospitality"]
+  },
+  {
+    "id": "febs-prodi-ai-data",
+    "category": "PROGRAM STUDI FEBS",
+    "topic": "AI & Data Analytics",
+    "type": "prodi",
+    "semantic_content": "Program Studi: AI & Data Analytics (S1) / Kecerdasan Buatan & Analisis Data.\nFakultas: FEBS.\n\nDeskripsi:\nIntegrasi Artificial Intelligence (AI) dan Big Data dengan Keuangan Syariah.\n\nKeunggulan & Kurikulum:\n- Fokus: Big Data for Islamic Finance, Machine Learning.\n- Sertifikasi: Asian Business Software Solution (ABSS).\n\nProspek Karir:\nData Analyst, Financial Data Scientist, AI Engineer, Ahli IT Keuangan.",
+    "keywords": ["ai", "artificial intelligence", "data analytics", "sains data", "big data", "machine learning", "coding", "programmer", "it"]
+  },
+  {
+    "id": "febs-prodi-fintech",
+    "category": "PROGRAM STUDI FEBS",
+    "topic": "Islamic Finance and Fintech",
+    "type": "prodi",
+    "semantic_content": "Program Studi: Islamic Finance and Fintech (S1) / Keuangan Islam & Tekfin.\nFakultas: FEBS.\n\nDeskripsi:\nMempelajari keuangan digital, teknologi blockchain, dan manajemen risiko syariah.\n\nKeunggulan & Kurikulum:\n- Fokus: Islamic Financial Technology, Risk Management.\n- Sertifikasi: Associate Wealth Planner Syariah.\n\nProspek Karir:\nDigital Finance Analyst, Fintech Founder, Konsultan Keuangan Digital.",
+    "keywords": ["fintech", "finance", "keuangan", "blockchain", "crypto", "manajemen risiko", "bank syariah", "teknologi finansial"]
+  },
+  {
+    "id": "febs-prodi-halal",
+    "category": "PROGRAM STUDI FEBS",
+    "topic": "Halal Industry",
+    "type": "prodi",
+    "semantic_content": "Program Studi: Halal Industry (S1) / Industri Halal.\nFakultas: FEBS.\n\nDeskripsi:\nInovasi produk halal global mencakup makanan, fashion, kosmetik, dan pariwisata.\n\nKeunggulan & Kurikulum:\n- Fokus: Global Halal Value Chain, Halal Certification.\n- Sertifikasi: Halal Supervisor Certification.\n\nProspek Karir:\nHalal Auditor (Auditor Halal), Policy Analyst, Manajer Produk Halal, Konsultan Sertifikasi Halal.",
+    "keywords": ["halal", "industri halal", "makanan", "fashion", "auditor", "sertifikasi halal", "lppom", "mui"]
+  },
+  {
+    "id": "febs-prodi-accounting",
+    "category": "PROGRAM STUDI FEBS",
+    "topic": "Accounting & Auditing",
+    "type": "prodi",
+    "semantic_content": "Program Studi: Accounting & Auditing (S1) / Akuntansi & Audit Syariah.\nFakultas: FEBS.\n\nDeskripsi:\nAkuntansi dan audit syariah dengan standar internasional.\n\nKeunggulan & Kurikulum:\n- Fokus: Sharia Auditing, Islamic Financial Accounting.\n- Sertifikasi: Brevet Tax Certification (Pajak).\n\nProspek Karir:\nSharia Auditor, Public Accountant (Akuntan Publik), Konsultan Pajak.",
+    "keywords": ["akuntansi", "accounting", "audit", "pajak", "tax", "akuntan publik", "keuangan"]
+  }
+]
