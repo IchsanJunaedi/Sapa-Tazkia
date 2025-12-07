@@ -10,144 +10,80 @@ const openai = new OpenAI({
 
 /**
  * ========================================================================
- * 🛡️ GOD MODE PROMPT CONFIGURATION (STRICT ANTI-HALLUCINATION)
+ * 🧠 INTELLIGENT PERSONA CONFIGURATION (KIA V2.0)
  * ========================================================================
- *
- * NOTE:
- * - Jangan ubah isi prompt ini kecuali paham efeknya pada behaviour AI.
- * - Untuk pertanyaan "identitas" kita akan BYPASS RAG/context dan jawab fixed reply.
+ * * Filosofi Baru: "Direct Answer First"
+ * Kia tidak lagi menjawab seperti SOP (1, 2, 3), tapi seperti CS Manusia.
+ * Ia memberikan inti jawaban di paragraf pertama, baru detail jika perlu.
  */
 
-const OPTIMIZED_SYSTEM_PROMPT = `
-⛔ **CRITICAL INSTRUCTION (BACA DULU):**
-Anda adalah "Kia", AI Khusus Universitas Tazkia.
-Anda **DILARANG KERAS** menjawab pertanyaan di luar topik akademik/kampus Tazkia.
+const SYSTEM_PROMPT = `
+🎯 **PERAN ANDA:**
+Anda adalah "Kia", Asisten Akademik Virtual Universitas Tazkia yang cerdas, hangat, dan profesional.
+Tugas Anda adalah melayani Mahasiswa/Calon Mahasiswa dengan informasi yang **Akurat, Ringkas, dan Solutif**.
 
-🚫 **DAFTAR TOPIK TERLARANG (HARUS DITOLAK):**
-1. **Kuliner/Resep Masakan:** (Contoh: "Cara buat nasi goreng", "Resep seblak"). Jawab: "Afwan, Kia hanya melayani info akademik, bukan resep masakan."
-2. **Hiburan/Selebriti/Film:** (Contoh: "Siapa artis A?", "Film terbaru").
-3. **Politik & Isu Sensitif.**
-4. **Tugas Sekolah Umum:** (Contoh: "Hitung luas lingkaran", "Apa ibu kota Peru").
+⛔ **BATASAN KERAS (STRICT RULES):**
+1. **Scope:** HANYA jawab pertanyaan seputar Akademik, Kampus Tazkia, dan Islam/Ekonomi Syariah.
+2. **Out of Scope:** TOLAK pertanyaan tentang Resep Masakan, Selebriti, Politik, atau Tugas Sekolah Umum (Matematika/Fisika dasar).
+3. **Anti-Hallucination:** Jawab HANYA berdasarkan data di **[CONTEXT]**. Jika data tidak ada, katakan jujur "Data belum tersedia", jangan mengarang.
 
-✅ **TUGAS UTAMA:**
-Hanya menjawab pertanyaan User menggunakan data yang disediakan di **{context}**.
+✍️ **GAYA MENJAWAB (STYLE GUIDE):**
+1. **DIRECT ANSWER (PENTING):** Jangan basa-basi ("Berikut adalah jawabannya..."). Langsung jawab intinya di kalimat pertama.
+   - *Salah:* "Mekanisme murabahah adalah sebagai berikut: 1. Bank membeli..."
+   - *Benar:* "Dalam akad Murabahah, Bank menjual barang ke nasabah dengan harga beli ditambah margin keuntungan yang disepakati secara transparan."
+2. **STRUKTUR:**
+   - **Paragraf 1:** Kesimpulan/Jawaban Inti (2-3 kalimat).
+   - **Paragraf 2 (Opsional):** Poin-poin detail/syarat HANYA JIKA diminta atau sangat teknis.
+3. **TONE:** Hangat, Islami, namun tetap Profesional. Gunakan "Kak" untuk menyapa user.
 
-🧠 **REASONING PROCESS (SEBELUM MENJAWAB):**
-1. Cek Topik: Apakah ini tentang Tazkia/Islam/Akademik? 
-   - JIKA TIDAK -> TOLAK dengan sopan & Islami.
-   - JIKA YA -> Lanjut ke langkah 2.
-2. Cek Konteks: Apakah jawabannya ada di {context}?
-   - JIKA TIDAK ADA -> Katakan "Mohon maaf, data spesifik belum tersedia." JANGAN MENGARANG.
-   - JIKA ADA -> Jawab sesuai data.
-
-🎨 **GAYA BAHASA & ADAB:**
-- **Salam:** Awali dengan "Assalamualaikum" atau "Waalaikumsalam".
-- **Tone:** Ramah, Formal, Islami ("Insya Allah", "Alhamdulillah", "Afwan").
-- **Doa Penutup:** Wajib ada doa singkat di akhir.
-- **Format:** Gunakan Bullet Points untuk daftar.
+☪️ **ADAB:**
+- Mulai dengan "Assalamualaikum" jika user memulai percakapan (sesi awal).
+- Tutup dengan tawaran bantuan lain atau doa singkat ("Semoga membantu ya, Kak!").
 `;
 
-const CONTEXT_ENFORCEMENT_PROMPTS = {
-  syariah: `KONTEKS HUKUM/SYARIAH:
+const CONTEXT_INSTRUCTION = `
+[DATA PENGETAHUAN - SUMBER KEBENARAN]
 {context}
 
-PERTANYAAN USER: "{query}"
+[PERTANYAAN USER]
+{query}
 
-INSTRUKSI:
-1. Jawab berdasarkan teks di atas.
-2. Jika teks tidak relevan dengan pertanyaan, katakan data tidak ditemukan.`,
-
-  general: `INFORMASI KAMPUS:
-{context}
-
-PERTANYAAN USER: "{query}"
-
-INSTRUKSI:
-1. Cek apakah {context} relevan dengan "{query}".
-2. JANGAN gunakan pengetahuan luar (internet/umum) jika {context} kosong.`,
-
-  program: `DATA AKADEMIK:
-{context}
-
-PERTANYAAN USER: "{query}"
-
-INSTRUKSI:
-1. Fokus pada Program Studi yang ditanyakan.
-2. Jika user bertanya PRODI KEDOKTERAN/TEKNIK yang tidak ada di list, katakan PRODI TERSEBUT TIDAK TERSEDIA DI TAZKIA.`
-};
-
-const OFFER_TEMPLATES = {
-  program: [
-    "Tertarik dengan prospek karirnya juga, Kak? 😊",
-    "Kia punya info rincian biaya kuliahnya, mau dilihat?",
-    "Perlu info syarat pendaftaran untuk jurusan ini?"
-  ],
-  general: [
-    "Ada hal lain yang bisa Kia bantu jelaskan? ✨",
-    "Apakah Kakak butuh panduan pendaftaran?",
-    "Ingin Kia hubungkan langsung ke Admin Kampus?"
-  ],
-  syariah: [
-    "Ingin tahu contoh penerapannya di bank syariah?",
-    "Perlu dalil Al-Quran yang mendasarinya?",
-    "Ada istilah fiqh lain yang membingungkan Kakak?"
-  ]
-};
-
-const FALLBACK_RESPONSES = {
-  lowConfidence: [
-    "Afwan, Kia kurang yakin dengan jawaban untuk pertanyaan tersebut. 🤔 Agar informasinya valid, silakan tanya langsung ke Admin Kampus di 0821-84-800-600 ya.",
-    "Mohon maaf, Kia belum menemukan informasi yang pas di database. Boleh dibantu Admin kami di 0821-84-800-600? 🙏"
-  ],
-  noContext: [
-    "Afwan, detail tersebut belum tersedia di data Kia saat ini. Silakan hubungi Admin Kampus di 0821-84-800-600 ya Kak. 😊",
-    "Qadarullah, Kia belum punya data lengkap soal itu. Coba konsultasi ke Admin di 0821-84-800-600 ya! ✨"
-  ]
-};
+[INSTRUKSI KHUSUS]
+- Analisa data di atas.
+- Jawab pertanyaan user dengan gaya "Direct Answer" sesuai Style Guide.
+- Jika data berupa JSON/Poin, rangkai menjadi kalimat yang mengalir (narasi), jangan cuma copy-paste list.
+`;
 
 /**
  * ========================================================================
- * 🛠️ CORE SERVICE LOGIC
+ * 🛠️ SERVICE METHODS
  * ========================================================================
  */
 
-/** ---------------------------
- *  Identity override constants
- *  ---------------------------
- */
-const IDENTITY_REPLY = `Assalamualaikum! 👋
-
-Kia adalah asisten AI resmi Universitas Tazkia 🤖✨
-Kia membantu informasi terkait kampus, akademik, program studi, dan layanan mahasiswa.
-Insya Allah Kia bantu semaksimal mungkin! 🙏
-
-Barakallahu fiikum 🌟`;
-
 /**
- * Simple identity/question intent detection.
- * Expand the list if you see more variations in logs.
+ * Mendeteksi pertanyaan identitas untuk bypass RAG
  */
 function isIdentityQuestion(text) {
   if (!text) return false;
   const q = text.toLowerCase();
   const patterns = [
-    "kamu siapa", "siapa kamu", "kia siapa",
-    "nama kamu", "nama mu", "siapa dirimu",
-    "perkenalkan dirimu", "asal kamu", "siapa kia",
-    "kenalan dong", "perkenalkan"
+    "kamu siapa", "siapa kamu", "kia siapa", "kenalan",
+    "siapa namamu", "robot apa ini", "admin siapa"
   ];
   return patterns.some(p => q.includes(p));
 }
 
 /**
- * Slightly more robust "small intent classification" for banned topics
+ * Filter topik terlarang dengan cepat
  */
 function isBannedTopicQuestion(text) {
   if (!text) return false;
   const q = text.toLowerCase();
+  // Keyword yang sangat spesifik untuk trigger rejection
   const banned = [
-    "resep", "cara buat", "nasi goreng", "masak", "film", "artis",
-    "politik", "ibu kota", "luas lingkaran", "tugas sekolah"
+    "resep", "cara masak", "bumbu", "tumis", "goreng", 
+    "film terbaru", "gosip", "presiden", "partai",
+    "hitung luas", "akar pangkat", "ibu kota negara"
   ];
   return banned.some(b => q.includes(b));
 }
@@ -155,238 +91,116 @@ function isBannedTopicQuestion(text) {
 async function createEmbedding(text) {
   try {
     if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY missing');
+    // Normalisasi spasi agar hemat token & akurat
     const cleanText = text.replace(/\s+/g, " ").trim();
+    
     const response = await openai.embeddings.create({
       model: "text-embedding-3-small",
       input: cleanText,
     });
     return response.data[0].embedding;
   } catch (error) {
-    console.error('❌ [OPENAI] Error creating embedding:', error);
+    console.error('❌ [OPENAI] Error creating embedding:', error.message);
     throw error;
   }
 }
 
-async function chatCompletion(messages, options = {}) {
-  try {
-    const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      messages: messages,
-      max_tokens: options.maxTokens || 500,
-      temperature: options.temperature || 0.3
-    });
-    return completion.choices[0].message.content.trim();
-  } catch (error) {
-    console.error('❌ [OPENAI] Completion Error:', error);
-    throw error;
-  }
-}
-
-// ==============================
-// 🚑 FIXED generateAIResponse
-// - Identity questions bypass RAG/context (fixed reply)
-// - Returns {content, usage}
-// - Keeps validation + fallback
-// ==============================
+/**
+ * Fungsi Utama Generator Jawaban
+ */
 async function generateAIResponse(userMessage, conversationHistory = [], customContext = null, options = {}) {
   try {
     const {
-      maxTokens = 600,
-      temperature = 0.1,
-      userType = 'general',
-      questionType = 'general',
-      forceContextUsage = false
+      maxTokens = 400, // Jawaban ringkas tidak butuh token banyak
+      temperature = 0.3, // Sedikit kreatif untuk merangkai kata, tapi tetap faktual
     } = options;
 
     const modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
-    // 1) Identity override: ALWAYS bypass context and return fixed identity reply
+    // 1. Cek Identitas (Fast Response)
     if (isIdentityQuestion(userMessage)) {
-      return { content: IDENTITY_REPLY, usage: { total_tokens: 0 } };
+      return { 
+        content: "Assalamualaikum! 👋 Saya Kia, asisten virtual Universitas Tazkia. Kia siap bantu Kakak seputar informasi kampus, prodi, dan akademik. Ada yang bisa dibantu? 😊", 
+        usage: { total_tokens: 0 } 
+      };
     }
 
-    // 2) Quick banned-topic guard: if user clearly asks banned topics, reply politely without RAG
+    // 2. Cek Topik Terlarang (Fast Rejection)
     if (isBannedTopicQuestion(userMessage)) {
       return {
-        content:
-          "Afwan, Kia hanya melayani informasi akademik/kampus Tazkia. Untuk topik di luar itu (misal resep/film/soal umum), Kia tidak dapat membantu. Ada yang berkaitan kampus yang bisa Kia bantu?",
+        content: "Afwan Kak, Kia fokus membantu informasi seputar Universitas Tazkia dan Akademik saja. Untuk topik di luar itu, Kia belum bisa bantu ya. 🙏 Ada pertanyaan soal kampus?",
         usage: { total_tokens: 0 }
       };
     }
 
-    // Build messages (system + optional context + recent history + user)
-    const messages = buildContextEnforcementMessages(
-      userMessage,
-      conversationHistory,
-      customContext,
-      userType,
-      questionType,
-      forceContextUsage
-    );
+    // 3. Susun Messages untuk OpenAI
+    const messages = [
+      { role: 'system', content: SYSTEM_PROMPT },
+    ];
 
-    // Call OpenAI
+    // Masukkan History (Context Window) - Batasi 2 turn terakhir agar fokus
+    if (conversationHistory.length > 0) {
+      const recentHistory = conversationHistory.slice(-2);
+      messages.push(...recentHistory.map(msg => ({
+        role: msg.role === 'bot' ? 'assistant' : msg.role,
+        content: msg.content
+      })));
+    }
+
+    // Masukkan Context RAG & Query Saat ini
+    let finalUserPrompt = userMessage;
+    if (customContext) {
+        // Inject context ke dalam prompt user atau system message khusus
+        finalUserPrompt = CONTEXT_INSTRUCTION
+            .replace('{context}', customContext)
+            .replace('{query}', userMessage);
+    } else {
+        // Fallback jika context kosong (misal RAG gagal)
+        finalUserPrompt = `[DATA KOSONG] Tidak ada info database.\n[PERTANYAAN] ${userMessage}\n\nINSTRUKSI: Jawab sopan bahwa data spesifik belum ditemukan. Sarankan hubungi Admin.`;
+    }
+
+    messages.push({ role: 'user', content: finalUserPrompt });
+
+    // 4. Call OpenAI
     const completion = await openai.chat.completions.create({
       model: modelName,
       messages: messages,
       max_tokens: maxTokens,
       temperature: temperature,
-      presence_penalty: 0.0,
+      presence_penalty: 0.1, // Mencegah pengulangan kata
+      frequency_penalty: 0.1,
     });
 
     let aiReply = completion.choices[0].message.content.trim();
 
-    // Validate + enhance (anti-hallucination)
-    aiReply = validateAndEnhanceResponse(aiReply, customContext, userMessage, questionType);
+    // 5. Validasi Akhir (Safety Net untuk Halusinasi Resep/Code)
+    if (aiReply.includes("panaskan minyak") || aiReply.includes("potong dadu")) {
+        aiReply = "Afwan, sepertinya ada kesalahan teknis. Kia hanya bisa menjawab seputar akademik Tazkia. Silakan tanya hal lain ya Kak! 🙏";
+    }
 
-    // Grab usage info (if present)
-    const usage = completion.usage || { total_tokens: 0, prompt_tokens: 0, completion_tokens: 0 };
-
-    console.log('💰 [OPENAI USAGE]', {
-      model: modelName,
-      inputTokens: usage.prompt_tokens,
-      outputTokens: usage.completion_tokens,
-      totalTokens: usage.total_tokens,
-      responseLength: aiReply.length
-    });
+    // Logging Usage (Penting untuk monitoring biaya)
+    const usage = completion.usage || { total_tokens: 0 };
+    console.log(`🤖 [AI GEN] Tokens: ${usage.total_tokens} | Model: ${modelName}`);
 
     return { content: aiReply, usage };
 
   } catch (error) {
     console.error('❌ [OPENAI] Generation failed:', error);
-    // Fallback Return Object
     return {
-      content: getSmartFallback(userMessage, customContext, { questionType: options.questionType || 'general' }),
+      content: "Mohon maaf Kak, sistem Kia sedang sibuk. Boleh diulang pertanyaannya? Atau hubungi Admin kami di 0821-84-800-600. 🙏",
       usage: { total_tokens: 0 }
     };
   }
 }
 
-
-function buildContextEnforcementMessages(userMessage, conversationHistory, customContext, userType, questionType, forceContextUsage) {
-  const messages = [];
-
-  let systemPrompt = OPTIMIZED_SYSTEM_PROMPT;
-
-  if (customContext) {
-    const contextTemplate = CONTEXT_ENFORCEMENT_PROMPTS[questionType] || CONTEXT_ENFORCEMENT_PROMPTS.general;
-
-    systemPrompt = contextTemplate
-      .replace('{context}', customContext)
-      .replace('{query}', userMessage);
-
-    if (forceContextUsage) {
-      systemPrompt += `\n\n⚠️ **PERINGATAN KERAS:** Gunakan data di atas! Jika pertanyaan User adalah tentang RESEP/MASAKAN/HIBURAN, JANGAN GUNAKAN DATA, TAPI TOLAK PERMINTAAN.`;
-    }
-  } else {
-    systemPrompt += `\n\n⚠️ **INFO:** Database Kosong.
-    INSTRUKSI:
-    1. Jika pertanyaan adalah sapaan ("Halo", "Assalamualaikum"), jawab ramah.
-    2. Jika pertanyaan butuh FAKTA (Biaya, Prodi, Resep, Cara), KATAKAN TIDAK TAHU. JANGAN MENGARANG.`;
-  }
-
-  messages.push({ role: 'system', content: systemPrompt });
-
-  if (conversationHistory && conversationHistory.length > 0) {
-    const recentHistory = conversationHistory.slice(-3); // sedikit lebih kontekstual
-    messages.push(...recentHistory.map(msg => ({
-      role: msg.role === 'bot' ? 'assistant' : msg.role,
-      content: msg.content
-    })));
-  }
-
-  messages.push({ role: 'user', content: userMessage });
-
-  return messages;
-}
-
-function extractKeyInformation(context, question) {
-  if (!context) return null;
-
-  if (context.includes('- ') || context.includes('1. ')) {
-    const lines = context.split('\n');
-    const relevantLines = lines.filter(line =>
-      line.trim().length > 0 && (
-        line.includes('- ') ||
-        line.match(/^\d+\./) ||
-        line.toLowerCase().includes(extractTopic(question))
-      )
-    );
-
-    if (relevantLines.length > 0) {
-      let result = context.substring(0, 600);
-      const lastDot = result.lastIndexOf('.');
-      if (lastDot > 100) result = result.substring(0, lastDot + 1);
-      return result + "..";
-    }
-  }
-
-  const sentences = context.split(/[.!?]+/).filter(s => s.trim().length > 20);
-  return sentences.slice(0, 3).join('. ') + '.';
-}
-
-function validateAndEnhanceResponse(response, context, question, questionType) {
-  const lowerRes = (response || '').toLowerCase();
-
-  const forbiddenKeywords = ['tumis', 'siapkan bahan', 'panaskan minyak', 'potong-potong', 'sajikan hangat'];
-  if (forbiddenKeywords.some(word => lowerRes.includes(word))) {
-    console.warn('🚨 [OPENAI] Hallucination Detected (Recipe). Blocking output.');
-    return "Afwan Kak, Kia adalah asisten akademik. Kia tidak memiliki kapabilitas untuk memberikan resep masakan atau info di luar topik kampus. Ada yang bisa Kia bantu seputar perkuliahan? 😊";
-  }
-
-  const invalidPhrases = [
-    'maaf, informasi tidak ditemukan',
-    'tidak ada dalam konteks',
-    'saya tidak tahu',
-    'konteks yang diberikan tidak mencantumkan'
-  ];
-
-  const isInvalid = invalidPhrases.some(p => lowerRes.includes(p));
-
-  if (context && isInvalid) {
-    const keyInfo = extractKeyInformation(context, question);
-    if (keyInfo) {
-      return `Afwan Kak, berdasarkan data yang Kia miliki:\n\n${keyInfo}\n\n${generateOfferPhrase(extractTopic(question), questionType)}`;
-    }
-  }
-
-  return response;
-}
-
-function getSmartFallback(question, context, options) {
-  const { questionType } = options || {};
-  if (context) {
-    const keyInfo = extractKeyInformation(context, question);
-    if (keyInfo) {
-      return `Afwan, informasi singkat yang Kia temukan: ${keyInfo}. Silakan tanya lebih detail ya Kak.`;
-    }
-  }
-
-  const fallbacks = FALLBACK_RESPONSES.noContext;
-  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
-}
-
-function extractTopic(question) {
-  const ignore = ['apa', 'saja', 'yang', 'ada', 'di', 'prodi', 'fakultas', 'bagaimana', 'bisa', 'tolong', 'jelaskan', 'kak', 'kia'];
-  return (question || '').toLowerCase().split(' ')
-    .filter(w => !ignore.includes(w) && w.length > 3)
-    .join(' ') || 'topik ini';
-}
-
-function generateOfferPhrase(topic, type = 'general') {
-  const list = OFFER_TEMPLATES[type] || OFFER_TEMPLATES.general;
-  return list[Math.floor(Math.random() * list.length)];
-}
-
-function checkContextUsage(response, context) {
-  if (!context) return 'none';
-  const keyword = context.substring(0, 20).toLowerCase().split(' ')[0];
-  return (response || '').toLowerCase().includes(keyword) ? 'good' : 'weak';
-}
-
 async function testOpenAIConnection() {
   try {
-    const res = await chatCompletion([{ role: 'user', content: 'Ping' }]);
-    return { success: true, message: res };
+    const res = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: 'user', content: 'Say connected' }],
+        max_tokens: 10
+    });
+    return { success: true, message: res.choices[0].message.content };
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -395,6 +209,5 @@ async function testOpenAIConnection() {
 module.exports = {
   generateAIResponse,
   createEmbedding,
-  testOpenAIConnection,
-  extractKeyInformation
+  testOpenAIConnection
 };
