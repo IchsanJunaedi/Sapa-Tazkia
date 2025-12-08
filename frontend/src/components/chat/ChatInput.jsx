@@ -1,94 +1,114 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, ArrowRight, Mic, Paperclip } from 'lucide-react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
+import { Plus, ArrowUp } from 'lucide-react';
 
-const ChatInput = ({ onSend, disabled = false }) => {
-  const [input, setInput] = useState('');
-  const textareaRef = useRef(null);
+const ChatInput = ({ onSend, disabled }) => {
+    const [input, setInput] = useState('');
+    const textareaRef = useRef(null);
+    const formRef = useRef(null);
 
-  const handleSend = () => {
-    if (input.trim() && !disabled) {
-      onSend(input);
-      setInput('');
-    }
-  };
+    // Batas Maksimal 250 Karakter
+    const MAX_CHARS = 250;
+    const isTooLong = input.length > MAX_CHARS;
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+    const adjustHeightAndShape = () => {
+        const textarea = textareaRef.current;
+        const form = formRef.current;
+        
+        if (textarea && form) {
+            textarea.style.height = 'auto'; 
+            const currentHeight = textarea.scrollHeight;
+            textarea.style.height = `${Math.min(currentHeight, 150)}px`;
 
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
-    }
-  }, [input]);
-
-  return (
-    <div className="border-t border-gray-200 bg-white p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Additional Actions */}
-        <div className="flex items-center justify-between mb-2 px-1">
-          <div className="flex items-center space-x-2">
-            <button 
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
-              title="Attach file"
-            >
-              <Paperclip size={16} />
-            </button>
-            <button 
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
-              title="Voice input"
-            >
-              <Mic size={16} />
-            </button>
-          </div>
-          
-          <span className="text-xs text-gray-400">
-            {input.length}/2000
-          </span>
-        </div>
-
-        {/* Input Area */}
-        <div className="flex items-end space-x-3">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Tanyakan sesuatu kepada Sapa Tazkia..."
-            disabled={disabled}
-            rows={1}
-            maxLength={2000}
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none font-normal text-[15px] leading-relaxed tracking-wide placeholder-gray-400 bg-white transition-all duration-200"
-            style={{ minHeight: '48px' }}
-          />
-
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || disabled}
-            className="flex-shrink-0 w-12 h-12 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center transition-all duration-200 transform hover:scale-105 active:scale-95"
-            title="Kirim pesan"
-          >
-            {disabled ? 
-              <Loader2 size={20} className="animate-spin" /> : 
-              <Send size={20} />
+            if (currentHeight > 52) {
+                form.style.borderRadius = '1.5rem'; 
+            } else {
+                form.style.borderRadius = '30px'; 
             }
-          </button>
-        </div>
+        }
+    };
 
-        {/* Helper Text */}
-        <div className="mt-2 px-1">
-          <p className="text-xs text-gray-400 text-center">
-            Tekan Enter untuk mengirim, Shift + Enter untuk baris baru
-          </p>
+    const handleSubmit = (e) => {
+        if (e) e.preventDefault();
+        
+        if (input.trim() && !isTooLong && !disabled) {
+            onSend(input.trim());
+            setInput('');
+            
+            if (textareaRef.current && formRef.current) {
+                textareaRef.current.style.height = 'auto';
+                formRef.current.style.borderRadius = '30px';
+            }
+        }
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSubmit();
+        }
+    };
+
+    useLayoutEffect(() => {
+        adjustHeightAndShape();
+    }, [input]);
+
+    const isButtonEnabled = input.trim() && !isTooLong && !disabled;
+
+    return (
+        <div className="p-4 md:p-6 border-t border-gray-200 flex justify-center bg-[#fef6e4]">
+            <form 
+                ref={formRef}
+                onSubmit={handleSubmit} 
+                // ✅ [FIX 1] Hapus 'overflow-hidden' agar tooltip bisa keluar dari kotak
+                className="w-full max-w-3xl flex items-end p-2 bg-white border border-gray-300 shadow-xl transition-all duration-200 ease-out relative"
+                style={{ borderRadius: '30px' }} 
+            >
+                <button type="button" className="p-2 mb-1 mr-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0 h-10 w-10 flex items-center justify-center" title="Attach" disabled={disabled}>
+                    <Plus size={20} />
+                </button>
+                
+                <textarea
+                    ref={textareaRef}
+                    placeholder="Message Sapa Tazkia"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={disabled}
+                    rows={1}
+                    // ✅ [FIX 2] Hapus logic warna merah. Tetap gray-700 selamanya.
+                    className="flex-1 py-3 px-2 text-base text-gray-700 placeholder-gray-500 focus:outline-none bg-white resize-none max-h-[150px]"
+                    style={{ 
+                        lineHeight: '1.5', 
+                        minHeight: '44px' 
+                    }}
+                />
+                
+                {/* Wrapper div untuk Logic Tooltip & Button */}
+                <div className="relative group mb-1 ml-2 flex-shrink-0">
+                    <button
+                        type="submit"
+                        disabled={!isButtonEnabled}
+                        className={`h-10 w-10 flex items-center justify-center rounded-full transition-colors shadow-md ${
+                            isButtonEnabled 
+                            ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                            : 'bg-gray-300 cursor-not-allowed text-gray-500'
+                        }`}
+                        aria-label="Send Message"
+                    >
+                        <ArrowUp size={20} />
+                    </button>
+
+                    {/* Tooltip: Sekarang posisinya aman karena overflow form sudah dibuka */}
+                    {isTooLong && (
+                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-max px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none shadow-lg z-50">
+                            Message is too long
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                        </div>
+                    )}
+                </div>
+            </form>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default ChatInput;
