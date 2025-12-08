@@ -25,8 +25,19 @@ const sendChat = async (req, res) => {
 
     console.log('💬 [AI CONTROLLER] User Chat Request:', { userId, conversationId, isNewChat });
 
+    // Validasi Pesan Kosong
     if (!message || message.trim() === '') {
       return res.status(400).json({ success: false, message: "Pesan tidak boleh kosong" });
+    }
+
+    // ✅ [NEW LOGIC] PEMBATASAN KARAKTER (Security Layer)
+    // Mencegah request bypass via Postman/API yang melebihi batas frontend
+    const MAX_CHARS = 250; // Sesuaikan dengan Frontend (250)
+    if (message.length > MAX_CHARS) {
+        return res.status(400).json({ 
+            success: false, 
+            message: `Maaf, pesan terlalu panjang. Maksimal ${MAX_CHARS} karakter.` 
+        });
     }
 
     const cleanMessage = message.trim();
