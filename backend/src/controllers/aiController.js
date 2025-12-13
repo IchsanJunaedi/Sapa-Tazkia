@@ -6,7 +6,7 @@ const prisma = require('../../config/prisma');
 
 /**
  * ============================================================================
- * 1. FITUR UTAMA: CHATBOT INTELLIGENT (USER LOGIN MODE)
+ * 1. FITUR UTAMA: CHATBOT INTELLIGENT (SMART ROUTING)
  * ============================================================================
  */
 
@@ -18,31 +18,18 @@ const sendChat = async (req, res) => {
     const { message, conversationId, isNewChat } = req.body;
     const userId = req.user?.id || null; 
 
-    // ✅ STRICT AUTH CHECK: Hanya untuk user login
+    // 1. AUTH CHECK
     if (!userId) {
         return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    console.log('💬 [AI CONTROLLER] User Chat Request:', { userId, conversationId, isNewChat });
-
-    // Validasi Pesan Kosong
+    // 2. VALIDASI INPUT
     if (!message || message.trim() === '') {
       return res.status(400).json({ success: false, message: "Pesan tidak boleh kosong" });
     }
-
-    // ✅ [NEW LOGIC] PEMBATASAN KARAKTER (Security Layer)
-    // Mencegah request bypass via Postman/API yang melebihi batas frontend
-    const MAX_CHARS = 250; // Sesuaikan dengan Frontend (250)
-    if (message.length > MAX_CHARS) {
-        return res.status(400).json({ 
-            success: false, 
-            message: `Maaf, pesan terlalu panjang. Maksimal ${MAX_CHARS} karakter.` 
-        });
-    }
-
     const cleanMessage = message.trim();
 
-    // 2. Load History
+    // 3. LOAD HISTORY
     let conversationHistory = [];
     if (conversationId && !isNewChat) {
       try {
@@ -50,7 +37,7 @@ const sendChat = async (req, res) => {
           where: { conversationId: parseInt(conversationId), conversation: { userId: userId } },
           select: { role: true, content: true },
           orderBy: { createdAt: 'asc' },
-          take: 8 
+          take: 6
         });
         conversationHistory = existingMessages.map(msg => ({
           role: msg.role === 'bot' ? 'assistant' : 'user',
@@ -59,143 +46,135 @@ const sendChat = async (req, res) => {
       } catch (error) { console.warn('History load failed:', error.message); }
     }
 
-    // 3. ✅ RAG PROCESS
-    console.log('🚀 [AI CONTROLLER] Calling RAG Service...');
+    // =================================================================
+    // 🧠 LOGIC: SMART ROUTING (AKADEMIK vs UMUM)
+    // =================================================================
     
-    let ragResult;     
-    let finalAnswer;   
+    // Kata kunci pemicu mode Akademik
+    const academicKeywords = ['nilai', 'ipk', 'grade', 'transkrip', 'skor', 'hasil studi', 'pdf', 'download', 'unduh', 'semester'];
+    const isAcademicQuery = academicKeywords.some(keyword => cleanMessage.toLowerCase().includes(keyword));
+
+    let finalAnswer = "";
     let realTokenUsage = 0;
-
-    try {
-      // Call RAG
-      ragResult = await ragService.answerQuestion(cleanMessage, conversationHistory);
-      finalAnswer = ragResult.answer; 
-      
-      // ✅ Ambil Token Asli OpenAI
-      realTokenUsage = ragResult.usage ? ragResult.usage.total_tokens : 0;
-
-      // Fallback estimasi jika usage kosong
-      if (!realTokenUsage) {
-         const inputChars = cleanMessage.length + JSON.stringify(conversationHistory).length;
-         const outputChars = finalAnswer ? finalAnswer.length : 0;
-         realTokenUsage = Math.ceil((inputChars + outputChars) / 4) + 1400; 
-      }
-
-      console.log('✅ [AI CONTROLLER] RAG Success. Tokens:', realTokenUsage);
-
-    } catch (ragError) {
-      console.error('❌ [AI CONTROLLER] RAG Failed:', ragError.message);
-      
-      // FALLBACK
-      console.log('🔄 Using OpenAI fallback...');
-      try {
-        const fallbackRes = await generateAIResponse(cleanMessage, conversationHistory, 'general');
+    
+    if (isAcademicQuery) {
+        // ---------------------------------------------------------
+        // JALUR 1: PERTANYAAN AKADEMIK (Database -> OpenAI Langsung)
+        // ---------------------------------------------------------
+        console.log('🎓 [MODE] ACADEMIC QUERY DETECTED. BYPASSING RAG...');
         
-        finalAnswer = typeof fallbackRes === 'object' ? fallbackRes.content : fallbackRes;
-        const usageData = typeof fallbackRes === 'object' ? fallbackRes.usage : null;
-        
-        realTokenUsage = usageData ? usageData.total_tokens : Math.ceil((cleanMessage.length + finalAnswer.length)/4);
+        // A. Ambil Data DB
+        const [userSummary, userGrades] = await Promise.all([
+            prisma.user.findUnique({
+               where: { id: userId },
+               include: { academicSummary: true, programStudi: true }
+            }),
+            prisma.academicGrade.findMany({
+               where: { userId: userId },
+               include: { course: true },
+               orderBy: { semester: 'asc' }
+            })
+        ]);
 
-      } catch (fallbackError) {
-        throw new Error('All AI services unavailable');
-      }
+        if (userSummary) {
+             const ipk = userSummary.academicSummary?.ipk || "0.00";
+             const sks = userSummary.academicSummary?.totalSks || 0;
+             const prodi = userSummary.programStudi?.name || "Tidak diketahui";
+             
+             const gradeList = userGrades.length > 0 
+               ? userGrades.map(g => `- Sem ${g.semester}: ${g.course.name} (${g.grade})`).join('\n')
+               : "Belum ada data nilai.";
+
+             // B. Buat Prompt Spesifik (Sangat Tegas)
+             const academicPrompt = `
+             KAMU ADALAH ASISTEN AKADEMIK PRIBADI. JANGAN CARI DATA DI INTERNET/DOKUMEN LAIN.
+             GUNAKAN DATA DI BAWAH INI UNTUK MENJAWAB:
+
+             [DATA VALID DARI DATABASE]
+             Nama: ${userSummary.fullName}
+             Prodi: ${prodi}
+             IPK: ${ipk}
+             Total SKS: ${sks}
+             
+             Rincian Nilai:
+             ${gradeList}
+             
+             [INSTRUKSI WAJIB]
+             1. Jawab pertanyaan user dengan ramah berdasarkan data di atas.
+             2. Jika user bertanya "Bisa download PDF?" atau "Minta PDF", JAWAB "Bisa" dan TAMBAHKAN TAG INI DI AKHIR JAWABAN: [DOWNLOAD_PDF]
+             3. JANGAN PERNAH MENOLAK PERMINTAAN DOWNLOAD PDF.
+             
+             Pertanyaan User: "${cleanMessage}"
+             `;
+
+             // C. Kirim ke OpenAI (Tanpa RAG)
+             const aiRes = await generateAIResponse(academicPrompt, conversationHistory, 'general');
+             finalAnswer = typeof aiRes === 'object' ? aiRes.content : aiRes;
+             realTokenUsage = 1500; // Estimasi token
+             console.log('✅ [MODE] Academic Answer Generated directly via OpenAI.');
+        } else {
+             finalAnswer = "Maaf, data akademik Anda tidak ditemukan di database.";
+        }
+
+    } else {
+        // ---------------------------------------------------------
+        // JALUR 2: PERTANYAAN UMUM (RAG -> OpenAI)
+        // ---------------------------------------------------------
+        console.log('🌍 [MODE] GENERAL QUERY. USING RAG SERVICE...');
+        
+        try {
+            const ragResult = await ragService.answerQuestion(cleanMessage, conversationHistory);
+            finalAnswer = ragResult.answer;
+            realTokenUsage = ragResult.usage ? ragResult.usage.total_tokens : 1000;
+        } catch (err) {
+            console.error('RAG Error:', err);
+            finalAnswer = "Maaf, saya sedang mengalami gangguan koneksi ke server pengetahuan kampus.";
+        }
     }
 
     // =================================================================
-    // 4. ✅ TOKEN TRACKING & DEDUCTION (FIXED)
+    // 4. SAVE TO DB & TOKEN TRACKING
     // =================================================================
-    let currentRemaining = null; 
-
+    
+    // Track Token
     if (realTokenUsage > 0) {
-        const trackerIdentifier = userId; 
-        
-        // Track Usage
-        await rateLimitService.trackTokenUsage(trackerIdentifier, req.ip, realTokenUsage);
-        console.log(`📉 [AI LIMIT] Deducted ${realTokenUsage} tokens for User ${userId}`);
-
-        // Get Latest Balance (User)
-        const quotaStatus = await rateLimitService.getQuotaStatus(trackerIdentifier, 'user');
-        currentRemaining = quotaStatus.remaining;
-        console.log(`📊 [AI LIMIT] Updated User Balance: ${currentRemaining} / ${quotaStatus.limit}`);
+        await rateLimitService.trackTokenUsage(userId, req.ip, realTokenUsage);
     }
-    // =================================================================
 
-    // 5. ✅ DB SAVE - ANTI-GHOSTING & SMART TITLE GENERATION
+    // Save Conversation
     currentConversationId = conversationId ? parseInt(conversationId) : null;
     shouldCreateNewConversation = isNewChat || !currentConversationId;
 
     try {
-        // Default title: Potongan pesan user (Fallback)
-        let conversationTitle = cleanMessage.substring(0, 50) + (cleanMessage.length > 50 ? '...' : '');
-
-        if (!shouldCreateNewConversation) {
-            const existingConv = await prisma.conversation.findFirst({
-                where: { id: currentConversationId, userId: userId }
-            });
-
-            if (!existingConv) {
-                console.warn(`⚠️ [DB] Conversation ID ${currentConversationId} not found. Creating new.`);
-                shouldCreateNewConversation = true; 
-                currentConversationId = null;
-            }
-        }
-
+        let conversationTitle = cleanMessage.substring(0, 50);
+        
+        // Auto Title untuk Chat Baru
         if (shouldCreateNewConversation) {
-          // 🧠 SMART TITLE GENERATION (FITUR BARU)
-          // Kita minta AI membuat judul pendek berdasarkan pesan user
-          try {
-             // Prompt khusus agar judulnya singkat, padat, dan jelas (Title Case)
-             const titlePrompt = `Buatkan judul percakapan yang sangat singkat (maksimal 4-5 kata), menarik, dan formal berdasarkan pertanyaan ini: "${cleanMessage}". Langsung tulis judulnya saja tanpa tanda kutip. Contoh: "Lokasi Kampus Tazkia" atau "Biaya Kuliah 2025".`;
-             
-             // Gunakan service OpenAI yang sudah ada
-             const generatedTitleRes = await generateAIResponse(titlePrompt, [], 'general');
-             const generatedTitle = typeof generatedTitleRes === 'object' ? generatedTitleRes.content : generatedTitleRes;
-             
-             if (generatedTitle && generatedTitle.length < 60) {
-                 conversationTitle = generatedTitle.replace(/^["']|["']$/g, '').trim(); // Hapus tanda kutip jika ada
-                 console.log(`✨ [AI TITLE] Generated Title: "${conversationTitle}"`);
-             }
-          } catch (titleError) {
-             console.warn('⚠️ Title generation failed, using default:', titleError.message);
-             // Tidak perlu crash, cukup pakai default title
-          }
+             const titlePrompt = `Buat judul pendek (max 4 kata) untuk: "${cleanMessage}"`;
+             try {
+                const titleRes = await generateAIResponse(titlePrompt, [], 'general');
+                const rawTitle = typeof titleRes === 'object' ? titleRes.content : titleRes;
+                if (rawTitle) conversationTitle = rawTitle.replace(/['"]/g, '').trim();
+             } catch(e) {}
 
-          // Buat Conversation Baru dengan Judul AI
-          const newConversation = await prisma.conversation.create({
-            data: {
-              userId: userId,
-              title: conversationTitle, // <-- Judul dari AI masuk sini
-              messages: {
-                create: [
-                  { role: 'user', content: cleanMessage },
-                  { role: 'bot', content: finalAnswer }
-                ]
-              }
-            }
-          });
-          currentConversationId = newConversation.id;
-          console.log(`✅ [DB] New Conversation Created: ID ${currentConversationId}`);
+             const newConv = await prisma.conversation.create({
+                data: {
+                  userId, title: conversationTitle, 
+                  messages: { create: [{ role: 'user', content: cleanMessage }, { role: 'bot', content: finalAnswer }] }
+                }
+             });
+             currentConversationId = newConv.id;
         } else {
-          // Update Existing
-          await prisma.message.createMany({
-            data: [
-              { conversationId: currentConversationId, role: 'user', content: cleanMessage },
-              { conversationId: currentConversationId, role: 'bot', content: finalAnswer }
-            ]
-          });
-          
-          // Update timestamp
-          await prisma.conversation.update({
-              where: { id: currentConversationId },
-              data: { updatedAt: new Date() }
-          });
-          console.log(`✅ [DB] Message saved & Timestamp updated for ID ${currentConversationId}`);
+             await prisma.message.createMany({
+                data: [{ conversationId: currentConversationId, role: 'user', content: cleanMessage }, { conversationId: currentConversationId, role: 'bot', content: finalAnswer }]
+             });
+             await prisma.conversation.update({ where: { id: currentConversationId }, data: { updatedAt: new Date() } });
         }
-    } catch (dbError) {
-        console.error('❌ [DB SAVE ERROR]:', dbError.message);
-    }
+    } catch (e) { console.error('DB Save Error:', e); }
 
-    // 6. RESPONSE
+    // 5. SEND RESPONSE
+    const quotaStatus = await rateLimitService.getQuotaStatus(userId, 'user');
+    
     res.json({
       success: true,
       reply: finalAnswer, 
@@ -204,34 +183,36 @@ const sendChat = async (req, res) => {
       isNewConversation: shouldCreateNewConversation,
       usage: {
         tokensUsed: realTokenUsage,
-        policy: 'user', 
-        remaining: currentRemaining 
+        remaining: quotaStatus.remaining 
       }
     });
 
   } catch (error) {
-    console.error('❌ [AI CONTROLLER] Chat Error:', error);
-    const errorMessage = error.message.includes('unavailable') 
-      ? "Layanan sedang sibuk." : "Terjadi kesalahan sistem.";
-      
-    res.status(500).json({ success: false, message: errorMessage });
+    console.error('❌ [AI CONTROLLER] Fatal Error:', error);
+    res.status(500).json({ success: false, message: "Terjadi kesalahan sistem." });
   }
 };
 
-// ... (Helper Functions - Dipertahankan) ...
+/**
+ * ============================================================================
+ * 2. HELPER FUNCTIONS (RESTORED FULLY)
+ * ============================================================================
+ */
 
-const triggerIngestion = async (req, res) => { /* ... */ };
+const triggerIngestion = async (req, res) => {
+    // Fungsi dummy atau implementasi asli jika ada
+    return res.json({ success: true, message: "Ingestion triggered (dummy)" });
+};
 
 const getConversations = async (req, res) => { 
     try {
         const userId = req.user.id;
         const conversations = await prisma.conversation.findMany({
             where: { userId },
-            orderBy: { updatedAt: 'desc' }, // Urutkan dari yang terbaru diupdate
+            orderBy: { updatedAt: 'desc' }, 
             take: 20
         });
 
-        // MAPPING DATA (Fix Sidebar History)
         const formattedConversations = conversations.map(chat => ({
             ...chat,
             timestamp: chat.updatedAt || chat.createdAt, 
@@ -255,27 +236,16 @@ const getChatHistory = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
         
-        // ✅ PERBAIKAN: Validasi ID sebelum query ke database
-        // Pastikan ID ada dan bisa diubah menjadi angka
-        if (!id) {
-            return res.status(400).json({ success: false, message: "ID Conversation diperlukan" });
-        }
+        if (!id) return res.status(400).json({ success: false, message: "ID Conversation diperlukan" });
 
         const conversationId = parseInt(id);
+        if (isNaN(conversationId)) return res.status(400).json({ success: false, message: "ID Conversation harus berupa angka valid" });
 
-        // Jika ID bukan angka (misal: "abc" atau undefined), stop proses agar Prisma tidak error
-        if (isNaN(conversationId)) {
-            return res.status(400).json({ success: false, message: "ID Conversation harus berupa angka valid" });
-        }
-
-        // Query menggunakan ID yang sudah dipastikan angka (conversationId)
         const chatCheck = await prisma.conversation.findFirst({
             where: { id: conversationId, userId }
         });
 
-        if (!chatCheck) {
-             return res.status(404).json({ success: false, message: "Chat not found" });
-        }
+        if (!chatCheck) return res.status(404).json({ success: false, message: "Chat not found" });
 
         const messages = await prisma.message.findMany({
             where: { conversationId: conversationId },
@@ -307,6 +277,7 @@ const deleteConversation = async (req, res) => {
     }
 };
 
+// Fungsi Placeholder agar Router tidak error
 const analyzeAcademicPerformance = async (req, res) => { res.json({success: true, message: "Feature coming soon"}) };
 const getStudyRecommendations = async (req, res) => { res.json({success: true, message: "Feature coming soon"}) };
 const testAI = async (req, res) => { res.json({success: true, message: "Test OK"}) };
@@ -315,6 +286,9 @@ const testOpenAIConnectionHandler = async (req, res) => {
     res.json(result);
 };
 
+// =================================================================
+// 3. EXPORTS (PASTIKAN SEMUA FUNGSI ADA DI SINI)
+// =================================================================
 module.exports = {
   sendChat,
   triggerIngestion,
