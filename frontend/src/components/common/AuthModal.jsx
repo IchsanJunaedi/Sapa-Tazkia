@@ -3,6 +3,7 @@ import { X, Mail, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axiosConfig';
+import Swal from 'sweetalert2'; // ✅ 1. Import SweetAlert2
 
 // Komponen ikon Google
 const GoogleIcon = () => (
@@ -174,8 +175,11 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
     onClose();
   };
 
-  // ✅ PERBAIKAN: Handle Continue dengan redirect ke AboutYouPage
-  const handleContinue = async () => {
+  // ✅ PERBAIKAN: Handle Continue dengan redirect ke AboutYouPage dan POPUP
+  const handleContinue = async (e) => {
+    // ✅ 2. Cegah Refresh Halaman
+    if (e) e.preventDefault(); 
+
     if (!email) {
       setError('Email atau NIM harus diisi');
       return;
@@ -234,7 +238,43 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
       }
     } catch (err) {
       console.error('❌ [AUTH MODAL] Auth failed:', err);
-      setError(err.message || 'Terjadi kesalahan saat autentikasi');
+      const errorMessage = err.message || 'Terjadi kesalahan saat autentikasi';
+      
+      setError(errorMessage);
+
+      // ✅ 3. LOGIKA POP UP SWEETALERT2
+      if (
+        errorMessage.toLowerCase().includes('already registered') || 
+        errorMessage.toLowerCase().includes('sudah terdaftar')
+      ) {
+        Swal.fire({
+          title: 'Email Sudah Terdaftar!',
+          text: 'Sepertinya kamu sudah pernah mendaftar dengan email ini.',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#111827', // Sesuai tema tombol kamu (gray-900)
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'Login Saja',
+          cancelButtonText: 'Gunakan Email Lain',
+          background: '#fff',
+          borderRadius: '1rem',
+          customClass: {
+            popup: 'rounded-2xl', // Agar lebih rounded dan modern
+            confirmButton: 'rounded-xl px-4 py-2',
+            cancelButton: 'rounded-xl px-4 py-2'
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            // User memilih Login Saja: Reset error agar bersih
+            setError('');
+          } else {
+            // User memilih Gunakan Email Lain: Kosongkan field
+            setEmail('');
+            setError('');
+          }
+        });
+      }
+
     } finally {
       setIsLoading(false);
     }
@@ -338,7 +378,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && email && !isLoading) {
       if (step === 0) {
-        handleContinue();
+        handleContinue(e); // ✅ Pastikan 'e' dikirim di sini juga
       }
     }
   };
