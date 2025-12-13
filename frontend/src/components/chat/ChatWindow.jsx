@@ -99,7 +99,8 @@ const formatMessageContent = (text) => {
 // 💬 INTERNAL COMPONENT: Single Chat Message
 // ==========================================
 
-const SingleChatMessage = ({ message }) => {
+// ✅ UPDATE: Terima prop onDownloadPDF
+const SingleChatMessage = ({ message, onDownloadPDF }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
 
@@ -205,11 +206,15 @@ const SingleChatMessage = ({ message }) => {
               </button>
             )}
             
-            {/* PDF Download Button */}
-            {message.hasPDF && !isTyping && (
-              <button className="glass-effect-download mt-3 w-full flex items-center justify-center space-x-2 px-4 py-2 bg-white/30 hover:bg-white/40 rounded-lg transition-all duration-300 text-sm font-medium text-gray-700 backdrop-blur-sm border border-white/20">
+            {/* ✅ PDF Download Button (UPDATED) */}
+            {/* Cek hasPdfButton (dari ChatPage) atau hasPDF (legacy) */}
+            {(message.hasPdfButton || message.hasPDF) && !isTyping && (
+              <button 
+                onClick={onDownloadPDF} // ✅ Panggil fungsi download
+                className="glass-effect-download mt-3 w-full flex items-center justify-center space-x-2 px-4 py-2 bg-white/30 hover:bg-white/40 rounded-lg transition-all duration-300 text-sm font-medium text-gray-700 backdrop-blur-sm border border-white/20 hover:text-orange-600 hover:border-orange-200"
+              >
                 <Download size={16} />
-                <span>Unduh Nilai Semester 2 (PDF)</span>
+                <span>Download Transkrip PDF</span>
               </button>
             )}
           </div>
@@ -254,7 +259,8 @@ const SingleChatMessage = ({ message }) => {
 // 🚀 MAIN COMPONENT: Chat Window Container
 // ==========================================
 
-const ChatWindow = ({ messages, isLoading, error }) => {
+// ✅ UPDATE: Terima prop onDownloadPDF
+const ChatWindow = ({ messages, isLoading, error, onDownloadPDF }) => {
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -329,13 +335,13 @@ const ChatWindow = ({ messages, isLoading, error }) => {
   // --- CONTENT STATE (Daftar Pesan) ---
   return (
     <div className="flex flex-col space-y-2 pb-4 w-full"> 
-      {/* ✅ FIX LAYOUT: 
-        Kita hapus semua properti yang bikin 'box' (overflow, height, bg).
-        Sekarang dia murni container flex yang lebar.
-      */}
       
       {messages.map((msg, index) => (
-        <SingleChatMessage key={index} message={msg} />
+        <SingleChatMessage 
+            key={index} 
+            message={msg} 
+            onDownloadPDF={onDownloadPDF} // ✅ Pass function ke child
+        />
       ))}
       
       {/* Loading Indicator */}
