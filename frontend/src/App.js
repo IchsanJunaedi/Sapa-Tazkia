@@ -9,6 +9,9 @@ import AuthCallback from './pages/AuthCallback';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
+// ✅ NEW: Import Halaman Akademik
+import AcademicPage from './pages/AcademicPage';
+
 function App() {
   return (
     <Router>
@@ -29,8 +32,18 @@ function App() {
               </ProtectedRoute>
             } 
           />
+
+          {/* ✅ NEW: Route untuk Halaman Akademik (Nilai & PDF) */}
+          <Route 
+            path="/academic" 
+            element={
+              <ProtectedRoute>
+                <AcademicPage />
+              </ProtectedRoute>
+            } 
+          />
           
-          {/* ✅ PERBAIKAN DI SINI: Dua Route untuk ChatPage */}
+          {/* Route untuk ChatPage */}
           
           {/* 1. Route untuk New Chat (Chat Baru) */}
           <Route 
