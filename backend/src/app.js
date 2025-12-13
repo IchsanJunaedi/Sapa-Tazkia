@@ -9,6 +9,7 @@ const authRoutes = require('./routes/authRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const guestRoutes = require('./routes/guestRoutes');
 const rateLimitRoutes = require('./routes/rateLimitRoutes'); // ✅ NEW: Rate limit routes
+const academicRoutes = require('./routes/academicRoutes');   // ✅ NEW: Academic Routes (Ditambahkan)
 
 // Import services
 const authService = require('./services/authService');
@@ -26,7 +27,7 @@ const prisma = new PrismaClient();
 // ✅ NEW: Initialize rate limit system dengan error handling
 const initializeRateLimitSystem = async () => {
   try {
-    // ✅ FIX: Coba berbagai path yang mungkin
+    // ✅ FIX: Coba berbagai path yang mungkin untuk jobs
     let rateLimitJobs;
     try {
       rateLimitJobs = require('./jobs/rateLimitJobs');
@@ -35,7 +36,7 @@ const initializeRateLimitSystem = async () => {
         rateLimitJobs = require('../jobs/rateLimitJobs');
       } catch (error2) {
         console.warn('⚠️ [RATE LIMIT] Rate limit jobs not found, continuing without background jobs');
-        return;
+        // Jangan return dulu, coba lanjut inisialisasi service lain jika memungkinkan
       }
     }
     
@@ -45,13 +46,22 @@ const initializeRateLimitSystem = async () => {
     }
     
     // Test Redis connection
-    const redisService = require('./services/redisService');
-    const redisHealth = await redisService.healthCheck();
-    console.log(`✅ [RATE LIMIT] Redis connection: ${redisHealth ? 'HEALTHY' : 'UNHEALTHY'}`);
+    try {
+        const redisService = require('./services/redisService');
+        const redisHealth = await redisService.healthCheck();
+        console.log(`✅ [RATE LIMIT] Redis connection: ${redisHealth ? 'HEALTHY' : 'UNHEALTHY'}`);
+    } catch (redisError) {
+        console.warn(`⚠️ [RATE LIMIT] Redis check failed: ${redisError.message}`);
+    }
     
-    // Initialize rate limit service
-    const rateLimitService = require('./services/rateLimitService');
-    console.log('✅ [RATE LIMIT] Rate limit service ready');
+    // Initialize rate limit service check (optional but good for verification)
+    try {
+        const rateLimitService = require('./services/rateLimitService');
+        // Jika ada method init atau check di service, panggil di sini
+        console.log('✅ [RATE LIMIT] Rate limit service ready');
+    } catch (serviceError) {
+         console.warn(`⚠️ [RATE LIMIT] Rate limit service load failed: ${serviceError.message}`);
+    }
     
   } catch (error) {
     console.error('❌ [RATE LIMIT] Failed to initialize rate limit system:', error.message);
@@ -79,7 +89,7 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       return callback(null, true);
     } else {
-      console.log('🔒 CORS Blocked:', origin);
+      // console.log('🔒 CORS Blocked:', origin); // Optional logging
       return callback(new Error(`CORS policy: Origin ${origin} not allowed`), false);
     }
   },
@@ -156,7 +166,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   
-  // ✅ NEW: Add rate limit headers to all responses
+  // ✅ NEW: Add rate limit headers to all responses (Default values)
   if (!res.get('X-RateLimit-Limit')) {
     res.setHeader('X-RateLimit-Limit', 'unknown');
     res.setHeader('X-RateLimit-Remaining', 'unknown');
@@ -208,7 +218,7 @@ app.get('/', (req, res) => {
   res.json({
     success: true,
     message: '🚀 Sapa Tazkia Backend API',
-    version: '4.0.0', // ✅ UPDATE VERSION - Rate Limit Integration
+    version: '4.1.0', // ✅ UPDATE VERSION - Academic Routes Added
     status: 'running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
@@ -225,6 +235,7 @@ app.get('/', (req, res) => {
       auth: '/api/auth',
       ai: '/api/ai',
       guest: '/api/guest',
+      academic: '/api/academic', // ✅ NEW: Academic endpoint info
       rateLimit: '/api/rate-limit', // ✅ NEW: Rate limit endpoints
       health: '/health',
       status: '/status'
@@ -435,6 +446,9 @@ app.use('/api/guest', guestRoutes);
 // ✅ NEW: Rate limit routes - For monitoring and management
 app.use('/api/rate-limit', rateLimitRoutes);
 
+// ✅ NEW: Academic Routes (Ditambahkan sesuai request)
+app.use('/api/academic', academicRoutes);
+
 // ========================================================
 // ERROR HANDLING MIDDLEWARE - ENHANCED WITH RATE LIMIT ERRORS
 // ========================================================
@@ -490,6 +504,12 @@ app.use('*', (req, res) => {
         'GET  /api/ai/public-test',
         'POST /api/ai/reset-knowledge',
         'GET  /api/ai/rate-limit-status' // ✅ NEW
+      ],
+      academic: [ // ✅ NEW: Academic Routes Info
+        'GET /api/academic/summary',
+        'GET /api/academic/grades',
+        'GET /api/academic/transcript',
+        'POST /api/academic/analyze'
       ],
       rateLimit: [ // ✅ NEW: Rate limit endpoints
         'GET  /api/rate-limit/status',
@@ -699,6 +719,12 @@ const server = app.listen(PORT, async () => {
   console.log('   GET  /status ................... System status (+Rate Limit Config)');
   console.log('   GET  /session-debug ............ Session debug (+Rate Limit Context)');
   console.log('   GET  /test .................... Test route (+Rate Limit Headers)');
+  console.log('');
+  console.log('🎓 ACADEMIC ENDPOINTS:'); // ✅ NEW LOGS
+  console.log('   GET  /api/academic/summary ..... Academic Summary');
+  console.log('   GET  /api/academic/grades ...... Student Grades');
+  console.log('   GET  /api/academic/transcript .. Full Transcript');
+  console.log('   POST /api/academic/analyze ..... AI Performance Analysis');
   console.log('');
   console.log('🤖 AI ENDPOINTS (Guest & Auth):');
   console.log('   POST /api/ai/chat ............. AI Chat dengan RAG (+Rate Limited)');
