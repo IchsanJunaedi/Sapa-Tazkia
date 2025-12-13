@@ -5,6 +5,7 @@ import api from '../api/axiosConfig';
 import { Plus, X, ArrowUp } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Sidebar from '../components/layout/SideBar';
+import Swal from 'sweetalert2'; // ✅ TAMBAHAN: Import SweetAlert2
 
 // --- Komponen GradientText ---
 const GradientText = ({ children, className = '' }) => {
@@ -281,7 +282,42 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
       }
     } catch (err) {
       console.error('❌ [AUTH MODAL] Auth failed:', err);
-      setError(err.message || 'Terjadi kesalahan saat autentikasi');
+      const errorMessage = err.message || 'Terjadi kesalahan saat autentikasi';
+      setError(errorMessage);
+
+      // ✅ TAMBAHAN: POP UP SWEETALERT jika email sudah terdaftar
+      if (
+        errorMessage.toLowerCase().includes('already registered') || 
+        errorMessage.toLowerCase().includes('sudah terdaftar')
+      ) {
+        Swal.fire({
+          title: 'Email Sudah Terdaftar!',
+          text: 'Sepertinya kamu sudah pernah mendaftar dengan email ini.',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#111827', // Warna dark grey sesuai tema (gray-900)
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'Login Saja',
+          cancelButtonText: 'Gunakan Email Lain',
+          background: '#fff',
+          borderRadius: '1rem',
+          customClass: {
+            popup: 'rounded-2xl',
+            confirmButton: 'rounded-xl px-4 py-2',
+            cancelButton: 'rounded-xl px-4 py-2'
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            // Jika user memilih Login, hilangkan pesan error agar bersih
+            setError('');
+          } else {
+            // Jika user memilih email lain, kosongkan form
+            setEmail('');
+            setError('');
+          }
+        });
+      }
+
     } finally {
       setIsLoading(false);
     }
