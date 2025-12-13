@@ -3,31 +3,28 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
 import { sendMessageToAI } from '../api/aiService'; 
-import { Plus, ArrowUp, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Plus, ArrowUp, MoreHorizontal, Trash2} from 'lucide-react'; // ✅ Import Icon Download
 import ConfirmationModal from '../components/ConfirmationModal';
 import Sidebar from '../components/layout/SideBar';
 import ChatWindow from '../components/chat/ChatWindow'; 
-import RateLimitStatus from '../components/common/RateLimitStatus'; 
+import RateLimitStatus from '../components/common/RateLimitStatus';
+import { generateTranscriptPDF } from '../utils/pdfGenerator'; // ✅ Import PDF Generator
 
-// --- Komponen ChatInput (FIXED: Direct DOM Manipulation) ---
+// --- 1. Komponen ChatInput (FIXED: Direct DOM Manipulation) ---
 const ChatInput = ({ onSend, disabled }) => {
     const [input, setInput] = useState('');
     const textareaRef = useRef(null);
     const formRef = useRef(null);
-
-    // Batas Maksimal 250 Karakter
     const MAX_CHARS = 250;
     const isTooLong = input.length > MAX_CHARS;
 
     const adjustHeightAndShape = () => {
         const textarea = textareaRef.current;
         const form = formRef.current;
-        
         if (textarea && form) {
             textarea.style.height = 'auto'; 
             const currentHeight = textarea.scrollHeight;
             textarea.style.height = `${Math.min(currentHeight, 150)}px`;
-
             if (currentHeight > 52) {
                 form.style.borderRadius = '1.5rem'; 
             } else {
@@ -38,11 +35,9 @@ const ChatInput = ({ onSend, disabled }) => {
 
     const handleSubmit = (e) => {
         if (e) e.preventDefault();
-        
         if (input.trim() && !isTooLong && !disabled) {
             onSend(input.trim());
             setInput('');
-            
             if (textareaRef.current && formRef.current) {
                 textareaRef.current.style.height = 'auto';
                 formRef.current.style.borderRadius = '30px';
@@ -68,7 +63,6 @@ const ChatInput = ({ onSend, disabled }) => {
             <form 
                 ref={formRef}
                 onSubmit={handleSubmit} 
-                // ✅ [FIX 1] Hapus 'overflow-hidden' agar tooltip bisa keluar dari kotak
                 className="w-full max-w-3xl flex items-end p-2 bg-white border border-gray-300 shadow-xl transition-all duration-200 ease-out relative"
                 style={{ borderRadius: '30px' }} 
             >
@@ -84,15 +78,10 @@ const ChatInput = ({ onSend, disabled }) => {
                     onKeyDown={handleKeyDown}
                     disabled={disabled}
                     rows={1}
-                    // ✅ [FIX 2] Hapus logic warna merah. Tetap gray-700 selamanya.
                     className="flex-1 py-3 px-2 text-base text-gray-700 placeholder-gray-500 focus:outline-none bg-white resize-none max-h-[150px]"
-                    style={{ 
-                        lineHeight: '1.5', 
-                        minHeight: '44px' 
-                    }}
+                    style={{ lineHeight: '1.5', minHeight: '44px' }}
                 />
                 
-                {/* Wrapper div untuk Logic Tooltip & Button */}
                 <div className="relative group mb-1 ml-2 flex-shrink-0">
                     <button
                         type="submit"
@@ -106,8 +95,6 @@ const ChatInput = ({ onSend, disabled }) => {
                     >
                         <ArrowUp size={20} />
                     </button>
-
-                    {/* Tooltip: Sekarang posisinya aman karena overflow form sudah dibuka */}
                     {isTooLong && (
                         <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-max px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none shadow-lg z-50">
                             Message is too long
@@ -120,7 +107,7 @@ const ChatInput = ({ onSend, disabled }) => {
     );
 };
 
-// --- Komponen Utama ChatPage (TIDAK ADA PERUBAHAN LOGIC) ---
+// --- 2. Komponen Utama ChatPage (MODIFIED FOR PDF FEATURE) ---
 const ChatPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -133,7 +120,7 @@ const ChatPage = () => {
     const [error, setError] = useState(null); 
     const [isStartingNewChat, setIsStartingNewChat] = useState(false);
     
-    // 1. IS GUEST INITIALIZATION
+    // IS GUEST INITIALIZATION
     const [isGuest, setIsGuest] = useState(() => {
         if (location.state && typeof location.state.isGuest !== 'undefined') {
             return location.state.isGuest;
@@ -148,15 +135,12 @@ const ChatPage = () => {
         return !!storageGuest;
     });
 
-    // 2. CURRENT CHAT ID INITIALIZATION
+    // CURRENT CHAT ID INITIALIZATION
     const [currentChatId, setCurrentChatId] = useState(() => {
         if (chatId) return chatId;
-
         if (location.state?.initialMessage || location.state?.fromLandingPage) {
-            console.log('🚀 [CHAT PAGE] Initializing New Chat from Landing Page');
             return null; 
         }
-
         const saved = localStorage.getItem('chatpage_state');
         if (saved) {
             try {
@@ -187,14 +171,12 @@ const ChatPage = () => {
         hasRestoredFromUrl: false 
     });
 
-    // 3. IS NEW CHAT INITIALIZATION
+    // IS NEW CHAT INITIALIZATION
     const [isNewChat, setIsNewChat] = useState(() => {
         if (chatId) return false;
-
         if (location.state?.initialMessage || location.state?.fromLandingPage) {
             return true;
         }
-
         const saved = localStorage.getItem('chatpage_state');
         if (saved) {
             try {
@@ -209,10 +191,7 @@ const ChatPage = () => {
 
     // Save state ke localStorage
     useEffect(() => {
-        if (isGuest) {
-            return;
-        }
-
+        if (isGuest) return;
         const timeoutId = setTimeout(() => {
             const stateToSave = {
                 isNewChat,
@@ -222,7 +201,6 @@ const ChatPage = () => {
             };
             localStorage.setItem('chatpage_state', JSON.stringify(stateToSave));
         }, 100);
-
         return () => clearTimeout(timeoutId);
     }, [isNewChat, currentChatId, messages, isGuest]);
 
@@ -263,10 +241,7 @@ const ChatPage = () => {
             setChatHistory([]);
             return;
         }
-
-        if (!user || !user.id) {
-            return;
-        }
+        if (!user || !user.id) return;
 
         try {
             const response = await api.get('/api/ai/conversations');
@@ -286,8 +261,6 @@ const ChatPage = () => {
     useEffect(() => {
         if (chatId && isAuthenticated && !isGuest && !initializationRef.current.hasRestoredFromUrl) {
             if (messages.length === 0 || currentChatId !== chatId) {
-                console.log(`🔄 [CHAT PAGE] Restoring chat from URL: ${chatId}`);
-                
                 initializationRef.current.hasRestoredFromUrl = true;
                 
                 setCurrentChatId(chatId);
@@ -298,7 +271,9 @@ const ChatPage = () => {
                 api.get(`/api/ai/history/${chatId}`)
                     .then(response => {
                         if (response.data && Array.isArray(response.data.messages)) {
-                            setMessages(response.data.messages);
+                            // ✅ PROCESS MESSAGES FOR PDF TAG
+                            const processedMessages = response.data.messages.map(msg => processMessageContent(msg));
+                            setMessages(processedMessages);
                         } else {
                             setMessages([]);
                         }
@@ -366,6 +341,35 @@ const ChatPage = () => {
         setChatToDelete(null);
     };
 
+    // ✅ HELPER: Process Message Content (Detect PDF Tag)
+    const processMessageContent = (msg) => {
+        // Cek jika pesan mengandung tag khusus
+        if (msg.role === 'bot' && msg.content && msg.content.includes('[DOWNLOAD_PDF]')) {
+             return {
+                 ...msg,
+                 content: msg.content.replace('[DOWNLOAD_PDF]', '').trim(),
+                 hasPdfButton: true // Flag untuk menampilkan tombol
+             };
+        }
+        return msg;
+    };
+
+    // ✅ NEW FUNCTION: Handle PDF Download from Chat Button
+    const handleDownloadPDF = async () => {
+        try {
+            // Kita fetch data terbaru biar valid
+            const response = await api.get('/api/academic/transcript');
+            if (response.data.success) {
+                generateTranscriptPDF(response.data.data);
+            } else {
+                alert('Gagal mengambil data transkrip.');
+            }
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Terjadi kesalahan saat mengunduh PDF.');
+        }
+    };
+
     // HANDLE AI MESSAGE UPDATED
     const handleAIMessage = useCallback(async (messageText, isGuestMode = false, isInitialMessage = false, forceNewChat = false) => {
         if (initializationRef.current.hasUserInitiatedNewChat && isInitialMessage) {
@@ -389,12 +393,22 @@ const ChatPage = () => {
                 effectiveCurrentChatId
             );
             
+            // ✅ PROCESS RESPONSE FOR PDF TAG
+            let botContent = response.message || response.reply || 'Maaf, tidak ada respons dari AI.';
+            let hasPdfButton = false;
+
+            if (botContent.includes('[DOWNLOAD_PDF]')) {
+                botContent = botContent.replace('[DOWNLOAD_PDF]', '').trim();
+                hasPdfButton = true;
+            }
+
             const botMessage = {
                 id: Date.now() + 1,
-                content: response.message || response.reply || 'Maaf, tidak ada respons dari AI.',
+                content: botContent,
                 sender: 'ai',
                 role: 'bot',
                 timestamp: response.timestamp || new Date().toISOString(),
+                hasPdfButton: hasPdfButton // ✅ Simpan flag di state
             };
 
             setMessages(prev => [...prev, botMessage]);
@@ -494,7 +508,9 @@ const ChatPage = () => {
         try {
             const response = await api.get(`/api/ai/history/${chatId}`);
             if (response.data && Array.isArray(response.data.messages)) {
-                setMessages(response.data.messages);
+                // ✅ PROCESS HISTORY FOR PDF TAG
+                const processedMessages = response.data.messages.map(msg => processMessageContent(msg));
+                setMessages(processedMessages);
             } else {
                 setMessages([]);
             }
@@ -736,6 +752,8 @@ const ChatPage = () => {
                             userName={user ? getUserName() : null}
                             isGuest={isGuest}
                             error={error}
+                            // ✅ PASS PDF FUNCTION PROP KE CHATWINDOW
+                            onDownloadPDF={handleDownloadPDF} 
                         />
                     </div>
                 </div>
