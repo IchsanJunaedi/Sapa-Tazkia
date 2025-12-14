@@ -46,13 +46,9 @@ const initializeRateLimitSystem = async () => {
     }
     
     // Test Redis connection
-    try {
-        const redisService = require('./services/redisService');
-        const redisHealth = await redisService.healthCheck();
-        console.log(`✅ [RATE LIMIT] Redis connection: ${redisHealth ? 'HEALTHY' : 'UNHEALTHY'}`);
-    } catch (redisError) {
-        console.warn(`⚠️ [RATE LIMIT] Redis check failed: ${redisError.message}`);
-    }
+    const redisService = require('./services/redisService');
+    const redisHealth = await redisService.healthCheck();
+    console.log(`✅ [RATE LIMIT] Redis connection: ${redisHealth ? 'HEALTHY' : 'UNHEALTHY'}`);
     
     // Initialize rate limit service check (optional but good for verification)
     try {
