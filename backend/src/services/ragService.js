@@ -13,8 +13,8 @@ const COLLECTION_NAME = 'sapa_tazkia_knowledge';
 const VECTOR_SIZE = 1536;
 
 // Context window besar untuk menampung jawaban multi-topik
-const MAX_CONTEXT_CHARS = 3500; 
-const SCORE_THRESHOLD = 0.35;
+const MAX_CONTEXT_CHARS = 2000; 
+const SCORE_THRESHOLD = 0.30;
 
 const client = new QdrantClient({ host: QDRANT_HOST, port: QDRANT_PORT });
 
@@ -208,8 +208,8 @@ class RagService {
   async answerQuestion(userMessage, conversationHistory = []) {
     try {
       // 1. Fast Path (Sapaan pendek)
-      if (userMessage.length < 4) {
-        return { answer: "Halo! Ada yang bisa Kia bantu seputar STMIK Tazkia?", usage: {}, docsFound: 0 };
+      if (userMessage.length < 5) {
+        return { answer: "Halo! Ada yang bisa Kia bantu seputar Tazkia?", usage: {}, docsFound: 0 };
       }
       
       // 2. Retrieve Docs (Hybrid: AI + Manual)
