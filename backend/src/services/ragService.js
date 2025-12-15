@@ -1,20 +1,21 @@
 const { QdrantClient } = require('@qdrant/js-client-rest');
-const openaiService = require('./openaiService'); // Pastikan ini terhubung dengan benar
+const openaiService = require('./openaiService'); // Pastikan path ini sesuai
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
 /**
  * ⚙️ KONFIGURASI RAG SERVICE - PRODUCTION GRADE (HYBRID EDITION)
+ * Project: Sapa Tazkia Chatbot
  */
 const QDRANT_HOST = process.env.QDRANT_HOST || 'localhost';
 const QDRANT_PORT = process.env.QDRANT_PORT || 6333;
 const COLLECTION_NAME = 'sapa_tazkia_knowledge';
-const VECTOR_SIZE = 1536;
+const VECTOR_SIZE = 1536; // Sesuai model embedding OpenAI (text-embedding-3-small)
 
 // Context window besar untuk menampung jawaban multi-topik
-const MAX_CONTEXT_CHARS = 2000; 
-const SCORE_THRESHOLD = 0.30;
+const MAX_CONTEXT_CHARS = 2500; 
+const SCORE_THRESHOLD = 0.30;   
 
 const client = new QdrantClient({ host: QDRANT_HOST, port: QDRANT_PORT });
 
@@ -27,43 +28,54 @@ class RagService {
   // 1. QUERY OPTIMIZATION (THE BRAIN) 🧠 - HYBRID MODE
   // =============================================================================
 
-  /**
-   * Menggabungkan kecerdasan AI (Refine) + Aturan Pasti (Manual)
-   * Agar sistem tidak hanya pintar tapi juga patuh pada aturan bisnis.
-   */
-  async generateSearchQueries(userQuery) {
+  // UPDATED: Menerima parameter 'history' untuk context awareness
+  async generateSearchQueries(userQuery, history = []) {
+    const startGen = Date.now();
     try {
-      console.log(`🧠 [RAG] Generating queries for: "${userQuery}"`);
-      
       const finalQueries = new Set();
-      
-      // 1. Masukkan Query Asli (Wajib)
       finalQueries.add(userQuery);
 
-      // 2. Jalankan Manual Expansion (KODE LAMA KAMU DIPERTAHANKAN & DIPAKAI)
-      // Ini penting untuk keyword spesifik seperti 'murabahah' -> 'margin'
       const manualQueries = this.expandQueryManually(userQuery);
-      if (manualQueries.length > 0) {
-        console.log(`   ↳ 🛠️ Manual Logic added: ${JSON.stringify(manualQueries)}`);
-        manualQueries.forEach(q => finalQueries.add(q));
-      }
+      if (manualQueries.length > 0) manualQueries.forEach(q => finalQueries.add(q));
 
-      // 3. Jalankan AI Refinement (UPGRADE BARU)
-      // Ini untuk menangani typo parah & multi-intent ("dimana dan prodi apa")
-      try {
-        const aiQueries = await openaiService.refineQuery(userQuery);
-        if (Array.isArray(aiQueries) && aiQueries.length > 0) {
-            console.log(`   ↳ 🤖 AI Logic added: ${JSON.stringify(aiQueries)}`);
-            aiQueries.forEach(q => finalQueries.add(q));
-        }
-      } catch (aiError) {
-        console.warn('⚠️ [RAG] AI Refiner busy, proceeding with Manual+Raw only.');
-      }
-
-      // Konversi Set ke Array & Batasi jumlah agar tidak overload Qdrant (Max 5 query variasi)
-      const queryArray = Array.from(finalQueries).slice(0, 5);
+      // --- LOGIC BARU: SMART FAST PATH ⚡ ---
+      const cleanQuery = userQuery.toLowerCase().trim();
+      const wordCount = cleanQuery.split(/\s+/).length;
       
-      console.log(`✅ [RAG] Final Search Queries: ${JSON.stringify(queryArray)}`);
+      // Deteksi kata rujukan (Contextual References)
+      // Jika ada kata ini, user pasti merujuk ke obrolan sebelumnya -> WAJIB PAKE AI
+      const hasReferenceWords = ['nya', 'itu', 'tersebut', 'tadi', 'ini', 'dia'].some(w => cleanQuery.includes(w));
+      
+      const isFollowUp = history.length > 0; 
+      
+      // KONDISI JALANKAN AI REFINER:
+      // 1. Kalimat panjang (> 5 kata)
+      // 2. ATAU punya history (Follow up)
+      // 3. ATAU mengandung kata rujukan (meskipun history kosong/error, kita coba paksa AI menebak)
+      if (wordCount > 5 || isFollowUp || hasReferenceWords) {
+        try {
+          // Timeout sedikit dilonggarkan ke 2.5s untuk memberi waktu AI berpikir konteks
+          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve([]), 2500));
+          
+          const startAI = Date.now();
+          const aiQueries = await Promise.race([
+            openaiService.refineQuery(userQuery, history),
+            timeoutPromise
+          ]);
+          
+          if (Array.isArray(aiQueries) && aiQueries.length > 0) {
+              console.log(`   ↳ 🤖 AI Logic added: ${JSON.stringify(aiQueries)}`);
+              aiQueries.forEach(q => finalQueries.add(q));
+          }
+        } catch (aiError) {
+          console.warn('⚠️ [RAG] AI Refiner busy/error');
+        }
+      } else {
+         console.log('⚡ [RAG] Fast Path: Skipping AI Refiner for short greeting/initial query.');
+      }
+
+      const queryArray = Array.from(finalQueries).slice(0, 4); 
+      console.log(`✅ [RAG] Queries Generated: ${JSON.stringify(queryArray)}`);
       return queryArray;
 
     } catch (error) {
@@ -72,24 +84,25 @@ class RagService {
     }
   }
 
-  // Fungsi Manual ini SANGAT PENTING dan TIDAK DIHAPUS
+  // Fungsi Manual: Hardcoded knowledge
   expandQueryManually(query) {
     const normalized = query.toLowerCase().trim();
     const expanded = [];
 
-    // Fix Typo Fatal Manual
+    // Fix Typo Fatal
     let cleanQuery = normalized.replace(/taozkia|tazkya|taskia/g, 'tazkia');
 
-    // Deteksi Multi-Intent Sederhana
+    // Deteksi Intent Lokasi
     if (cleanQuery.includes('dimana') || cleanQuery.includes('lokasi') || cleanQuery.includes('alamat')) {
-      expanded.push('alamat lengkap lokasi kampus stmik tazkia');
+      expanded.push('alamat lengkap lokasi kampus stmik tazkia sentul');
     }
     
+    // Deteksi Intent Prodi/Jurusan
     if (cleanQuery.includes('prodi') || cleanQuery.includes('jurusan') || cleanQuery.includes('studi')) {
       expanded.push('daftar program studi jurusan stmik tazkia');
     }
 
-    // Domain Specific Expansion (Bisnis Logic Tazkia)
+    // Domain Specific
     if (cleanQuery.includes('murabahah') && (cleanQuery.includes('harga') || cleanQuery.includes('jual'))) {
       expanded.push('mekanisme penetapan harga murabahah');
       expanded.push('definisi margin keuntungan murabahah');
@@ -102,21 +115,25 @@ class RagService {
   // 2. SEARCH ENGINE (PARALLEL EXECUTION) 🚀
   // =============================================================================
 
-  async searchRelevantDocs(userQuery) {
+  // UPDATED: Menerima history
+  async searchRelevantDocs(userQuery, history = []) {
+    const startSearchTotal = Date.now();
     try {
-      // Step 1: Generate Multiple Search Queries (Hybrid: AI + Manual)
-      const queries = await this.generateSearchQueries(userQuery);
+      // Step 1: Generate Queries (Pass history)
+      const queries = await this.generateSearchQueries(userQuery, history);
       
       let allCandidates = [];
 
-      // Step 2: Parallel Search (Mencari dokumen untuk SEMUA variasi query)
+      // Step 2: Parallel Search
       console.log('🔍 [RAG] Executing Parallel Vector Search...');
+      const startVector = Date.now();
+
       const searchPromises = queries.map(async (q) => {
         try {
           const vector = await openaiService.createEmbedding(q);
           const result = await client.search(COLLECTION_NAME, {
             vector: vector,
-            limit: 4, // Ambil top 4 per sub-query
+            limit: 3, 
             with_payload: true,
             score_threshold: SCORE_THRESHOLD,
           });
@@ -127,24 +144,23 @@ class RagService {
         }
       });
 
-      const results = await Promise.all(searchPromises);
+      const results = await Promise.allSettled(searchPromises);
       
-      // Flatten array (Gabungkan semua hasil)
-      results.forEach(resArray => allCandidates.push(...resArray));
+      console.log(`⏱️ [Perf] Vector DB Search completed in ${(Date.now() - startVector)}ms`);
 
-      // Step 3: Advanced Deduplication
-      // Kita pakai Map untuk memastikan tidak ada dokumen kembar (berdasarkan Hash Isi)
+      results.forEach(res => {
+        if (res.status === 'fulfilled') {
+            allCandidates.push(...res.value);
+        }
+      });
+
+      // Step 3: Deduplication
       const uniqueDocs = new Map();
-      
       for (const item of allCandidates) {
         const content = (item.payload.text || "").trim();
-        const title = item.payload.title || "No Title";
-        
-        // Gunakan Hash Content sebagai kunci unik agar dokumen yg isinya sama persis tidak muncul 2x
         const docId = this.calculateTextHash(content);
 
         if (uniqueDocs.has(docId)) {
-          // Jika duplikat ditemukan, simpan HANYA jika score-nya lebih tinggi (lebih relevan)
           const existing = uniqueDocs.get(docId);
           if (item.score > existing.score) {
             uniqueDocs.set(docId, { ...item, cleanContent: content });
@@ -154,20 +170,18 @@ class RagService {
         }
       }
 
-      // Sort by Highest Score & Ambil Top 5 Terbaik
       const finalDocs = Array.from(uniqueDocs.values())
         .sort((a, b) => b.score - a.score)
         .slice(0, 5); 
 
-      // 🔍 DETAILED LOGGING (Untuk Debugging Kamu)
+      // Logging Hasil
       if (finalDocs.length > 0) {
-        console.log(`📄 [RAG] Found ${finalDocs.length} unique relevant documents:`);
+        console.log(`📄 [RAG] Found ${finalDocs.length} unique docs. Total Retrieval Time: ${(Date.now() - startSearchTotal)}ms`);
         finalDocs.forEach((d, i) => {
           console.log(`   ${i+1}. [Score: ${d.score.toFixed(4)}] ${d.payload.title}`);
-          console.log(`      Source: ${d.payload.source_file}`);
         });
       } else {
-        console.log('📭 [RAG] No relevant documents found above threshold.');
+        console.log('📭 [RAG] No relevant documents found.');
       }
 
       return finalDocs;
@@ -191,8 +205,6 @@ class RagService {
     for (const doc of docs) {
       const title = doc.payload.title || "Informasi";
       let text = doc.cleanContent || "";
-      
-      // Format konteks: [Topik] Isi
       const formattedChunk = `[[Sumber: ${title}]]\n${text}`;
       
       if ((currentLength + formattedChunk.length) > MAX_CONTEXT_CHARS) break;
@@ -200,30 +212,36 @@ class RagService {
       contextChunks.push(formattedChunk);
       currentLength += formattedChunk.length;
     }
-
-    console.log(`🧩 [RAG] Context Compiled: ${contextChunks.length} chunks (${currentLength} chars).`);
     return contextChunks.join('\n\n---\n\n'); 
   }
 
   async answerQuestion(userMessage, conversationHistory = []) {
+    const startTotal = Date.now();
     try {
-      // 1. Fast Path (Sapaan pendek)
-      if (userMessage.length < 5) {
-        return { answer: "Halo! Ada yang bisa Kia bantu seputar Tazkia?", usage: {}, docsFound: 0 };
+      // 1. Fast Path Check untuk pesan sangat pendek TANPA history
+      if (userMessage.length < 5 && conversationHistory.length === 0) {
+        return { 
+            answer: "Halo! Saya Asisten Virtual Sapa Tazkia. Ada yang bisa saya bantu seputar kampus STMIK Tazkia?", 
+            usage: {}, 
+            docsFound: 0 
+        };
       }
       
-      // 2. Retrieve Docs (Hybrid: AI + Manual)
-      const relevantDocs = await this.searchRelevantDocs(userMessage);
+      // 2. Retrieve Docs (Pass history agar context aware)
+      const relevantDocs = await this.searchRelevantDocs(userMessage, conversationHistory);
       
       // 3. Compile Context
       const contextString = this.compileContext(relevantDocs);
       
-      // 4. Generate Answer via OpenAI Service
+      // 4. Generate Answer via OpenAI
       const options = {
         questionType: 'general',
         forceContextUsage: relevantDocs.length > 0
       };
       
+      console.log('🤖 [RAG] Generating Final Answer...');
+      const startGen = Date.now();
+
       const aiResult = await openaiService.generateAIResponse(
         userMessage,
         conversationHistory,
@@ -231,16 +249,26 @@ class RagService {
         options
       );
 
+      const genTime = ((Date.now() - startGen) / 1000).toFixed(2);
+      const totalTime = ((Date.now() - startTotal) / 1000).toFixed(2);
+      
+      console.log(`🚀 [Perf] Answer Generated in ${genTime}s. Total Request Time: ${totalTime}s`);
+
       return {
         answer: aiResult.content,
         usage: aiResult.usage,
         docsFound: relevantDocs.length,
-        docsDetail: relevantDocs.map(d => ({ title: d.payload.title, score: d.score }))
+        docsDetail: relevantDocs.map(d => ({ title: d.payload.title, score: d.score })),
+        metrics: { totalTime: totalTime, genTime: genTime }
       };
 
     } catch (error) {
       console.error('❌ [RAG] Answer Process Error:', error.message);
-      return { answer: "Maaf, Kia sedang mengalami gangguan sistem sebentar.", usage: {}, docsFound: 0 };
+      return { 
+          answer: "Mohon maaf, sistem Sapa Tazkia sedang mengalami gangguan teknis saat mengakses basis pengetahuan.", 
+          usage: {}, 
+          docsFound: 0 
+      };
     }
   }
 
@@ -265,7 +293,7 @@ class RagService {
         await client.createCollection(COLLECTION_NAME, { 
           vectors: { size: VECTOR_SIZE, distance: 'Cosine' } 
         });
-        console.log(`✅ [RAG] Collection '${COLLECTION_NAME}' ready.`);
+        console.log(`✅ [RAG] Collection '${COLLECTION_NAME}' created.`);
       }
     } catch (error) {
       console.error('❌ [RAG] Qdrant Connect Error:', error.message);
@@ -283,13 +311,16 @@ class RagService {
   async ingestData() {
     console.log('🔄 [RAG] Ingestion Start... (Updating Knowledge Base)');
     
-    // Reset DB untuk memastikan data bersih
     await this.deleteCollection();
-    await new Promise(r => setTimeout(r, 1000)); // Delay aman
+    await new Promise(r => setTimeout(r, 1000)); 
     await this.ensureCollection();
     
     const dataDir = path.join(__dirname, '../../data');
-    if (!fs.existsSync(dataDir)) return { success: false, message: "Folder data missing" };
+    
+    if (!fs.existsSync(dataDir)) {
+        console.error(`❌ [RAG] Data directory not found at: ${dataDir}`);
+        return { success: false, message: "Folder data missing" };
+    }
     
     const files = fs.readdirSync(dataDir).filter(f => f.endsWith('.json'));
     let totalCount = 0;
@@ -306,10 +337,11 @@ class RagService {
            const rawContent = item.semantic_content || item.text || '';
            const topic = item.topic || 'General Info';
            
-           // Format text embedding agar 'topic' menyatu dengan 'isi'
-           const richText = `[Topik: ${topic}]\n${rawContent}`;
+           // Format text embedding agar 'topic' menyatu dengan 'isi' plus KEYWORDS
+           const keywordStr = item.keywords ? `\n[Keywords: ${item.keywords.join(', ')}]` : '';
+           const richText = `[Topik: ${topic}]${keywordStr}\n${rawContent}`;
            
-           if (richText.length < 15) continue; // Skip jika terlalu pendek
+           if (richText.length < 15) continue; 
            
            // Create embedding
            const vector = await openaiService.createEmbedding(richText);
@@ -340,4 +372,4 @@ class RagService {
   }
 }
 
-module.exports = new RagService(); 
+module.exports = new RagService();
