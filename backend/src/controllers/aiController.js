@@ -1,5 +1,6 @@
 const ragService = require('../services/ragService'); 
-const { generateAIResponse, testOpenAIConnection } = require('../services/openaiService');
+// ✅ FIX 1: Import generateTitle yang sudah kita buat di service
+const { generateAIResponse, testOpenAIConnection, generateTitle } = require('../services/openaiService');
 const academicService = require('../services/academicService');
 const rateLimitService = require('../services/rateLimitService'); 
 const prisma = require('../../config/prisma');
@@ -146,28 +147,30 @@ const sendChat = async (req, res) => {
     shouldCreateNewConversation = isNewChat || !currentConversationId;
 
     try {
-        let conversationTitle = cleanMessage.substring(0, 50);
+        let conversationTitle = "Percakapan Baru"; // Default title
         
         // Auto Title untuk Chat Baru
         if (shouldCreateNewConversation) {
-             const titlePrompt = `Buat judul pendek (max 4 kata) untuk: "${cleanMessage}"`;
-             try {
-                const titleRes = await generateAIResponse(titlePrompt, [], 'general');
-                const rawTitle = typeof titleRes === 'object' ? titleRes.content : titleRes;
-                if (rawTitle) conversationTitle = rawTitle.replace(/['"]/g, '').trim();
-             } catch(e) {}
+             // ✅ FIX 2: GUNAKAN FUNGSI DEDICATED DARI SERVICE
+             // Kita kirim pesan user DAN jawaban AI agar judulnya pintar & sesuai konteks
+             console.log("🏷️ Generating Smart Title...");
+             conversationTitle = await generateTitle(cleanMessage, finalAnswer);
 
              const newConv = await prisma.conversation.create({
                 data: {
-                  userId, title: conversationTitle, 
+                  userId, 
+                  title: conversationTitle, // Title hasil generateTitle
                   messages: { create: [{ role: 'user', content: cleanMessage }, { role: 'bot', content: finalAnswer }] }
                 }
              });
              currentConversationId = newConv.id;
+             console.log(`✅ New Conversation Created: [${newConv.id}] ${conversationTitle}`);
         } else {
+             // Chat lama: update pesan saja
              await prisma.message.createMany({
                 data: [{ conversationId: currentConversationId, role: 'user', content: cleanMessage }, { conversationId: currentConversationId, role: 'bot', content: finalAnswer }]
              });
+             // Update timestamp biar naik ke atas di sidebar
              await prisma.conversation.update({ where: { id: currentConversationId }, data: { updatedAt: new Date() } });
         }
     } catch (e) { console.error('DB Save Error:', e); }
@@ -181,6 +184,8 @@ const sendChat = async (req, res) => {
       conversationId: currentConversationId,
       timestamp: new Date().toISOString(),
       isNewConversation: shouldCreateNewConversation,
+      // Jika chat baru, kirim title ke frontend agar UI bisa update realtime tanpa refresh
+      title: shouldCreateNewConversation ? (await prisma.conversation.findUnique({where:{id:currentConversationId}}))?.title : null, 
       usage: {
         tokensUsed: realTokenUsage,
         remaining: quotaStatus.remaining 
@@ -216,7 +221,7 @@ const getConversations = async (req, res) => {
         const formattedConversations = conversations.map(chat => ({
             ...chat,
             timestamp: chat.updatedAt || chat.createdAt, 
-            lastMessage: chat.title 
+            lastMessage: chat.title // Pastikan frontend menampilkan title, bukan isi pesan
         }));
 
         res.json({ 
