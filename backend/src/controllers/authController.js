@@ -1,6 +1,7 @@
 const authService = require('../services/authService');
 const academicService = require('../services/academicService');
 const emailService = require('../services/emailService');
+const ragService = require('../services/ragService'); // ✅ BARU: Import RagService
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
@@ -802,6 +803,121 @@ const checkAuth = (req, res) => {
   });
 };
 
+// ============================================================================
+// 🚨 NEW CHAT FEATURE (ADAPTED FOR YOUR SCHEMA: Conversation & Message)
+// ============================================================================
+const chat = async (req, res) => {
+    try {
+        const userId = req.user.id; 
+        const { message, conversationId } = req.body; // Bisa terima conversationId dari frontend jika ada
+
+        if (!message || message.trim() === '') {
+            return res.status(400).json({ success: false, message: "Message is required" });
+        }
+
+        console.log(`👤 [USER ${userId}] Chatting...`);
+
+        // -----------------------------------------------------------
+        // A. SIAPKAN CONVERSATION ID & RETRIEVE HISTORY
+        // -----------------------------------------------------------
+        let targetConversationId = conversationId ? parseInt(conversationId) : null;
+        let conversationHistory = [];
+
+        // 1. Cari Percakapan Terakhir (Active)
+        // Kita cari percakapan terakhir user ini untuk mengambil konteks
+        const lastConversation = await prisma.conversation.findFirst({
+            where: { 
+                userId: userId,
+                id: targetConversationId || undefined // Kalau ada ID pakai ID, kalau gak ada cari yg terbaru
+            },
+            orderBy: { updatedAt: 'desc' },
+            include: {
+                messages: {
+                    take: 6, // Ambil 6 pesan terakhir
+                    orderBy: { createdAt: 'desc' }
+                }
+            }
+        });
+
+        if (lastConversation) {
+            targetConversationId = lastConversation.id;
+            // Format History untuk OpenAI (Balik urutan jadi: Lama -> Baru)
+            conversationHistory = lastConversation.messages.reverse().map(m => ({
+                role: m.role === 'bot' ? 'assistant' : 'user', 
+                content: m.content
+            }));
+        } else {
+            // Jika belum ada percakapan sama sekali, nanti kita buat baru di bawah
+            conversationHistory = [];
+        }
+
+        // -----------------------------------------------------------
+        // B. CALL RAG SERVICE
+        // -----------------------------------------------------------
+        const ragResult = await ragService.answerQuestion(message, conversationHistory);
+        const finalAnswer = ragResult.answer;
+        const tokensUsed = ragResult.usage ? ragResult.usage.total_tokens : 0;
+
+        // -----------------------------------------------------------
+        // C. SAVE TO DB (RELASI: CONVERSATION -> MESSAGES)
+        // -----------------------------------------------------------
+        try {
+            // Jika belum ada conversation ID (User baru chat pertama kali), Buat Baru
+            if (!targetConversationId) {
+                const newConv = await prisma.conversation.create({
+                    data: {
+                        userId: userId,
+                        title: message.substring(0, 30) + "..." // Judul otomatis dari pesan pertama
+                    }
+                });
+                targetConversationId = newConv.id;
+            } else {
+                // Update timestamp percakapan agar naik ke atas
+                await prisma.conversation.update({
+                    where: { id: targetConversationId },
+                    data: { updatedAt: new Date() }
+                });
+            }
+
+            // Simpan Pesan User
+            await prisma.message.create({
+                data: {
+                    conversationId: targetConversationId,
+                    role: 'user',
+                    content: message
+                }
+            });
+
+            // Simpan Jawaban Bot
+            await prisma.message.create({
+                data: {
+                    conversationId: targetConversationId,
+                    role: 'bot',
+                    content: finalAnswer,
+                    responseTime: parseFloat(ragResult.metrics?.genTime || 0) // Simpan latency juga (Schema Anda support Float)
+                }
+            });
+
+        } catch (saveError) {
+            console.error(`❌ [AUTH CHAT] Save DB Error:`, saveError.message);
+        }
+
+        // -----------------------------------------------------------
+        // D. RESPONSE
+        // -----------------------------------------------------------
+        res.json({
+            success: true,
+            reply: finalAnswer,
+            conversationId: targetConversationId, // Kirim balik ID agar frontend bisa lanjut di room yang sama
+            usage: { total_tokens: tokensUsed }
+        });
+
+    } catch (error) {
+        console.error("❌ [AUTH CHAT ERROR]", error);
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
 module.exports = {
   googleAuth,
   googleCallback,
@@ -820,5 +936,6 @@ module.exports = {
   verify,
   getProfile,
   checkAuth,
-  healthCheck
+  healthCheck,
+  chat // ✅ Export fungsi chat baru
 };
