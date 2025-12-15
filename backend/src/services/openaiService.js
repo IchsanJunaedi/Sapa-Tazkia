@@ -7,10 +7,10 @@ if (!process.env.OPENAI_API_KEY) {
 }
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  // ✅ FIX 2: Tambahkan Timeout & Retry agar tahan banting
-  timeout: 20000, // 20 Detik (Default cuma 10s, sering putus)
-  maxRetries: 2,  // Coba ulang 2x otomatis jika koneksi gagal
+    apiKey: process.env.OPENAI_API_KEY,
+    // ✅ FIX 2: Tambahkan Timeout & Retry agar tahan banting (Koneksi Cafe Friendly)
+    timeout: 20000, // 20 Detik
+    maxRetries: 2,  // Coba ulang 2x otomatis
 });
 
 const MODEL_NAME = process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -57,7 +57,8 @@ Agar jawaban mudah dibaca, ikuti aturan ini:
 `;
 
 /**
- * Prompt khusus untuk AI Query Refiner (UPDATED: Context Aware)
+ * Prompt khusus untuk AI Query Refiner (OPTIMIZED SPEED ⚡)
+ * Dibuat lebih ringkas agar respon AI di bawah 2 detik & Format JSON Valid.
  */
 const SYSTEM_PROMPT_REFINER = `
 Role: Search Query Optimizer.
@@ -243,6 +244,70 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
   }
 }
 
+/**
+ * 4. TITLE GENERATOR (SMART TITLE) 🏷️
+ * ✅ UPDATED: Lebih deterministik, anti-quote, dan support context jawaban AI.
+ */
+async function generateTitle(userMessage, aiResponse = null) {
+    try {
+      // 1. Validasi input kosong (tetap pertahankan ini)
+      if (!userMessage || userMessage.trim() === "") return "Percakapan Baru";
+      
+      // 2. Jika pesan sangat pendek (< 3 huruf), baru gunakan default
+      if (userMessage.length < 3) return "Percakapan Baru";
+
+      const messages = [
+        { 
+          role: 'system', 
+          content: `Anda adalah Title Generator. 
+          Tugas: Buat judul singkat (2-5 kata) yang menggambarkan INTI pertanyaan user.
+          
+          ATURAN KERAS:
+          1. JANGAN gunakan tanda kutip.
+          2. JANGAN pakai kata "Tentang" atau "Mengenai". Langsung ke topik.
+          3. Jika user bertanya lokasi (misal: "dimana"), judul harus mengandung nama lokasi/tempat.
+          4. HANYA jika user murni menyapa (misal: "Assalamualaikum", "Halo", "Pagi"), output: "Percakapan Baru".
+          5. Prioritaskan isi pertanyaan user daripada jawaban AI.`
+        },
+        { 
+          role: 'user', 
+          content: `User: "${userMessage}"` 
+        }
+      ];
+
+      // Inject konteks jawaban AI (opsional tapi membantu)
+      if (aiResponse) {
+        // Kita potong biar hemat token, ambil intinya saja
+        const cleanAiResponse = aiResponse.substring(0, 100).replace(/\n/g, " ");
+        messages[1].content += `\nKonteks Jawaban AI: "${cleanAiResponse}"`;
+      }
+
+      messages[1].content += `\nJudul:`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini", 
+        messages: messages,
+        max_tokens: 15,       
+        temperature: 0.3      // Naikkan sedikit biar lebih kreatif menangkap maksud
+      });
+  
+      let title = completion.choices[0].message.content.trim();
+      
+      // Sanitasi akhir: Hapus tanda kutip & titik di akhir
+      title = title.replace(/^["']|["']$/g, '').replace(/\.$/, '');
+      
+      // Fallback terakhir jika AI masih bandel output kosong
+      if (title.length < 3) return "Percakapan Baru";
+
+      return title;
+
+    } catch (error) {
+      console.warn("⚠️ [TITLE GEN] Error, fallback manual:", error.message);
+      // Fallback manual: Ambil 4 kata pertama user
+      return userMessage.split(' ').slice(0, 4).join(' ');
+    }
+}
+
 // --- Utils (Safety Filters) ---
 function isIdentityQuestion(text) {
   const t = text.toLowerCase();
@@ -269,5 +334,6 @@ module.exports = {
   generateAIResponse,
   createEmbedding,
   refineQuery,
-  testOpenAIConnection
+  testOpenAIConnection,
+  generateTitle 
 };
