@@ -1,8 +1,16 @@
 const OpenAI = require('openai');
 require('dotenv').config();
 
+// ✅ FIX 1: Cek API Key agar tidak error gaib jika .env bermasalah
+if (!process.env.OPENAI_API_KEY) {
+    console.error("🚨 [FATAL] OPENAI_API_KEY tidak ditemukan di .env!");
+}
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  // ✅ FIX 2: Tambahkan Timeout & Retry agar tahan banting
+  timeout: 20000, // 20 Detik (Default cuma 10s, sering putus)
+  maxRetries: 2,  // Coba ulang 2x otomatis jika koneksi gagal
 });
 
 const MODEL_NAME = process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -52,24 +60,23 @@ Agar jawaban mudah dibaca, ikuti aturan ini:
  * Prompt khusus untuk AI Query Refiner (UPDATED: Context Aware)
  */
 const SYSTEM_PROMPT_REFINER = `
-Anda adalah AI Query Optimizer.
-Tugas: Ubah input user menjadi array keyword pencarian yang spesifik.
+Role: Search Query Optimizer.
+Tugas: Konversi input user menjadi JSON Array keyword untuk pencarian database.
 
-KONTEKS:
-Jika tersedia "HISTORY CHAT", gunakan itu untuk memahami rujukan kata (seperti "itu", "nya", "tersebut").
+LOGIC:
+1. Jika input jelas (misal: "Biaya kuliah"), langsung jadikan keyword.
+2. Jika input ambigu (misal: "Dalilnya?", "Lokasinya?"), WAJIB gabungkan dengan topik dari HISTORY CHAT.
 
-CONTOH 1 (Tanpa Context):
-Input: "stmik taozkia dimana?"
+CONTOH 1 (Tanpa Konteks):
+Input: "stmik tazkia dimana?"
 Output: ["alamat lokasi kampus stmik tazkia"]
 
-CONTOH 2 (Dengan Context):
-History: User tanya "Apa itu Musyarakah?", Bot jawab definisi.
+CONTOH 2 (Dengan Konteks):
+History: "Apa itu Musyarakah?"
 Input: "ada dalilnya ga?"
 Output: ["dalil dasar hukum musyarakah al-quran hadis"]
 
-ATURAN:
-- HANYA KIRIMKAN JSON ARRAY valid.
-- JANGAN berikan penjelasan apapun.
+FORMAT OUTPUT: HANYA JSON Array valid. Jangan ada teks lain.
 `;
 
 /**
@@ -98,12 +105,11 @@ const CONTEXT_INSTRUCTION_TEMPLATE = `
 
 /**
  * 1. QUERY REFINEMENT (THE BRAIN) 🧠
- * Fitur: Memperbaiki typo & Context Awareness (Memperbaiki isu "Ada dalilnya ga?")
+ * Fitur: Memperbaiki typo & Context Awareness
  */
 async function refineQuery(rawQuery, history = []) {
   try {
     // Optimization: Skip untuk query sapaan pendek HANYA JIKA tidak ada history
-    // (Jika ada history, user mungkin sedang follow-up pertanyaan pendek)
     if (history.length === 0 && (rawQuery.length < 5 || ["halo", "hi", "pagi", "assalamualaikum", "tes"].some(s => rawQuery.toLowerCase().includes(s)))) {
         return [rawQuery]; 
     }
@@ -133,6 +139,7 @@ async function refineQuery(rawQuery, history = []) {
     
     try {
         const parsed = JSON.parse(result);
+        // Handle format { "queries": [...] } atau [...]
         const finalArray = Array.isArray(parsed) ? parsed : (parsed.queries || parsed.results || [rawQuery]);
         
         if (finalArray.length > 0) {
@@ -145,7 +152,8 @@ async function refineQuery(rawQuery, history = []) {
     return [rawQuery];
 
   } catch (error) {
-    console.error('❌ [AI REFINER] Error:', error.message);
+    // Log warning saja, jangan throw error agar sistem tetap jalan pakai raw query
+    console.warn('⚠️ [AI REFINER] Fail/Timeout, using raw query:', error.message);
     return [rawQuery];
   }
 }
@@ -163,7 +171,7 @@ async function createEmbedding(text) {
     return response.data[0].embedding;
   } catch (error) {
     console.error('❌ [OPENAI] Embed Error:', error.message);
-    throw error;
+    throw error; // Throw error agar RAG tau koneksi putus
   }
 }
 
@@ -192,7 +200,7 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
     const messages = [{ role: 'system', content: SYSTEM_PROMPT_PERSONA }];
 
     if (conversationHistory.length > 0) {
-      messages.push(...conversationHistory.slice(-2).map(msg => ({
+      messages.push(...conversationHistory.slice(-4).map(msg => ({
         role: msg.role === 'bot' ? 'assistant' : msg.role,
         content: msg.content
       })));
@@ -229,7 +237,7 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
   } catch (error) {
     console.error('❌ [OPENAI] Gen Answer Error:', error.message);
     return { 
-      content: "Mohon maaf sistem sedang sibuk, silakan coba sesaat lagi atau hubungi **Admin**.", 
+      content: "Mohon maaf, koneksi Kia ke server sedang tidak stabil. Silakan coba sesaat lagi ya Kak. 🙏", 
       usage: {} 
     };
   }
