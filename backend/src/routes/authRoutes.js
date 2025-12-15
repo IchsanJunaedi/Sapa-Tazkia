@@ -34,7 +34,7 @@ const providerLimiter = rateLimit({
 });
 
 // 3. General Limiter (Navigasi Biasa)
-// Untuk cek sesi, cek profil, logout.
+// Untuk cek sesi, cek profil, logout, DAN CHAT.
 // Cukup longgar (30x/menit) agar user experience tetap nyaman.
 const generalLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
@@ -132,6 +132,10 @@ router.post('/logout', authMiddleware.requireAuth, generalLimiter, authControlle
 router.get('/verify', authMiddleware.requireAuth, generalLimiter, authController.verify);
 
 router.get('/me', authMiddleware.requireAuth, generalLimiter, authController.getProfile);
+
+// ✅ ✅ ✅ NEW: CHAT ENDPOINT (DITAMBAHKAN DI SINI)
+// Menggunakan generalLimiter agar aman tapi tidak seketat login
+router.post('/chat', authMiddleware.requireAuth, generalLimiter, authController.chat);
 
 // ========================================================
 // VERIFICATION & PROFILE MANAGEMENT
