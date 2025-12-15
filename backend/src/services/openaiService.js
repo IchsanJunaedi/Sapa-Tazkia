@@ -11,7 +11,6 @@ const MODEL_NAME = process.env.OPENAI_MODEL || 'gpt-4o-mini';
  * ========================================================================
  * 🧠 1. SYSTEM PROMPT (PERSONA + SMART FORMATTER)
  * ========================================================================
- * Update: Instruksi Visual (Bold & List) sudah ditanam di sini.
  */
 const SYSTEM_PROMPT_PERSONA = `
 🎯 **PERAN ANDA:**
@@ -20,7 +19,7 @@ Tugas Anda adalah melayani Mahasiswa/Calon Mahasiswa dengan informasi yang **Aku
 
 ⛔ **BATASAN KERAS (STRICT RULES):**
 1. **Scope:** HANYA jawab pertanyaan seputar Akademik, Kampus Tazkia, dan Islam/Ekonomi Syariah.
-2. **Context-Driven:** Jawab HANYA berdasarkan [CONTEXT]. Jika data tidak ada, katakan jujur "Data belum tersedia", jangan mengarang.
+2. **Context-Driven:** Jawab HANYA berdasarkan [CONTEXT]. Jika data tidak ada, katakan jujur "Mohon maaf, data spesifik belum tersedia", jangan mengarang (halusinasi).
 
 🎨 **ATURAN FORMATTING (VISUAL GUIDE):**
 Agar jawaban mudah dibaca, ikuti aturan ini:
@@ -31,10 +30,9 @@ Agar jawaban mudah dibaca, ikuti aturan ini:
    - **Tanggal/Deadline**.
 2. **LIST / BULLET POINTS:** Gunakan format list (\`- Item\`) HANYA JIKA menjelaskan:
    - Daftar Prodi/Jurusan.
-   - Daftar Alamat/Lokasi Kampus (Jika lebih dari 1).
+   - Daftar Alamat/Lokasi Kampus.
    - Rincian Biaya/Syarat.
    - Langkah-langkah.
-   - Fasilitas Kampus
 3. **NARASI:** Gunakan paragraf biasa untuk:
    - Definisi konsep (misal: "Apa itu Murabahah?").
    - Sapaan awal dan penutup. 
@@ -46,23 +44,31 @@ Agar jawaban mudah dibaca, ikuti aturan ini:
    - Penutup: Tawarkan bantuan lain ("Ada lagi yang bisa Kia bantu, Kak?").
 
 ☪️ **ADAB:**
-- Mulai dengan "Assalamualaikum" jika user memulai percakapan.
+- Mulai dengan "Assalamualaikum" jika user memulai percakapan dengan salam.
 - Tone: Hangat, Islami, Profesional.
 `;
 
 /**
- * Prompt khusus untuk AI Query Refiner (JANGAN DIHAPUS - INI FITUR CANGGIHNYA)
+ * Prompt khusus untuk AI Query Refiner (UPDATED: Context Aware)
  */
 const SYSTEM_PROMPT_REFINER = `
 Anda adalah AI Query Optimizer.
-Tugas: Ubah input user yang kotor/typo menjadi JSON Array kalimat baku untuk Vector Search.
+Tugas: Ubah input user menjadi array keyword pencarian yang spesifik.
 
-CONTOH:
-Input: "stmik taozkia dimana? prodinya apa aja?"
-Output: ["alamat lokasi kampus stmik tazkia", "daftar program studi jurusan stmik tazkia"]
+KONTEKS:
+Jika tersedia "HISTORY CHAT", gunakan itu untuk memahami rujukan kata (seperti "itu", "nya", "tersebut").
+
+CONTOH 1 (Tanpa Context):
+Input: "stmik taozkia dimana?"
+Output: ["alamat lokasi kampus stmik tazkia"]
+
+CONTOH 2 (Dengan Context):
+History: User tanya "Apa itu Musyarakah?", Bot jawab definisi.
+Input: "ada dalilnya ga?"
+Output: ["dalil dasar hukum musyarakah al-quran hadis"]
 
 ATURAN:
-- HANYA KIRIMKAN JSON ARRAY.
+- HANYA KIRIMKAN JSON ARRAY valid.
 - JANGAN berikan penjelasan apapun.
 `;
 
@@ -79,9 +85,9 @@ const CONTEXT_INSTRUCTION_TEMPLATE = `
 [INSTRUKSI PENJAWABAN]
 1. Analisa Data di atas.
 2. Jawab pertanyaan user dengan gaya "Direct Answer".
-3. **FORMATTING:** - Jika data berisi daftar (Lokasi/Prodi), WAJIB ubah menjadi **Bullet Points**.
-   - Jika data adalah Penjelasan Konsep (Definisi), gunakan **Paragraf Narasi**.
-   - TEBALKAN (**Bold**) kata kunci penting seperti Lokasi, Harga, dan Nama Prodi.
+3. **FORMATTING:** - Jika data berisi daftar, WAJIB ubah menjadi **Bullet Points**.
+   - Jika data adalah Penjelasan Konsep, gunakan **Paragraf Narasi**.
+   - TEBALKAN (**Bold**) kata kunci penting.
 `;
 
 /**
@@ -92,32 +98,46 @@ const CONTEXT_INSTRUCTION_TEMPLATE = `
 
 /**
  * 1. QUERY REFINEMENT (THE BRAIN) 🧠
- * Fitur: Memperbaiki typo & memecah query.
+ * Fitur: Memperbaiki typo & Context Awareness (Memperbaiki isu "Ada dalilnya ga?")
  */
-async function refineQuery(rawQuery) {
+async function refineQuery(rawQuery, history = []) {
   try {
-    if (rawQuery.length < 5 || ["halo", "hi", "pagi", "assalamualaikum"].some(s => rawQuery.toLowerCase().includes(s))) {
+    // Optimization: Skip untuk query sapaan pendek HANYA JIKA tidak ada history
+    // (Jika ada history, user mungkin sedang follow-up pertanyaan pendek)
+    if (history.length === 0 && (rawQuery.length < 5 || ["halo", "hi", "pagi", "assalamualaikum", "tes"].some(s => rawQuery.toLowerCase().includes(s)))) {
         return [rawQuery]; 
     }
 
+    const messages = [{ role: 'system', content: SYSTEM_PROMPT_REFINER }];
+
+    // Inject History (2 Chat Terakhir) agar AI paham konteks
+    if (history.length > 0) {
+         const lastTurn = history.slice(-2);
+         messages.push({
+             role: 'system',
+             content: `HISTORY CHAT TERAKHIR:\n${lastTurn.map(m => `${m.role}: ${m.content}`).join('\n')}`
+         });
+    }
+
+    messages.push({ role: 'user', content: rawQuery });
+
     const completion = await openai.chat.completions.create({
       model: MODEL_NAME,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT_REFINER },
-        { role: 'user', content: rawQuery }
-      ],
+      messages: messages,
       temperature: 0,
       max_tokens: 150,
+      response_format: { type: "json_object" } // Force JSON Mode
     });
 
     const result = completion.choices[0].message.content.trim();
     
     try {
-        const cleanJson = result.replace(/```json|```/g, '').trim();
-        const parsed = JSON.parse(cleanJson);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-            console.log(`🧠 [AI REFINER] "${rawQuery}" -> ${JSON.stringify(parsed)}`);
-            return parsed;
+        const parsed = JSON.parse(result);
+        const finalArray = Array.isArray(parsed) ? parsed : (parsed.queries || parsed.results || [rawQuery]);
+        
+        if (finalArray.length > 0) {
+            console.log(`🧠 [AI REFINER] "${rawQuery}" -> ${JSON.stringify(finalArray)}`);
+            return finalArray;
         }
     } catch (e) {
         console.warn(`⚠️ [AI REFINER] Parse fail, fallback to raw query.`);
@@ -130,6 +150,9 @@ async function refineQuery(rawQuery) {
   }
 }
 
+/**
+ * 2. EMBEDDING GENERATOR
+ */
 async function createEmbedding(text) {
   try {
     const cleanText = text.replace(/\s+/g, " ").trim();
@@ -145,8 +168,7 @@ async function createEmbedding(text) {
 }
 
 /**
- * 2. RESPONSE GENERATOR (FINAL ANSWER)
- * Logic: Persona + Formatting + Context
+ * 3. RESPONSE GENERATOR (FINAL ANSWER)
  */
 async function generateAIResponse(userMessage, conversationHistory = [], customContext = null, options = {}) {
   try {
@@ -161,7 +183,7 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
     }
     if (isBannedTopicQuestion(userMessage)) {
       return { 
-        content: "Mohon maaf Kak, Kia hanya fokus menjawab seputar informasi **Akademik & Kampus Tazkia** ya. 🙏", 
+        content: "Mohon maaf Kak, Kia hanya fokus menjawab seputar informasi **Akademik & Kampus Tazkia** ya. 🙏 Silakan tanya tentang pendaftaran, biaya, atau prodi.", 
         usage: { total_tokens: 0 } 
       };
     }
@@ -169,7 +191,6 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
     // --- Construct Messages ---
     const messages = [{ role: 'system', content: SYSTEM_PROMPT_PERSONA }];
 
-    // History (2 Chat Terakhir)
     if (conversationHistory.length > 0) {
       messages.push(...conversationHistory.slice(-2).map(msg => ({
         role: msg.role === 'bot' ? 'assistant' : msg.role,
@@ -177,14 +198,15 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
       })));
     }
 
-    // Context Injection
+    // Context Injection Logic
     let finalUserPrompt = userMessage;
-    if (customContext) {
+    
+    if (customContext && customContext.trim().length > 0) {
       finalUserPrompt = CONTEXT_INSTRUCTION_TEMPLATE
         .replace('{context}', customContext)
         .replace('{query}', userMessage);
     } else {
-      finalUserPrompt = `[DATA TIDAK DITEMUKAN]\nUser bertanya: "${userMessage}"\nJawab dengan sopan bahwa informasi detail belum tersedia, sarankan hubungi Admin.`;
+      finalUserPrompt = `[DATA TIDAK DITEMUKAN]\nUser bertanya: "${userMessage}"\nInstruksi: Jawab dengan sopan bahwa informasi detail belum tersedia di database Kia, dan sarankan user menghubungi Admin atau Website resmi Tazkia.`;
     }
 
     messages.push({ role: 'user', content: finalUserPrompt });
@@ -195,7 +217,7 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
       messages: messages,
       max_tokens: maxTokens,
       temperature: temperature,
-      presence_penalty: 0.1, // Mencegah kata berulang
+      presence_penalty: 0.1, 
     });
 
     const reply = completion.choices[0].message.content.trim();
@@ -216,19 +238,19 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
 // --- Utils (Safety Filters) ---
 function isIdentityQuestion(text) {
   const t = text.toLowerCase();
-  return ["siapa kamu", "kamu siapa", "admin", "robot"].some(k => t.includes(k));
+  return ["siapa kamu", "kamu siapa", "admin", "robot", "human", "manusia"].some(k => t.includes(k));
 }
 
 function isBannedTopicQuestion(text) {
   const t = text.toLowerCase();
-  return ["resep", "masak", "politik", "presiden"].some(k => t.includes(k));
+  return ["resep", "masak", "politik", "presiden", "partai", "judi", "slot"].some(k => t.includes(k));
 }
 
 async function testOpenAIConnection() {
     try {
         const res = await openai.chat.completions.create({
             model: "gpt-4o-mini",
-            messages: [{ role: 'user', content: 'Tes' }],
+            messages: [{ role: 'user', content: 'Tes koneksi' }],
             max_tokens: 5
         });
         return { success: true };
@@ -238,6 +260,6 @@ async function testOpenAIConnection() {
 module.exports = {
   generateAIResponse,
   createEmbedding,
-  refineQuery, // Fitur ini TETAP ADA dan AMAN
+  refineQuery,
   testOpenAIConnection
 };
