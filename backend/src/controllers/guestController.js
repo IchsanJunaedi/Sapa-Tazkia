@@ -2,6 +2,7 @@ const ragService = require('../services/ragService');
 const rateLimitService = require('../services/rateLimitService'); 
 const { generateAIResponse } = require('../services/openaiService'); 
 
+// In-memory storage untuk Guest (Hilang saat restart server)
 const guestSessions = new Map();
 
 const guestChat = async (req, res) => {
@@ -16,27 +17,45 @@ const guestChat = async (req, res) => {
     const currentSessionId = sessionId || `guest-${Date.now()}`;
     console.log(`👤 [GUEST] Chat from IP: ${ipAddress}`);
 
-    // 1. RAG Process
+    // =================================================================
+    // 1. 🧠 HISTORY RETRIEVAL (LOGIC BARU)
+    // =================================================================
+    let conversationHistory = [];
+    
+    // Cek apakah ada sesi sebelumnya
+    if (guestSessions.has(currentSessionId)) {
+        const session = guestSessions.get(currentSessionId);
+        
+        // Ambil 6 pesan terakhir agar hemat token & tetap relevan
+        const lastMessages = session.messages.slice(-6); 
+        
+        // Format ulang agar sesuai standar OpenAI (user & assistant)
+        conversationHistory = lastMessages.map(msg => ({
+            role: msg.role === 'bot' ? 'assistant' : 'user', // Convert 'bot' ke 'assistant'
+            content: msg.content
+        }));
+    }
+    // =================================================================
+
+    // 2. RAG Process
     let ragResult; 
     let finalAnswer;
-    let usedRAG = false;
     let realTokenUsage = 0; 
 
     try {
-       // Panggil RAG 
-       ragResult = await ragService.answerQuestion(message, []);
+       // ✅ PASS HISTORY KE SINI (Agar logic 'Ada dalilnya ga?' jalan)
+       ragResult = await ragService.answerQuestion(message, conversationHistory);
        
        finalAnswer = ragResult.answer; 
-       usedRAG = true;
        
-       // ✅ AMBIL TOKEN ASLI DARI DATA OPENAI
+       // Ambil token usage real
        realTokenUsage = ragResult.usage ? ragResult.usage.total_tokens : 0;
 
-       // Fallback jika usage tidak ada
+       // Fallback estimasi jika null
        if (!realTokenUsage) {
          const inputChars = message.length;
          const outputChars = finalAnswer ? finalAnswer.length : 0;
-         realTokenUsage = Math.ceil((inputChars + outputChars) / 4) + 1400;
+         realTokenUsage = Math.ceil((inputChars + outputChars) / 4) + 100;
        }
 
     } catch (ragError) {
@@ -45,74 +64,81 @@ const guestChat = async (req, res) => {
     }
 
     // =================================================================
-    // 2. ✅ TOKEN TRACKING & REALTIME BALANCE UPDATE
+    // 3. TOKEN TRACKING & BALANCE UPDATE
     // =================================================================
-    let currentRemaining = null; // Variabel untuk menyimpan sisa saldo terbaru
+    let currentRemaining = null; 
 
     if (realTokenUsage > 0) {
         // A. Potong Saldo
         await rateLimitService.trackTokenUsage(null, ipAddress, realTokenUsage);
         console.log(`📉 [GUEST LIMIT] Deducted REAL usage: ${realTokenUsage} tokens`);
 
-        // B. ✅ FIX: Ambil Sisa Saldo TERBARU setelah pemotongan
-        // Middleware mengirim saldo "sebelum" dipotong. Kita butuh saldo "sesudah" dipotong.
+        // B. Ambil Sisa Saldo TERBARU
         const quotaStatus = await rateLimitService.getQuotaStatus(ipAddress, 'guest');
         currentRemaining = quotaStatus.remaining;
         console.log(`📊 [GUEST LIMIT] Updated Balance: ${currentRemaining}`);
     }
-    // =================================================================
 
-    // Session Management
-    if (!guestSessions.has(currentSessionId)) {
-        guestSessions.set(currentSessionId, { messages: [], lastActivity: new Date() });
-    }
-    const session = guestSessions.get(currentSessionId);
-    session.messages.push({ role: 'user', content: message }, { role: 'bot', content: finalAnswer });
+    // =================================================================
+    // 4. SAVE SESSION (UPDATE HISTORY)
+    // =================================================================
     
-    // Auto cleanup
+    // Jika sesi belum ada, buat baru
+    if (!guestSessions.has(currentSessionId)) {
+        guestSessions.set(currentSessionId, { 
+            messages: [], 
+            createdAt: new Date(),
+            lastActivity: new Date() 
+        });
+    }
+    
+    const session = guestSessions.get(currentSessionId);
+    
+    // Simpan pesan baru
+    session.messages.push({ role: 'user', content: message });
+    session.messages.push({ role: 'bot', content: finalAnswer });
+    session.lastActivity = new Date(); // Update activity time
+    
+    // Cleanup otomatis
     cleanupOldSessions();
 
-    // Response
+    // 5. Kirim Response
     res.json({
       success: true,
       reply: finalAnswer, 
       sessionId: currentSessionId,
       timestamp: new Date().toISOString(),
-      // ✅ Kirim data usage DAN remaining terbaru ke frontend
-      // Frontend akan memprioritaskan 'remaining' di sini daripada di Header
       usage: {
         tokensUsed: realTokenUsage, 
         policy: 'guest',
-        remaining: currentRemaining // <-- KUNCI PERBAIKANNYA
+        remaining: currentRemaining 
       }
     });
 
   } catch (error) {
     console.error('❌ [GUEST ERROR]', error.message);
     
-    // Fallback Logic (Direct OpenAI)
+    // --- FALLBACK LOGIC ---
+    // Jika RAG mati total, switch ke OpenAI direct (tetap pakai history)
     if (error.message.includes('Qdrant') || error.message.includes('fetch')) {
         try {
-            const fallbackResponse = await generateAIResponse(message, [], 'general');
+            // Ambil history lagi (karena scope variabel di atas)
+            let fallbackHistory = [];
+            if (guestSessions.has(req.body.sessionId)) {
+                 const msgs = guestSessions.get(req.body.sessionId).messages.slice(-6);
+                 fallbackHistory = msgs.map(m => ({ role: m.role==='bot'?'assistant':'user', content: m.content }));
+            }
+
+            const fallbackResponse = await generateAIResponse(message, fallbackHistory, null, 'general');
             
             const replyText = typeof fallbackResponse === 'object' ? fallbackResponse.content : fallbackResponse;
-            const usageData = typeof fallbackResponse === 'object' ? fallbackResponse.usage : null;
+            const fallbackUsage = fallbackResponse.usage ? fallbackResponse.usage.total_tokens : 0;
             
-            let fallbackTokens = 0;
-            if (usageData) {
-                fallbackTokens = usageData.total_tokens;
-            } else {
-                fallbackTokens = Math.ceil((message.length + replyText.length) / 4);
+            // Track usage fallback
+            if (fallbackUsage > 0) {
+                await rateLimitService.trackTokenUsage(null, req.ip, fallbackUsage);
             }
-
-            let fallbackRemaining = null;
-
-            if (fallbackTokens > 0) {
-                await rateLimitService.trackTokenUsage(null, req.ip, fallbackTokens);
-                // Ambil saldo terbaru juga di sini
-                const quotaStatus = await rateLimitService.getQuotaStatus(req.ip, 'guest');
-                fallbackRemaining = quotaStatus.remaining;
-            }
+            const fallbackQuota = await rateLimitService.getQuotaStatus(req.ip, 'guest');
 
             return res.json({
                 success: true,
@@ -120,23 +146,22 @@ const guestChat = async (req, res) => {
                 sessionId: req.body.sessionId || `guest-${Date.now()}`,
                 fallback: true,
                 usage: { 
-                    tokensUsed: fallbackTokens, 
-                    policy: 'guest',
-                    remaining: fallbackRemaining // <-- Kirim sisa saldo terbaru
+                    tokensUsed: fallbackUsage, 
+                    remaining: fallbackQuota.remaining 
                 }
             });
         } catch (e) { console.error("Fallback error", e); }
     }
 
     if (error.message.includes('rate_limit')) {
-        return res.status(429).json({ success: false, message: "Terlalu banyak permintaan." });
+        return res.status(429).json({ success: false, message: "Terlalu banyak permintaan. Kuota habis." });
     }
 
     res.status(500).json({ success: false, message: "System Error" });
   }
 };
 
-// ... (fungsi getter lain tidak berubah) ...
+// ... (Helper functions getter/cleanup di bawah tidak perlu diubah, tetap sama) ...
 const getGuestConversation = async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -159,9 +184,9 @@ const getGuestSessionInfo = async (req, res) => {
       data: {
         sessionId: sessionId,
         messageCount: session.messages.length,
-        createdAt: session.createdAt,
+        createdAt: session.createdAt || new Date(),
         lastActivity: session.lastActivity,
-        ageInMinutes: Math.round((new Date() - session.createdAt) / (1000 * 60))
+        ageInMinutes: Math.round((new Date() - (session.createdAt || new Date())) / (1000 * 60))
       }
     });
   } catch (error) {
@@ -181,7 +206,7 @@ const clearGuestSession = async (req, res) => {
 
 const cleanupOldSessions = () => {
   const now = new Date();
-  const MAX_AGE = 2 * 60 * 60 * 1000; 
+  const MAX_AGE = 2 * 60 * 60 * 1000; // 2 Jam
   for (const [sessionId, session] of guestSessions.entries()) {
     if (now - session.lastActivity > MAX_AGE) guestSessions.delete(sessionId);
   }
