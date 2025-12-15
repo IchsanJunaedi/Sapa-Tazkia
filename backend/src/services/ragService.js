@@ -24,56 +24,51 @@ class RagService {
   }
 
   // =============================================================================
-  // 1. QUERY OPTIMIZATION (THE BRAIN) 🧠
+  // 1. QUERY OPTIMIZATION (THE BRAIN) 🧠 - HYBRID MODE
   // =============================================================================
 
   async generateSearchQueries(userQuery, history = []) {
-    const startGen = Date.now();
     try {
       const finalQueries = new Set();
+      const cleanQuery = userQuery.toLowerCase().trim();
+      
+      // --- LOGIC: CONTEXT INJECTION (FAST & STABLE) ⚡ ---
+      // Daripada panggil AI Refiner (yang lama & bisa timeout), kita pakai Logic Kode.
+      // Jika pertanyaan pendek/ambigu DAN ada history, GABUNGKAN dengan pertanyaan sebelumnya.
+      
+      let contextAdded = false;
+
+      if (history.length > 0) {
+          // Ambil pertanyaan user terakhir dari history
+          const lastUserMessage = history.find(m => m.role === 'user')?.content || "";
+          
+          // Deteksi pertanyaan ambigu (contoh: "Dalilnya?", "Lokasinya dimana?", "Syaratnya?")
+          const isShort = cleanQuery.split(' ').length < 6; // Kurang dari 6 kata
+          const triggers = ['nya', 'itu', 'tersebut', 'tadi', 'ini', 'dia', 'beliau', 'dimana', 'berapa', 'kapan'];
+          const hasTrigger = triggers.some(w => cleanQuery.includes(w));
+
+          if ((isShort || hasTrigger) && lastUserMessage.length > 2) {
+              // ⚡ SPEED HACK: Gabungkan String (Instant, 0ms)
+              // Contoh: "Dalilnya ada ga?" + "Apa itu Ijarah?" 
+              // Menjadi: "Dalilnya ada ga? Apa itu Ijarah?"
+              // Vector DB akan otomatis menangkap konteks "Ijarah".
+              const combinedQuery = `${userQuery} ${lastUserMessage}`;
+              
+              console.log(`🔗 [CONTEXT FIX] Combined Query: "${combinedQuery}"`);
+              finalQueries.add(combinedQuery);
+              contextAdded = true;
+          }
+      }
+
+      // Selalu masukkan query asli juga sebagai cadangan
       finalQueries.add(userQuery);
 
+      // Manual Expansion (Hardcoded Knowledge - Instant)
       const manualQueries = this.expandQueryManually(userQuery);
       if (manualQueries.length > 0) manualQueries.forEach(q => finalQueries.add(q));
 
-      // --- LOGIC: SMART FAST PATH ⚡ ---
-      const cleanQuery = userQuery.toLowerCase().trim();
-      const wordCount = cleanQuery.split(/\s+/).length;
-      
-      // Deteksi kata rujukan (Contextual References)
-      const hasReferenceWords = ['nya', 'itu', 'tersebut', 'tadi', 'ini', 'dia'].some(w => cleanQuery.includes(w));
-      const isFollowUp = history.length > 0; 
-      
-      // KONDISI JALANKAN AI REFINER:
-      if (wordCount > 5 || isFollowUp || hasReferenceWords) {
-        try {
-          // 🚨 UPDATE: Timeout dinaikkan ke 6000ms (6 Detik) - ULTRA SAFE
-          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve([]), 6000));
-          
-          const startAI = Date.now();
-          const aiQueries = await Promise.race([
-            openaiService.refineQuery(userQuery, history),
-            timeoutPromise
-          ]);
-          
-          const aiDuration = Date.now() - startAI;
-          if (aiDuration > 2000) console.warn(`⚠️ [Perf] AI Refiner took ${aiDuration}ms`);
-
-          if (Array.isArray(aiQueries) && aiQueries.length > 0) {
-              console.log(`   ↳ 🤖 AI Logic added: ${JSON.stringify(aiQueries)}`);
-              aiQueries.forEach(q => finalQueries.add(q));
-          } else if (aiDuration >= 4500) {
-              console.warn('⚠️ [RAG] AI Refiner Timed Out (Fallback to raw search)');
-          }
-        } catch (aiError) {
-          console.warn('⚠️ [RAG] AI Refiner busy/error');
-        }
-      } else {
-         console.log('⚡ [RAG] Fast Path: Skipping AI Refiner for short query.');
-      }
-
       const queryArray = Array.from(finalQueries).slice(0, 4); 
-      console.log(`✅ [RAG] Queries Generated: ${JSON.stringify(queryArray)}`);
+      console.log(`✅ [RAG] Queries Ready: ${JSON.stringify(queryArray)}`);
       return queryArray;
 
     } catch (error) {
@@ -199,18 +194,22 @@ class RagService {
   async answerQuestion(userMessage, conversationHistory = []) {
     const startTotal = Date.now();
     try {
-      // Fast Path Check untuk pesan sangat pendek TANPA history
-      if (userMessage.length < 5 && conversationHistory.length === 0) {
-        return { 
-            answer: "Halo! Saya Asisten Virtual Sapa Tazkia. Ada yang bisa saya bantu seputar kampus STMIK Tazkia?", 
-            usage: {}, 
-            docsFound: 0 
-        };
+      // 1. Fast Path Check untuk Salam/Basa-basi (0ms - Gak usah ke DB)
+      if (userMessage.length < 15 && conversationHistory.length === 0) {
+         const lower = userMessage.toLowerCase();
+         if (['halo', 'hi', 'assalamualaikum', 'pagi', 'tes'].some(w => lower.includes(w))) {
+             return { 
+                 answer: "Waalaikumsalam! Halo, saya Kia. Ada yang bisa dibantu seputar Tazkia?", 
+                 usage: {}, docsFound: 0, metrics: { totalTime: 0.01, genTime: 0 } 
+             };
+         }
       }
       
+      // 2. Search (Using Fast Logic)
       const relevantDocs = await this.searchRelevantDocs(userMessage, conversationHistory);
       const contextString = this.compileContext(relevantDocs);
       
+      // 3. Generate Answer
       const options = {
         questionType: 'general',
         forceContextUsage: relevantDocs.length > 0
@@ -280,7 +279,7 @@ class RagService {
   async deleteCollection() { try { await client.deleteCollection(COLLECTION_NAME); } catch {} }
 
   // =============================================================================
-  // 5. INGESTION (DATA LOADING - LOGIC UTUH DARI KODE ANDA)
+  // 5. INGESTION (DATA LOADING - ORIGINAL LOGIC PRESERVED)
   // =============================================================================
 
   async ingestData() {
