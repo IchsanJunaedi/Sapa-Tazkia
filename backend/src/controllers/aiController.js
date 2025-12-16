@@ -269,16 +269,39 @@ const getChatHistory = async (req, res) => {
     }
 };
 
+// ✅ FIX 3: IMPROVED DELETE FUNCTION
 const deleteConversation = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user.id;
-        await prisma.conversation.deleteMany({
-            where: { id: parseInt(id), userId }
+
+        // Validasi ID
+        if (!id || isNaN(parseInt(id))) {
+             return res.status(400).json({ success: false, message: "ID Chat tidak valid" });
+        }
+
+        // Gunakan deleteMany untuk keamanan (ID + userId)
+        // Karena Schema sudah onDelete: Cascade, ini akan otomatis menghapus message
+        const result = await prisma.conversation.deleteMany({
+            where: { 
+                id: parseInt(id), 
+                userId: userId // Security: Hanya hapus milik sendiri
+            }
         });
-        res.json({ success: true, message: "Deleted" });
+
+        // Cek apakah ada yang terhapus (jika 0 berarti tidak ditemukan atau bukan pemilik)
+        if (result.count === 0) {
+            return res.status(404).json({ success: false, message: "Chat tidak ditemukan atau Anda tidak memiliki akses" });
+        }
+
+        res.json({ success: true, message: "Percakapan berhasil dihapus" });
     } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to delete" });
+        // Log error yang sebenarnya ke console server agar bisa ditelusuri
+        console.error("❌ [DELETE ERROR]", error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Gagal menghapus percakapan. Silakan coba lagi nanti." 
+        });
     }
 };
 
