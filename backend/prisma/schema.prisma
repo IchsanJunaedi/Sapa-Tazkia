@@ -24,11 +24,11 @@ model User {
   isProfileComplete Boolean @default(false)
   dateOfBirth DateTime?
 
-  phone     String?  @db.VarChar(15)
+  phone      String?  @db.VarChar(15)
   programStudiId Int?
-  angkatan  Int?
+  angkatan   Int?
 
-  status    String   @default("pending") @db.VarChar(20)
+  status     String   @default("pending") @db.VarChar(20)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -49,15 +49,15 @@ model User {
 }
 
 model Session {
-  id           String    @id @default(uuid()) @db.VarChar(255)
-  userId       Int
-  token        String    @db.Text
-  ipAddress    String?   @db.VarChar(45)
-  userAgent    String?   @db.Text
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  lastActivity DateTime  @default(now())
-  expiresAt    DateTime
+  id            String    @id @default(uuid()) @db.VarChar(255)
+  userId        Int
+  token         String    @db.Text
+  ipAddress     String?   @db.VarChar(45)
+  userAgent     String?   @db.Text
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  lastActivity  DateTime  @default(now())
+  expiresAt     DateTime
 
   user User @relation(fields: [userId], references: [id])
 
@@ -76,7 +76,7 @@ model ProgramStudi {
   status    String   @default("active") @db.VarChar(20)
   createdAt DateTime @default(now())
 
-  users   User[]
+  users    User[]
   courses Course[]
 
   @@map("program_studi")
@@ -108,7 +108,7 @@ model AcademicGrade {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  user   User   @relation(fields: [userId], references: [id])
+  user    User   @relation(fields: [userId], references: [id])
   course Course @relation(fields: [courseId], references: [id])
 
   @@unique([userId, courseId, semester])
@@ -141,8 +141,8 @@ model Conversation {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id])
-  messages Message[]
+  user      User      @relation(fields: [userId], references: [id])
+  messages  Message[]
 
   @@map("chat_conversations")
 }
@@ -155,7 +155,8 @@ model Message {
   responseTime   Float?
   createdAt      DateTime @default(now())
 
-  conversation Conversation @relation(fields: [conversationId], references: [id])
+  // ✅ PERBAIKAN DI SINI: Menambahkan onDelete: Cascade
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@map("chat_messages")
 }
@@ -194,17 +195,17 @@ model RateLimit {
 }
 
 model RateLimitLog {
-  id           String   @id @default(cuid())
-  userId       String?
-  ipAddress    String?
-  userAgent    String?
-  endpoint     String
-  method       String
-  statusCode   Int
-  wasBlocked   Boolean  @default(false)
-  requestSize  Int?     // tokens used
-  responseTime Int?     // ms
-  timestamp    DateTime @default(now())
+  id             String   @id @default(cuid())
+  userId         String?
+  ipAddress      String?
+  userAgent      String?
+  endpoint       String
+  method         String
+  statusCode     Int
+  wasBlocked     Boolean  @default(false)
+  requestSize    Int?     // tokens used
+  responseTime   Int?     // ms
+  timestamp      DateTime @default(now())
 
   @@index([timestamp])
   @@index([userId, timestamp])
