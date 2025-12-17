@@ -2,16 +2,16 @@ import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
-import { sendMessageToAI } from '../api/aiService'; 
-import { Plus, ArrowUp, MoreHorizontal, Trash2} from 'lucide-react'; // ✅ Import Icon Download
+import { sendMessageToAI, cancelCurrentRequest } from '../api/aiService';
+import { Plus, ArrowUp, MoreHorizontal, Trash2, Square, RotateCcw } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Sidebar from '../components/layout/SideBar';
-import ChatWindow from '../components/chat/ChatWindow'; 
+import ChatWindow from '../components/chat/ChatWindow';
 import RateLimitStatus from '../components/common/RateLimitStatus';
 import { generateTranscriptPDF } from '../utils/pdfGenerator'; // ✅ Import PDF Generator
 
-// --- 1. Komponen ChatInput (FIXED: Direct DOM Manipulation) ---
-const ChatInput = ({ onSend, disabled }) => {
+// --- 1. Komponen ChatInput (UPDATED: Cancel Button Feature) ---
+const ChatInput = ({ onSend, disabled, isGenerating, onCancel }) => {
     const [input, setInput] = useState('');
     const textareaRef = useRef(null);
     const formRef = useRef(null);
@@ -22,20 +22,20 @@ const ChatInput = ({ onSend, disabled }) => {
         const textarea = textareaRef.current;
         const form = formRef.current;
         if (textarea && form) {
-            textarea.style.height = 'auto'; 
+            textarea.style.height = 'auto';
             const currentHeight = textarea.scrollHeight;
             textarea.style.height = `${Math.min(currentHeight, 150)}px`;
             if (currentHeight > 52) {
-                form.style.borderRadius = '1.5rem'; 
+                form.style.borderRadius = '1.5rem';
             } else {
-                form.style.borderRadius = '30px'; 
+                form.style.borderRadius = '30px';
             }
         }
     };
 
     const handleSubmit = (e) => {
         if (e) e.preventDefault();
-        if (input.trim() && !isTooLong && !disabled) {
+        if (input.trim() && !isTooLong && !disabled && !isGenerating) {
             onSend(input.trim());
             setInput('');
             if (textareaRef.current && formRef.current) {
@@ -56,46 +56,59 @@ const ChatInput = ({ onSend, disabled }) => {
         adjustHeightAndShape();
     }, [input]);
 
-    const isButtonEnabled = input.trim() && !isTooLong && !disabled;
+    const canSend = input.trim() && !isTooLong && !disabled && !isGenerating;
 
     return (
         <div className="p-4 md:p-6 border-t border-gray-200 flex justify-center bg-[#fef6e4]">
-            <form 
+            <form
                 ref={formRef}
-                onSubmit={handleSubmit} 
+                onSubmit={handleSubmit}
                 className="w-full max-w-3xl flex items-end p-2 bg-white border border-gray-300 shadow-xl transition-all duration-200 ease-out relative"
-                style={{ borderRadius: '30px' }} 
+                style={{ borderRadius: '30px' }}
             >
-                <button type="button" className="p-2 mb-1 mr-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0 h-10 w-10 flex items-center justify-center" title="Attach" disabled={disabled}>
+                <button type="button" className="p-2 mb-1 mr-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0 h-10 w-10 flex items-center justify-center" title="Attach" disabled={disabled || isGenerating}>
                     <Plus size={20} />
                 </button>
-                
+
                 <textarea
                     ref={textareaRef}
                     placeholder="Message Sapa Tazkia"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    disabled={disabled}
+                    disabled={disabled || isGenerating}
                     rows={1}
                     className="flex-1 py-3 px-2 text-base text-gray-700 placeholder-gray-500 focus:outline-none bg-white resize-none max-h-[150px]"
                     style={{ lineHeight: '1.5', minHeight: '44px' }}
                 />
-                
+
                 <div className="relative group mb-1 ml-2 flex-shrink-0">
-                    <button
-                        type="submit"
-                        disabled={!isButtonEnabled}
-                        className={`h-10 w-10 flex items-center justify-center rounded-full transition-colors shadow-md ${
-                            isButtonEnabled 
-                            ? 'bg-blue-500 hover:bg-blue-600 text-white' 
-                            : 'bg-gray-300 cursor-not-allowed text-gray-500'
-                        }`}
-                        aria-label="Send Message"
-                    >
-                        <ArrowUp size={20} />
-                    </button>
-                    {isTooLong && (
+                    {/* Tombol Cancel saat Generating */}
+                    {isGenerating ? (
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="h-10 w-10 flex items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white transition-all duration-200 shadow-md animate-pulse"
+                            aria-label="Cancel Generation"
+                            title="Batalkan"
+                        >
+                            <Square size={14} fill="currentColor" />
+                        </button>
+                    ) : (
+                        /* Tombol Send Normal */
+                        <button
+                            type="submit"
+                            disabled={!canSend}
+                            className={`h-10 w-10 flex items-center justify-center rounded-full transition-all duration-200 shadow-md ${canSend
+                                ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                                : 'bg-gray-300 cursor-not-allowed text-gray-500'
+                                }`}
+                            aria-label="Send Message"
+                        >
+                            <ArrowUp size={20} />
+                        </button>
+                    )}
+                    {isTooLong && !isGenerating && (
                         <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-max px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none shadow-lg z-50">
                             Message is too long
                             <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
@@ -107,19 +120,20 @@ const ChatInput = ({ onSend, disabled }) => {
     );
 };
 
-// --- 2. Komponen Utama ChatPage (MODIFIED FOR PDF FEATURE) ---
+// --- 2. Komponen Utama ChatPage (UPDATED: Cancel & Retry Feature) ---
 const ChatPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { chatId } = useParams(); 
-    
+    const { chatId } = useParams();
+
     const { user, logout, loading, isAuthenticated } = useAuth();
 
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null); 
+    const [error, setError] = useState(null);
     const [isStartingNewChat, setIsStartingNewChat] = useState(false);
-    
+    const [lastUserMessage, setLastUserMessage] = useState(null); // ✅ NEW: untuk Retry
+
     // IS GUEST INITIALIZATION
     const [isGuest, setIsGuest] = useState(() => {
         if (location.state && typeof location.state.isGuest !== 'undefined') {
@@ -127,7 +141,7 @@ const ChatPage = () => {
         }
         const urlGuest = new URLSearchParams(location.search).get('guest') === 'true';
         if (urlGuest) return true;
-        
+
         const token = localStorage.getItem('token');
         if (token) return false;
 
@@ -139,7 +153,7 @@ const ChatPage = () => {
     const [currentChatId, setCurrentChatId] = useState(() => {
         if (chatId) return chatId;
         if (location.state?.initialMessage || location.state?.fromLandingPage) {
-            return null; 
+            return null;
         }
         const saved = localStorage.getItem('chatpage_state');
         if (saved) {
@@ -152,15 +166,15 @@ const ChatPage = () => {
         }
         return null;
     });
-    
+
     const [chatHistory, setChatHistory] = useState([]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
-    
+
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [chatToDelete, setChatToDelete] = useState(null);
     const [showMenu, setShowMenu] = useState(false);
-    
+
     const chatContainerRef = useRef(null);
     const menuButtonRef = useRef(null);
 
@@ -168,7 +182,7 @@ const ChatPage = () => {
         hasProcessedInitialState: false,
         isProcessingInitialMessage: false,
         hasUserInitiatedNewChat: false,
-        hasRestoredFromUrl: false 
+        hasRestoredFromUrl: false
     });
 
     // IS NEW CHAT INITIALIZATION
@@ -262,7 +276,7 @@ const ChatPage = () => {
         if (chatId && isAuthenticated && !isGuest && !initializationRef.current.hasRestoredFromUrl) {
             if (messages.length === 0 || currentChatId !== chatId) {
                 initializationRef.current.hasRestoredFromUrl = true;
-                
+
                 setCurrentChatId(chatId);
                 setIsNewChat(false);
                 setIsLoading(true);
@@ -280,8 +294,8 @@ const ChatPage = () => {
                     })
                     .catch(err => {
                         console.error("❌ Failed to restore chat from URL:", err);
-                        if(err.response?.status === 404) {
-                             navigate('/chat', { replace: true });
+                        if (err.response?.status === 404) {
+                            navigate('/chat', { replace: true });
                         }
                     })
                     .finally(() => {
@@ -307,7 +321,7 @@ const ChatPage = () => {
         setIsDeleting(true);
         const previousChatHistory = [...chatHistory];
         setChatHistory(prev => prev.filter(chat => chat.id !== chatToDelete));
-        
+
         if (currentChatId === chatToDelete) {
             setCurrentChatId(null);
             setMessages([]);
@@ -345,11 +359,11 @@ const ChatPage = () => {
     const processMessageContent = (msg) => {
         // Cek jika pesan mengandung tag khusus
         if (msg.role === 'bot' && msg.content && msg.content.includes('[DOWNLOAD_PDF]')) {
-             return {
-                 ...msg,
-                 content: msg.content.replace('[DOWNLOAD_PDF]', '').trim(),
-                 hasPdfButton: true // Flag untuk menampilkan tombol
-             };
+            return {
+                ...msg,
+                content: msg.content.replace('[DOWNLOAD_PDF]', '').trim(),
+                hasPdfButton: true // Flag untuk menampilkan tombol
+            };
         }
         return msg;
     };
@@ -378,21 +392,21 @@ const ChatPage = () => {
         }
 
         setIsLoading(true);
-        setError(null); 
+        setError(null);
 
         try {
             const effectiveCurrentChatId = forceNewChat ? null : currentChatId;
             const shouldCreateNewChat = forceNewChat || (!effectiveCurrentChatId && isNewChat);
-            
+
             console.log('🤖 [CHAT PAGE] Sending to AI...');
 
             const response = await sendMessageToAI(
-                messageText, 
-                isGuestMode, 
+                messageText,
+                isGuestMode,
                 shouldCreateNewChat,
                 effectiveCurrentChatId
             );
-            
+
             // ✅ PROCESS RESPONSE FOR PDF TAG
             let botContent = response.message || response.reply || 'Maaf, tidak ada respons dari AI.';
             let hasPdfButton = false;
@@ -415,12 +429,12 @@ const ChatPage = () => {
 
             if (response.conversationId) {
                 setCurrentChatId(response.conversationId);
-                
+
                 if (shouldCreateNewChat) {
                     setIsNewChat(false);
                     navigate(`/chat/${response.conversationId}`, { replace: true });
                 }
-                
+
                 setTimeout(() => {
                     loadChatHistory(true);
                 }, 500);
@@ -428,9 +442,23 @@ const ChatPage = () => {
 
         } catch (error) {
             console.error('❌ [CHAT PAGE] Error sending message:', error);
-            
+
+            // ✅ Handle cancelled request
+            if (error.isCancelled) {
+                const cancelledMessage = {
+                    id: Date.now() + 1,
+                    content: 'Generasi jawaban dibatalkan.',
+                    sender: 'ai',
+                    role: 'bot',
+                    timestamp: new Date().toISOString(),
+                    isCancelled: true
+                };
+                setMessages(prev => [...prev, cancelledMessage]);
+                return; // Jangan process error lainnya
+            }
+
             if (error.status === 429 || error.code === 'rate_limit_exceeded') {
-                setError(error); 
+                setError(error);
             } else {
                 const errorMessage = {
                     id: Date.now() + 1,
@@ -448,7 +476,7 @@ const ChatPage = () => {
                 initializationRef.current.isProcessingInitialMessage = false;
             }
         }
-    }, [currentChatId, loadChatHistory, isNewChat, navigate]); 
+    }, [currentChatId, loadChatHistory, isNewChat, navigate]);
 
     const handleSendMessage = async (messageText) => {
         if (!isGuest && (!isAuthenticated || !user)) {
@@ -456,7 +484,8 @@ const ChatPage = () => {
             return;
         }
 
-        setError(null); 
+        setError(null);
+        setLastUserMessage(messageText); // ✅ Simpan untuk Retry
 
         const userMessage = {
             id: Date.now(),
@@ -471,20 +500,133 @@ const ChatPage = () => {
         await handleAIMessage(messageText, isGuest);
     };
 
+    // ✅ NEW: Cancel Generation Handler
+    const handleCancelGeneration = useCallback(() => {
+        const wasCancelled = cancelCurrentRequest();
+        if (wasCancelled) {
+            console.log('🛑 [CHAT PAGE] Generation cancelled by user');
+            // Loading akan di-set false oleh error handler di handleAIMessage
+        }
+    }, []);
+
+    // ✅ FIXED: Retry Handler - menggunakan ref untuk menghindari stale closure
+    const lastUserMessageRef = useRef(null);
+
+    // Update ref setiap kali lastUserMessage berubah
+    useEffect(() => {
+        lastUserMessageRef.current = lastUserMessage;
+    }, [lastUserMessage]);
+
+    const handleRetry = useCallback(async () => {
+        const messageToRetry = lastUserMessageRef.current;
+        console.log('🔄 [CHAT PAGE] Retry called, message:', messageToRetry);
+
+        if (messageToRetry) {
+            // Hapus bubble cancelled/error terakhir
+            setMessages(prev => {
+                const lastMsg = prev[prev.length - 1];
+                if (lastMsg && (lastMsg.isCancelled || lastMsg.isError)) {
+                    return prev.slice(0, -1);
+                }
+                return prev;
+            });
+
+            // Set loading dan kirim ulang
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const effectiveCurrentChatId = currentChatId;
+                const shouldCreateNewChat = !effectiveCurrentChatId && isNewChat;
+
+                console.log('🤖 [CHAT PAGE] Retrying message to AI...');
+
+                const response = await sendMessageToAI(
+                    messageToRetry,
+                    isGuest,
+                    shouldCreateNewChat,
+                    effectiveCurrentChatId
+                );
+
+                // Process response
+                let botContent = response.message || response.reply || 'Maaf, tidak ada respons dari AI.';
+                let hasPdfButton = false;
+
+                if (botContent.includes('[DOWNLOAD_PDF]')) {
+                    botContent = botContent.replace('[DOWNLOAD_PDF]', '').trim();
+                    hasPdfButton = true;
+                }
+
+                const botMessage = {
+                    id: Date.now() + 1,
+                    content: botContent,
+                    sender: 'ai',
+                    role: 'bot',
+                    timestamp: response.timestamp || new Date().toISOString(),
+                    hasPdfButton: hasPdfButton
+                };
+
+                setMessages(prev => [...prev, botMessage]);
+
+                if (response.conversationId) {
+                    setCurrentChatId(response.conversationId);
+
+                    if (shouldCreateNewChat) {
+                        setIsNewChat(false);
+                        navigate(`/chat/${response.conversationId}`, { replace: true });
+                    }
+
+                    setTimeout(() => {
+                        loadChatHistory(true);
+                    }, 500);
+                }
+
+            } catch (error) {
+                console.error('❌ [CHAT PAGE] Retry error:', error);
+
+                if (error.isCancelled) {
+                    const cancelledMessage = {
+                        id: Date.now() + 1,
+                        content: 'Generasi jawaban dibatalkan.',
+                        sender: 'ai',
+                        role: 'bot',
+                        timestamp: new Date().toISOString(),
+                        isCancelled: true
+                    };
+                    setMessages(prev => [...prev, cancelledMessage]);
+                } else if (error.status === 429 || error.code === 'rate_limit_exceeded') {
+                    setError(error);
+                } else {
+                    const errorMessage = {
+                        id: Date.now() + 1,
+                        content: 'Maaf, terjadi kesalahan pada sistem. Silakan coba sesaat lagi.',
+                        sender: 'ai',
+                        role: 'bot',
+                        timestamp: new Date().toISOString(),
+                        isError: true
+                    };
+                    setMessages(prev => [...prev, errorMessage]);
+                }
+            } finally {
+                setIsLoading(false);
+            }
+        }
+    }, [currentChatId, isNewChat, isGuest, navigate, loadChatHistory]);
+
     const handleNewChat = useCallback(() => {
         initializationRef.current.hasUserInitiatedNewChat = true;
-        initializationRef.current.hasProcessedInitialState = true; 
-        
+        initializationRef.current.hasProcessedInitialState = true;
+
         setIsStartingNewChat(true);
         setMessages([]);
         setCurrentChatId(null);
         setIsNewChat(true);
-        setError(null); 
-        
+        setError(null);
+
         navigate('/chat', { replace: true });
-        
+
         initializationRef.current.isProcessingInitialMessage = false;
-        
+
         setTimeout(() => {
             if (!isGuest) {
                 localStorage.removeItem('chatpage_state');
@@ -501,7 +643,7 @@ const ChatPage = () => {
         setIsNewChat(false);
         setIsLoading(true);
         setMessages([]);
-        setError(null); 
+        setError(null);
 
         navigate(`/chat/${chatId}`, { replace: false });
 
@@ -539,7 +681,7 @@ const ChatPage = () => {
 
     // EFFECT INISIALISASI
     useEffect(() => {
-        if (initializationRef.current.hasProcessedInitialState || 
+        if (initializationRef.current.hasProcessedInitialState ||
             initializationRef.current.isProcessingInitialMessage ||
             initializationRef.current.hasUserInitiatedNewChat) {
             return;
@@ -549,20 +691,20 @@ const ChatPage = () => {
             const locationState = location.state;
 
             if (locationState && typeof locationState.isGuest !== 'undefined') {
-                 if (locationState.isGuest !== isGuest) {
-                      setIsGuest(locationState.isGuest);
-                 }
+                if (locationState.isGuest !== isGuest) {
+                    setIsGuest(locationState.isGuest);
+                }
             }
 
             if (locationState?.initialMessage && locationState?.fromLandingPage) {
                 initializationRef.current.isProcessingInitialMessage = true;
                 initializationRef.current.hasProcessedInitialState = true;
-                
+
                 setMessages([]);
                 setCurrentChatId(null);
                 setIsNewChat(true);
                 setError(null);
-                
+
                 const userMessage = {
                     id: Date.now(),
                     content: locationState.initialMessage,
@@ -573,14 +715,14 @@ const ChatPage = () => {
                 };
 
                 setMessages([userMessage]);
-                
+
                 await handleAIMessage(
-                    locationState.initialMessage, 
-                    !!locationState.isGuest, 
-                    true, 
-                    true 
+                    locationState.initialMessage,
+                    !!locationState.isGuest,
+                    true,
+                    true
                 );
-                
+
                 if (window.history.replaceState) {
                     const newState = { ...locationState };
                     delete newState.initialMessage;
@@ -621,7 +763,7 @@ const ChatPage = () => {
             if (isGuest) {
                 const locationIsGuest = location.state?.isGuest;
                 if (locationIsGuest === false || locationIsGuest === undefined) {
-                      setIsGuest(false);
+                    setIsGuest(false);
                 }
             }
             loadChatHistory();
@@ -652,7 +794,7 @@ const ChatPage = () => {
             <div className="flex h-screen bg-[#fbf9f6] items-center justify-center">
                 <div className="text-center">
                     <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                     </div>
                     <p className="text-gray-600">Redirecting...</p>
                 </div>
@@ -662,10 +804,10 @@ const ChatPage = () => {
 
     return (
         <div className="flex h-screen bg-amber-50 font-sans overflow-hidden">
-            
-            <RateLimitStatus 
-                isGuestMode={isGuest} 
-                userName={user ? getUserName() : 'Mahasiswa'} 
+
+            <RateLimitStatus
+                isGuestMode={isGuest}
+                userName={user ? getUserName() : 'Mahasiswa'}
             />
 
             <ConfirmationModal
@@ -698,23 +840,23 @@ const ChatPage = () => {
             <div className="flex-1 flex flex-col overflow-hidden relative">
                 <nav className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 flex-shrink-0">
                     <div className="flex items-center">
-                        <button 
+                        <button
                             onClick={() => navigate('/', { replace: true, state: { from: 'chat-page' } })}
                             className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
                         >
-                            <img 
-                                src="/logosapatazkia.png" 
-                                alt="Sapa Tazkia Logo" 
+                            <img
+                                src="/logosapatazkia.png"
+                                alt="Sapa Tazkia Logo"
                                 className="h-8 w-auto hover:scale-105 transition-transform duration-200"
                             />
                         </button>
                     </div>
-                    
+
                     <div className="flex items-center space-x-4">
                         {isGuest ? (
                             <span className="text-blue-500 font-medium">Mode Tamu</span>
                         ) : null}
-                        
+
                         {!isGuest && currentChatId && (
                             <div className="relative">
                                 <button
@@ -724,7 +866,7 @@ const ChatPage = () => {
                                 >
                                     <MoreHorizontal size={18} />
                                 </button>
-                                
+
                                 {showMenu && (
                                     <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
                                         <button
@@ -752,16 +894,18 @@ const ChatPage = () => {
                             userName={user ? getUserName() : null}
                             isGuest={isGuest}
                             error={error}
-                            // ✅ PASS PDF FUNCTION PROP KE CHATWINDOW
-                            onDownloadPDF={handleDownloadPDF} 
+                            onDownloadPDF={handleDownloadPDF}
+                            onRetry={handleRetry}  // ✅ NEW: Pass Retry handler
                         />
                     </div>
                 </div>
 
                 <div className="flex-shrink-0">
-                    <ChatInput 
-                        onSend={handleSendMessage} 
-                        disabled={isLoading || isDeleting || isStartingNewChat || (error && (error.status === 429 || error.code === 'rate_limit_exceeded'))} 
+                    <ChatInput
+                        onSend={handleSendMessage}
+                        disabled={isDeleting || isStartingNewChat || (error && (error.status === 429 || error.code === 'rate_limit_exceeded'))}
+                        isGenerating={isLoading}
+                        onCancel={handleCancelGeneration}
                     />
                 </div>
             </div>
