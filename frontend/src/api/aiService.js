@@ -4,7 +4,7 @@ import axios from 'axios';
 console.log("%c🚀 AI SERVICE v5.1 LOADED (Catchy UI)", "background: #222; color: #ff00ff; font-size: 12px; padding: 4px;");
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-const DEFAULT_LIMIT = 7000; 
+const DEFAULT_LIMIT = 7000;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -27,7 +27,7 @@ api.interceptors.request.use(
 
 // State Management
 let rateLimitState = {
-  remaining: DEFAULT_LIMIT, 
+  remaining: DEFAULT_LIMIT,
   limit: DEFAULT_LIMIT,
   resetTime: Date.now() + 43200000, // 12 jam default
   userType: 'guest',
@@ -35,6 +35,32 @@ let rateLimitState = {
 };
 
 const rateLimitListeners = new Set();
+
+// ============================================================
+// ABORT CONTROLLER - untuk fitur Cancel
+// ============================================================
+let currentAbortController = null;
+
+/**
+ * Cancel request AI yang sedang berjalan
+ * @returns {boolean} true jika berhasil cancel, false jika tidak ada request aktif
+ */
+export const cancelCurrentRequest = () => {
+  if (currentAbortController) {
+    currentAbortController.abort();
+    currentAbortController = null;
+    console.log('🛑 [AI SERVICE] Request cancelled by user');
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Check apakah ada request yang sedang berjalan
+ */
+export const isRequestInProgress = () => {
+  return currentAbortController !== null;
+};
 
 export const addRateLimitListener = (listener) => {
   rateLimitListeners.add(listener);
@@ -55,54 +81,54 @@ export const getRateLimitState = () => rateLimitState;
 
 // Processor Data
 const processRateLimitData = (response) => {
-    const headers = response.headers;
-    const bodyUsage = response.data?.usage; 
-    const bodyLimits = response.data?.data?.window_limits;
+  const headers = response.headers;
+  const bodyUsage = response.data?.usage;
+  const bodyLimits = response.data?.data?.window_limits;
 
-    let newRemaining = rateLimitState.remaining;
-    let newLimit = rateLimitState.limit;
-    let newReset = rateLimitState.resetTime;
-    let newUserType = rateLimitState.userType;
-    let hasFreshData = false;
+  let newRemaining = rateLimitState.remaining;
+  let newLimit = rateLimitState.limit;
+  let newReset = rateLimitState.resetTime;
+  let newUserType = rateLimitState.userType;
+  let hasFreshData = false;
 
-    if (bodyUsage) {
-        if (bodyUsage.remaining !== undefined && bodyUsage.remaining !== null) {
-            newRemaining = bodyUsage.remaining;
-            hasFreshData = true;
-        } else if (bodyUsage.tokensUsed) {
-            newRemaining = Math.max(0, newRemaining - bodyUsage.tokensUsed);
-            hasFreshData = true;
-        }
-        if (bodyUsage.policy) newUserType = bodyUsage.policy;
+  if (bodyUsage) {
+    if (bodyUsage.remaining !== undefined && bodyUsage.remaining !== null) {
+      newRemaining = bodyUsage.remaining;
+      hasFreshData = true;
+    } else if (bodyUsage.tokensUsed) {
+      newRemaining = Math.max(0, newRemaining - bodyUsage.tokensUsed);
+      hasFreshData = true;
     }
+    if (bodyUsage.policy) newUserType = bodyUsage.policy;
+  }
 
-    if (bodyLimits) {
-        if (bodyLimits.remaining !== undefined) {
-             newRemaining = bodyLimits.remaining;
-             hasFreshData = true;
-        }
-        if (bodyLimits.limit) newLimit = bodyLimits.limit;
-        if (bodyLimits.reset_time) newReset = bodyLimits.reset_time;
+  if (bodyLimits) {
+    if (bodyLimits.remaining !== undefined) {
+      newRemaining = bodyLimits.remaining;
+      hasFreshData = true;
     }
+    if (bodyLimits.limit) newLimit = bodyLimits.limit;
+    if (bodyLimits.reset_time) newReset = bodyLimits.reset_time;
+  }
 
-    const headerRemaining = parseInt(headers['x-ratelimit-remaining']);
-    const headerLimit = parseInt(headers['x-ratelimit-limit']);
-    const headerReset = parseInt(headers['x-ratelimit-reset']);
-    const headerPolicy = headers['x-ratelimit-policy'];
+  const headerRemaining = parseInt(headers['x-ratelimit-remaining']);
+  const headerLimit = parseInt(headers['x-ratelimit-limit']);
+  const headerReset = parseInt(headers['x-ratelimit-reset']);
+  const headerPolicy = headers['x-ratelimit-policy'];
 
-    if (!isNaN(headerLimit) && headerLimit > 100) newLimit = headerLimit;
-    if (!isNaN(headerRemaining) && !hasFreshData) newRemaining = headerRemaining;
-    if (!isNaN(headerReset)) newReset = Date.now() + (headerReset * 1000);
-    if (headerPolicy) newUserType = headerPolicy;
+  if (!isNaN(headerLimit) && headerLimit > 100) newLimit = headerLimit;
+  if (!isNaN(headerRemaining) && !hasFreshData) newRemaining = headerRemaining;
+  if (!isNaN(headerReset)) newReset = Date.now() + (headerReset * 1000);
+  if (headerPolicy) newUserType = headerPolicy;
 
-    updateRateLimitState({
-        remaining: newRemaining,
-        limit: newLimit,
-        resetTime: newReset,
-        userType: newUserType
-    });
+  updateRateLimitState({
+    remaining: newRemaining,
+    limit: newLimit,
+    resetTime: newReset,
+    userType: newUserType
+  });
 
-    return { remaining: newRemaining, limit: newLimit };
+  return { remaining: newRemaining, limit: newLimit };
 };
 
 // ✅ HELPER: Format Jam (contoh: 15:30)
@@ -114,15 +140,15 @@ const formatClockTime = (timestamp) => {
 // ✅ Handle Error Standard
 const handleRateLimitError = (error) => {
   console.error('🚫 [RATE LIMIT] Error:', error.response?.data);
-  
+
   const errorData = error.response?.data;
   const bodyLimit = errorData?.limit || errorData?.data?.limit;
   const safeLimit = (bodyLimit && bodyLimit > 100) ? bodyLimit : (rateLimitState.limit || DEFAULT_LIMIT);
-  
+
   const retryAfter = errorData?.retry_after || 60;
   const userType = errorData?.user_type || 'guest';
   const resetTime = errorData?.reset_time || (Date.now() + (retryAfter * 1000));
-  
+
   // Update state ke 0
   updateRateLimitState({
     remaining: 0,
@@ -130,17 +156,17 @@ const handleRateLimitError = (error) => {
     resetTime: resetTime,
     userType: userType
   });
-  
+
   const timeString = formatClockTime(resetTime);
   // Pesan fallback standar
   const userMessage = `Oops, kuota habis! Kita lanjut lagi jam ${timeString} ya.`;
-  
+
   const rateLimitError = new Error(userMessage);
   rateLimitError.isRateLimit = true;
   rateLimitError.retryAfter = retryAfter;
-  rateLimitError.resetTime = resetTime; 
+  rateLimitError.resetTime = resetTime;
   rateLimitError.userType = userType;
-  
+
   return rateLimitError;
 };
 
@@ -163,7 +189,7 @@ export const showRateLimitModal = (resetTime, userType = 'guest') => {
     font-family: 'Plus Jakarta Sans', sans-serif;
     animation: fadeIn 0.2s ease-out;
   `;
-  
+
   const timeString = formatClockTime(resetTime);
 
   // Style CSS Animation dalam JS
@@ -275,40 +301,66 @@ export const getRateLimitStatus = async () => {
     if (response.data.success) processRateLimitData(response);
     return response.data;
   } catch (error) {
-    return { success: false }; 
+    return { success: false };
   }
 };
 
 export const sendGuestMessage = async (message, sessionId = null) => {
+  // Buat AbortController baru untuk request ini
+  currentAbortController = new AbortController();
+
   try {
-    const response = await guestApi.post('/guest/chat', { message, sessionId });
+    const response = await guestApi.post('/guest/chat', { message, sessionId }, {
+      signal: currentAbortController.signal
+    });
     processRateLimitData(response);
     if (response.data.success && response.data.sessionId) {
       localStorage.setItem('guestSessionId', response.data.sessionId);
     }
     return response.data;
   } catch (error) {
+    // Handle cancelled request
+    if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+      const cancelError = new Error('Request dibatalkan oleh pengguna');
+      cancelError.isCancelled = true;
+      throw cancelError;
+    }
     if (error.response?.status === 429) {
       const rateLimitError = handleRateLimitError(error);
       showRateLimitModal(rateLimitError.resetTime, 'guest');
       throw rateLimitError;
     }
     throw error;
+  } finally {
+    currentAbortController = null;
   }
 };
 
 export const sendAuthenticatedMessage = async (message, isNewChat = false, conversationId = null) => {
+  // Buat AbortController baru untuk request ini
+  currentAbortController = new AbortController();
+
   try {
-    const response = await api.post('/ai/chat', { message, isNewChat, conversationId });
+    const response = await api.post('/ai/chat', { message, isNewChat, conversationId }, {
+      signal: currentAbortController.signal
+    });
     processRateLimitData(response);
     return response.data;
   } catch (error) {
+    // Handle cancelled request
+    if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+      const cancelError = new Error('Request dibatalkan oleh pengguna');
+      cancelError.isCancelled = true;
+      throw cancelError;
+    }
     if (error.response?.status === 429) {
       const rateLimitError = handleRateLimitError(error);
       showRateLimitModal(rateLimitError.resetTime, 'user');
       throw rateLimitError;
     }
     throw error;
+  } finally {
+    currentAbortController = null;
   }
 };
 
@@ -317,8 +369,8 @@ export const sendMessageToAI = async (message, isGuest = false, isNewChat = fals
   if (currentState.remaining === 0) {
     // Cek apakah waktu sekarang sudah melewati waktu reset
     if (Date.now() < currentState.resetTime) {
-        showRateLimitModal(currentState.resetTime, currentState.userType);
-        throw new Error(`Limit habis. Reset pada jam ${formatClockTime(currentState.resetTime)}`);
+      showRateLimitModal(currentState.resetTime, currentState.userType);
+      throw new Error(`Limit habis. Reset pada jam ${formatClockTime(currentState.resetTime)}`);
     }
   }
 
@@ -358,7 +410,7 @@ export const getRateLimitProgress = () => {
   return Math.max(0, ((limit - remaining) / limit) * 100);
 };
 export const formatTimeUntilReset = (resetTime) => {
-    return formatClockTime(resetTime);
+  return formatClockTime(resetTime);
 };
 
 const aiService = {
@@ -384,7 +436,9 @@ const aiService = {
   formatTimeUntilReset,
   getRateLimitProgress,
   shouldShowRateLimitWarning,
-  showRateLimitModal
+  showRateLimitModal,
+  cancelCurrentRequest,
+  isRequestInProgress
 };
 
 export default aiService;
