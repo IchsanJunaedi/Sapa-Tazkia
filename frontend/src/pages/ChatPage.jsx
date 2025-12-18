@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
 import { sendMessageToAI, cancelCurrentRequest } from '../api/aiService';
-import { Plus, ArrowUp, MoreHorizontal, Trash2, Square, RotateCcw } from 'lucide-react';
+import { Plus, ArrowUp, MoreHorizontal, Trash2, Square } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Sidebar from '../components/layout/SideBar';
 import ChatWindow from '../components/chat/ChatWindow';
@@ -845,7 +845,7 @@ const ChatPage = () => {
                             className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
                         >
                             <img
-                                src="/logosapatazkia.png"
+                                src="/a2.png"
                                 alt="Sapa Tazkia Logo"
                                 className="h-8 w-auto hover:scale-105 transition-transform duration-200"
                             />
