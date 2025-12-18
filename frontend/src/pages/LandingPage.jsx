@@ -877,7 +877,7 @@ const LandingPage = () => {
               className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
             >
               <img 
-                src="/logosapatazkia.png" 
+                src="/a2.png" 
                 alt="Sapa Tazkia Logo" 
                 className="h-8 w-auto hover:scale-105 transition-transform duration-200"
               />
