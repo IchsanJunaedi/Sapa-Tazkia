@@ -92,8 +92,8 @@ const guestChat = async (req, res) => {
     // =================================================================
 
     // 🛑 ABORT CHECK: Jika client sudah batalin (Cancel), jangan simpan ke history
-    if (req.closed || req.destroyed) {
-      console.log('🛑 [GUEST CONTROLLER] Request aborted by client. Skipping session update.');
+    if (req.socket.destroyed) {
+      console.log('🛑 [GUEST CONTROLLER] Request aborted by client (socket destroyed). Skipping session update.');
       return;
     }
 
