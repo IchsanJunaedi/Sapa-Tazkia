@@ -149,8 +149,8 @@ const sendChat = async (req, res) => {
         // =================================================================
 
         // 🛑 ABORT CHECK: Jika client sudah putus koneksi (Cancel), jangan simpan ke DB
-        if (req.closed || req.destroyed) {
-            console.log('🛑 [AI CONTROLLER] Request aborted by client. Skipping DB save.');
+        if (req.socket.destroyed) {
+            console.log('🛑 [AI CONTROLLER] Request aborted by client (socket destroyed). Skipping DB save.');
             return;
         }
 
