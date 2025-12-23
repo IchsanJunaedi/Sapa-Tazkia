@@ -85,6 +85,13 @@ const processRateLimitData = (response) => {
   const bodyUsage = response.data?.usage;
   const bodyLimits = response.data?.data?.window_limits;
 
+  // 🔍 DEBUG: Log data yang diterima dari backend
+  console.log('📦 [RATE LIMIT] Backend Response:', {
+    bodyUsage,
+    bodyLimits,
+    currentState: rateLimitState
+  });
+
   let newRemaining = rateLimitState.remaining;
   let newLimit = rateLimitState.limit;
   let newReset = rateLimitState.resetTime;
@@ -95,9 +102,11 @@ const processRateLimitData = (response) => {
     if (bodyUsage.remaining !== undefined && bodyUsage.remaining !== null) {
       newRemaining = bodyUsage.remaining;
       hasFreshData = true;
+      console.log('✅ [RATE LIMIT] Using remaining from server:', newRemaining);
     } else if (bodyUsage.tokensUsed) {
       newRemaining = Math.max(0, newRemaining - bodyUsage.tokensUsed);
       hasFreshData = true;
+      console.log('⚠️ [RATE LIMIT] Calculated remaining locally:', newRemaining);
     }
     if (bodyUsage.policy) newUserType = bodyUsage.policy;
   }
