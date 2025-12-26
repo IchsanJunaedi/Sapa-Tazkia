@@ -33,7 +33,52 @@ const formatMessageWithArabic = (text) => {
   });
 };
 
-// 3. Format teks dengan bold untuk **teks**
+// 3. Format teks dengan link clickable
+const formatMessageWithLinks = (text) => {
+  if (typeof text !== 'string') return text;
+
+  // Regex untuk mendeteksi URL (mendukung http/https dan domain umum seperti .id, .com, .ac.id)
+  const urlRegex = /(https?:\/\/[^\s]+)|(\b(?:[a-z0-9-]+\.)+(?:ac\.id|id|com|net|org|edu|gov)\b(?:[^\s,.]*[^\s,])?)/gi;
+
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = urlRegex.exec(text)) !== null) {
+    const start = match.index;
+    const end = urlRegex.lastIndex;
+
+    // Tambahkan teks sebelum link
+    if (start > lastIndex) {
+      parts.push(text.substring(lastIndex, start));
+    }
+
+    const url = match[0];
+    const href = url.startsWith('http') ? url : `https://${url}`;
+
+    parts.push(
+      <a
+        key={`link-${start}`}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:text-blue-800 underline decoration-blue-500/30 hover:decoration-blue-700 transition-all font-medium"
+      >
+        {url}
+      </a>
+    );
+
+    lastIndex = end;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : text;
+};
+
+// 4. Format teks dengan bold untuk **teks**
 const formatMessageWithBold = (text) => {
   return text.split('\n').map((line, lineIndex) => {
     if (!line.trim()) return <div key={lineIndex} className="h-3"></div>;
@@ -46,7 +91,7 @@ const formatMessageWithBold = (text) => {
       if (boldStart > currentIndex) {
         parts.push(
           <span key={`${lineIndex}-${currentIndex}`}>
-            {line.substring(currentIndex, boldStart)}
+            {formatMessageWithLinks(line.substring(currentIndex, boldStart))}
           </span>
         );
       }
@@ -57,7 +102,7 @@ const formatMessageWithBold = (text) => {
       const boldText = line.substring(boldStart + 2, boldEnd);
       parts.push(
         <strong key={`${lineIndex}-bold-${boldStart}`} className="font-semibold text-gray-900">
-          {boldText}
+          {formatMessageWithLinks(boldText)}
         </strong>
       );
 
@@ -68,20 +113,20 @@ const formatMessageWithBold = (text) => {
     if (currentIndex < line.length) {
       parts.push(
         <span key={`${lineIndex}-end`}>
-          {line.substring(currentIndex)}
+          {formatMessageWithLinks(line.substring(currentIndex))}
         </span>
       );
     }
 
     return (
       <div key={lineIndex} className="mb-2 last:mb-0">
-        {parts.length > 0 ? parts : line}
+        {parts.length > 0 ? parts : formatMessageWithLinks(line)}
       </div>
     );
   });
 };
 
-// 4. Gabungkan semua formatter
+// 5. Gabungkan semua formatter
 const formatMessageContent = (text) => {
   if (!text || typeof text !== 'string') return null;
 
@@ -89,7 +134,12 @@ const formatMessageContent = (text) => {
   const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
   if (arabicRegex.test(cleanedText)) {
-    return formatMessageWithArabic(cleanedText);
+    return formatMessageWithArabic(cleanedText).map(element => {
+      if (element.props && element.props.children) {
+        return React.cloneElement(element, {}, formatMessageWithLinks(element.props.children));
+      }
+      return element;
+    });
   }
 
   return formatMessageWithBold(cleanedText);
@@ -177,10 +227,10 @@ const SingleChatMessage = ({ message, onDownloadPDF, onRetry }) => {
         {/* Message Content */}
         <div className="flex-1 min-w-0">
           <div className={`relative px-4 py-3 rounded-2xl shadow-sm ${isUser
-              ? 'bg-blue-500 text-white rounded-tr-sm'
-              : isCancelledOrError
-                ? 'bg-orange-50 text-gray-600 rounded-tl-sm border border-orange-200'
-                : 'glass-effect text-gray-800 rounded-tl-sm bg-white border border-gray-100'
+            ? 'bg-blue-500 text-white rounded-tr-sm'
+            : isCancelledOrError
+              ? 'bg-orange-50 text-gray-600 rounded-tl-sm border border-orange-200'
+              : 'glass-effect text-gray-800 rounded-tl-sm bg-white border border-gray-100'
             }`}>
 
             <div className={`
