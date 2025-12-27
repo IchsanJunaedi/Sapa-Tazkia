@@ -3,14 +3,13 @@ require('dotenv').config();
 
 // ✅ FIX 1: Cek API Key agar tidak error gaib jika .env bermasalah
 if (!process.env.OPENAI_API_KEY) {
-    console.error("🚨 [FATAL] OPENAI_API_KEY tidak ditemukan di .env!");
+  console.error("🚨 [FATAL] OPENAI_API_KEY tidak ditemukan di .env!");
 }
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    // ✅ FIX 2: Tambahkan Timeout & Retry agar tahan banting (Koneksi Cafe Friendly)
-    timeout: 20000, // 20 Detik
-    maxRetries: 2,  // Coba ulang 2x otomatis
+  apiKey: process.env.OPENAI_API_KEY,
+  timeout: 30000, // 30 Detik (Lebih tahan untuk long context)
+  maxRetries: 2,
 });
 
 const MODEL_NAME = process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -44,11 +43,14 @@ Agar jawaban mudah dibaca, ikuti aturan ini:
 3. **NARASI:** Gunakan paragraf biasa untuk:
    - Definisi konsep (misal: "Apa itu Murabahah?").
    - Sapaan awal dan penutup. 
+4. **LINK / URL:** Wajib gunakan format Markdown:
+   - Format: \`[Nama Website/Halaman](URL)\` (Contoh: \`[Website Tazkia](https://tazkia.ac.id)\`).
+   - **PENTING:** Berikan Jeda (Spasi atau Newline) antar link agar tidak menempel.
 
 ✍️ **GAYA MENJAWAB:**
 1. **Direct Answer:** Jawab inti pertanyaan di kalimat pertama.
 2. **Struktur:** - Paragraf 1: Jawaban Inti.
-   - List/Poin: Detail (Jika perlu).
+   - List/Poin: Detail & Link Resmi (Jika perlu).
    - Penutup: Tawarkan bantuan lain ("Ada lagi yang bisa Kia bantu, Kak?").
 
 ☪️ **ADAB:**
@@ -56,46 +58,18 @@ Agar jawaban mudah dibaca, ikuti aturan ini:
 - Tone: Hangat, Islami, Profesional.
 `;
 
-/**
- * Prompt khusus untuk AI Query Refiner (OPTIMIZED SPEED ⚡)
- * Dibuat lebih ringkas agar respon AI di bawah 2 detik & Format JSON Valid.
- */
-const SYSTEM_PROMPT_REFINER = `
-Role: Search Query Optimizer.
-Tugas: Konversi input user menjadi JSON Array keyword untuk pencarian database.
-
-LOGIC:
-1. Jika input jelas (misal: "Biaya kuliah"), langsung jadikan keyword.
-2. Jika input ambigu (misal: "Dalilnya?", "Lokasinya?"), WAJIB gabungkan dengan topik dari HISTORY CHAT.
-
-CONTOH 1 (Tanpa Konteks):
-Input: "stmik tazkia dimana?"
-Output: ["alamat lokasi kampus stmik tazkia"]
-
-CONTOH 2 (Dengan Konteks):
-History: "Apa itu Musyarakah?"
-Input: "ada dalilnya ga?"
-Output: ["dalil dasar hukum musyarakah al-quran hadis"]
-
-FORMAT OUTPUT: HANYA JSON Array valid. Jangan ada teks lain.
-`;
 
 /**
- * Template Context dengan Instruksi Formatting Ketat
+ * Template Context dengan Instruksi Ringkas (Hemat Token)
  */
 const CONTEXT_INSTRUCTION_TEMPLATE = `
-[DATA PENGETAHUAN DARI DATABASE]
+[CONTEXT]
 {context}
 
-[PERTANYAAN USER]
+[USER QUERY]
 {query}
 
-[INSTRUKSI PENJAWABAN]
-1. Analisa Data di atas.
-2. Jawab pertanyaan user dengan gaya "Direct Answer".
-3. **FORMATTING:** - Jika data berisi daftar, WAJIB ubah menjadi **Bullet Points**.
-   - Jika data adalah Penjelasan Konsep, gunakan **Paragraf Narasi**.
-   - TEBALKAN (**Bold**) kata kunci penting.
+Instruksi: Jawab berdasarkan context di atas. Ikuti persona Kia. Gunakan format yang efisien.
 `;
 
 /**
@@ -105,62 +79,7 @@ const CONTEXT_INSTRUCTION_TEMPLATE = `
  */
 
 /**
- * 1. QUERY REFINEMENT (THE BRAIN) 🧠
- * Fitur: Memperbaiki typo & Context Awareness
- */
-async function refineQuery(rawQuery, history = []) {
-  try {
-    // Optimization: Skip untuk query sapaan pendek HANYA JIKA tidak ada history
-    if (history.length === 0 && (rawQuery.length < 5 || ["halo", "hi", "pagi", "assalamualaikum", "tes"].some(s => rawQuery.toLowerCase().includes(s)))) {
-        return [rawQuery]; 
-    }
-
-    const messages = [{ role: 'system', content: SYSTEM_PROMPT_REFINER }];
-
-    // Inject History (2 Chat Terakhir) agar AI paham konteks
-    if (history.length > 0) {
-         const lastTurn = history.slice(-2);
-         messages.push({
-             role: 'system',
-             content: `HISTORY CHAT TERAKHIR:\n${lastTurn.map(m => `${m.role}: ${m.content}`).join('\n')}`
-         });
-    }
-
-    messages.push({ role: 'user', content: rawQuery });
-
-    const completion = await openai.chat.completions.create({
-      model: MODEL_NAME,
-      messages: messages,
-      temperature: 0,
-      max_tokens: 150,
-      response_format: { type: "json_object" } // Force JSON Mode
-    });
-
-    const result = completion.choices[0].message.content.trim();
-    
-    try {
-        const parsed = JSON.parse(result);
-        // Handle format { "queries": [...] } atau [...]
-        const finalArray = Array.isArray(parsed) ? parsed : (parsed.queries || parsed.results || [rawQuery]);
-        
-        if (finalArray.length > 0) {
-            console.log(`🧠 [AI REFINER] "${rawQuery}" -> ${JSON.stringify(finalArray)}`);
-            return finalArray;
-        }
-    } catch (e) {
-        console.warn(`⚠️ [AI REFINER] Parse fail, fallback to raw query.`);
-    }
-    return [rawQuery];
-
-  } catch (error) {
-    // Log warning saja, jangan throw error agar sistem tetap jalan pakai raw query
-    console.warn('⚠️ [AI REFINER] Fail/Timeout, using raw query:', error.message);
-    return [rawQuery];
-  }
-}
-
-/**
- * 2. EMBEDDING GENERATOR
+ * 1. EMBEDDING GENERATOR
  */
 async function createEmbedding(text) {
   try {
@@ -185,15 +104,15 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
 
     // --- Safety Checks ---
     if (isIdentityQuestion(userMessage)) {
-      return { 
-        content: "Assalamualaikum! 👋 Saya **Kia**, asisten virtual Universitas Tazkia. Kia siap bantu Kakak seputar informasi kampus, prodi, dan akademik. Ada yang bisa dibantu? 😊", 
-        usage: { total_tokens: 0 } 
+      return {
+        content: "Assalamualaikum! 👋 Saya **Kia**, asisten virtual Universitas Tazkia. Kia siap bantu Kakak seputar informasi kampus, prodi, dan akademik. Ada yang bisa dibantu? 😊",
+        usage: { total_tokens: 0 }
       };
     }
     if (isBannedTopicQuestion(userMessage)) {
-      return { 
-        content: "Mohon maaf Kak, Kia hanya fokus menjawab seputar informasi **Akademik & Kampus Tazkia** ya. 🙏 Silakan tanya tentang pendaftaran, biaya, atau prodi.", 
-        usage: { total_tokens: 0 } 
+      return {
+        content: "Mohon maaf Kak, Kia hanya fokus menjawab seputar informasi **Akademik & Kampus Tazkia** ya. 🙏 Silakan tanya tentang pendaftaran, biaya, atau prodi.",
+        usage: { total_tokens: 0 }
       };
     }
 
@@ -209,7 +128,7 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
 
     // Context Injection Logic
     let finalUserPrompt = userMessage;
-    
+
     if (customContext && customContext.trim().length > 0) {
       finalUserPrompt = CONTEXT_INSTRUCTION_TEMPLATE
         .replace('{context}', customContext)
@@ -226,8 +145,11 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
       messages: messages,
       max_tokens: maxTokens,
       temperature: temperature,
-      presence_penalty: 0.1, 
-    });
+      presence_penalty: 0.1,
+      stream: options.stream || false, // ✅ Support Streaming
+    }, { signal: options.abortSignal });
+
+    if (options.stream) return completion;
 
     const reply = completion.choices[0].message.content.trim();
     const usage = completion.usage || { total_tokens: 0 };
@@ -237,9 +159,9 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
 
   } catch (error) {
     console.error('❌ [OPENAI] Gen Answer Error:', error.message);
-    return { 
-      content: "Mohon maaf, koneksi Kia ke server sedang tidak stabil. Silakan coba sesaat lagi ya Kak. 🙏", 
-      usage: {} 
+    return {
+      content: "Mohon maaf, koneksi Kia ke server sedang tidak stabil. Silakan coba sesaat lagi ya Kak. 🙏",
+      usage: {}
     };
   }
 }
@@ -249,17 +171,17 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
  * ✅ UPDATED: Lebih deterministik, anti-quote, dan support context jawaban AI.
  */
 async function generateTitle(userMessage, aiResponse = null) {
-    try {
-      // 1. Validasi input kosong (tetap pertahankan ini)
-      if (!userMessage || userMessage.trim() === "") return "Percakapan Baru";
-      
-      // 2. Jika pesan sangat pendek (< 3 huruf), baru gunakan default
-      if (userMessage.length < 3) return "Percakapan Baru";
+  try {
+    // 1. Validasi input kosong (tetap pertahankan ini)
+    if (!userMessage || userMessage.trim() === "") return "Percakapan Baru";
 
-      const messages = [
-        { 
-          role: 'system', 
-          content: `Anda adalah Title Generator. 
+    // 2. Jika pesan sangat pendek (< 3 huruf), baru gunakan default
+    if (userMessage.length < 3) return "Percakapan Baru";
+
+    const messages = [
+      {
+        role: 'system',
+        content: `Anda adalah Title Generator. 
           Tugas: Buat judul singkat (2-5 kata) yang menggambarkan INTI pertanyaan user.
           
           ATURAN KERAS:
@@ -268,44 +190,44 @@ async function generateTitle(userMessage, aiResponse = null) {
           3. Jika user bertanya lokasi (misal: "dimana"), judul harus mengandung nama lokasi/tempat.
           4. HANYA jika user murni menyapa (misal: "Assalamualaikum", "Halo", "Pagi"), output: "Percakapan Baru".
           5. Prioritaskan isi pertanyaan user daripada jawaban AI.`
-        },
-        { 
-          role: 'user', 
-          content: `User: "${userMessage}"` 
-        }
-      ];
-
-      // Inject konteks jawaban AI (opsional tapi membantu)
-      if (aiResponse) {
-        // Kita potong biar hemat token, ambil intinya saja
-        const cleanAiResponse = aiResponse.substring(0, 100).replace(/\n/g, " ");
-        messages[1].content += `\nKonteks Jawaban AI: "${cleanAiResponse}"`;
+      },
+      {
+        role: 'user',
+        content: `User: "${userMessage}"`
       }
+    ];
 
-      messages[1].content += `\nJudul:`;
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini", 
-        messages: messages,
-        max_tokens: 15,       
-        temperature: 0.3      // Naikkan sedikit biar lebih kreatif menangkap maksud
-      });
-  
-      let title = completion.choices[0].message.content.trim();
-      
-      // Sanitasi akhir: Hapus tanda kutip & titik di akhir
-      title = title.replace(/^["']|["']$/g, '').replace(/\.$/, '');
-      
-      // Fallback terakhir jika AI masih bandel output kosong
-      if (title.length < 3) return "Percakapan Baru";
-
-      return title;
-
-    } catch (error) {
-      console.warn("⚠️ [TITLE GEN] Error, fallback manual:", error.message);
-      // Fallback manual: Ambil 4 kata pertama user
-      return userMessage.split(' ').slice(0, 4).join(' ');
+    // Inject konteks jawaban AI (opsional tapi membantu)
+    if (aiResponse) {
+      // Kita potong biar hemat token, ambil intinya saja
+      const cleanAiResponse = aiResponse.substring(0, 100).replace(/\n/g, " ");
+      messages[1].content += `\nKonteks Jawaban AI: "${cleanAiResponse}"`;
     }
+
+    messages[1].content += `\nJudul:`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: messages,
+      max_tokens: 15,
+      temperature: 0.3      // Naikkan sedikit biar lebih kreatif menangkap maksud
+    });
+
+    let title = completion.choices[0].message.content.trim();
+
+    // Sanitasi akhir: Hapus tanda kutip & titik di akhir
+    title = title.replace(/^["']|["']$/g, '').replace(/\.$/, '');
+
+    // Fallback terakhir jika AI masih bandel output kosong
+    if (title.length < 3) return "Percakapan Baru";
+
+    return title;
+
+  } catch (error) {
+    console.warn("⚠️ [TITLE GEN] Error, fallback manual:", error.message);
+    // Fallback manual: Ambil 4 kata pertama user
+    return userMessage.split(' ').slice(0, 4).join(' ');
+  }
 }
 
 // --- Utils (Safety Filters) ---
@@ -320,20 +242,19 @@ function isBannedTopicQuestion(text) {
 }
 
 async function testOpenAIConnection() {
-    try {
-        const res = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{ role: 'user', content: 'Tes koneksi' }],
-            max_tokens: 5
-        });
-        return { success: true };
-    } catch (e) { return { success: false, error: e.message }; }
+  try {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: 'user', content: 'Tes koneksi' }],
+      max_tokens: 5
+    });
+    return { success: true };
+  } catch (e) { return { success: false, error: e.message }; }
 }
 
 module.exports = {
   generateAIResponse,
   createEmbedding,
-  refineQuery,
   testOpenAIConnection,
-  generateTitle 
+  generateTitle
 };

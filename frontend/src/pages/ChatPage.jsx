@@ -185,6 +185,8 @@ const ChatPage = () => {
         hasRestoredFromUrl: false
     });
 
+    const isFetchingHistoryRef = useRef(false);
+
     // IS NEW CHAT INITIALIZATION
     const [isNewChat, setIsNewChat] = useState(() => {
         if (chatId) return false;
@@ -255,9 +257,10 @@ const ChatPage = () => {
             setChatHistory([]);
             return;
         }
-        if (!user || !user.id) return;
+        if (!user || !user.id || (loading && !forceReload)) return;
 
         try {
+            console.log('🔍 [CHAT PAGE] Loading conversation list...');
             const response = await api.get('/api/ai/conversations');
             setChatHistory(response.data.conversations || []);
         } catch (error) {
@@ -269,39 +272,47 @@ const ChatPage = () => {
                 setChatHistory([]);
             }
         }
-    }, [user, logout, navigate, isGuest]);
+    }, [user, loading, logout, navigate, isGuest]);
 
     // EMERGENCY BRIDGE EFFECT (RESTORE FROM URL)
     useEffect(() => {
         if (chatId && isAuthenticated && !isGuest && !initializationRef.current.hasRestoredFromUrl) {
-            if (messages.length === 0 || currentChatId !== chatId) {
+            // Prevent duplicate history fetch if messages are already present for this chatId
+            if (currentChatId === chatId && messages.length > 0) {
+                console.log("🔍 [CHAT PAGE] History already present in state, skipping fetch.");
                 initializationRef.current.hasRestoredFromUrl = true;
-
-                setCurrentChatId(chatId);
-                setIsNewChat(false);
-                setIsLoading(true);
-                setError(null);
-
-                api.get(`/api/ai/history/${chatId}`)
-                    .then(response => {
-                        if (response.data && Array.isArray(response.data.messages)) {
-                            // ✅ PROCESS MESSAGES FOR PDF TAG
-                            const processedMessages = response.data.messages.map(msg => processMessageContent(msg));
-                            setMessages(processedMessages);
-                        } else {
-                            setMessages([]);
-                        }
-                    })
-                    .catch(err => {
-                        console.error("❌ Failed to restore chat from URL:", err);
-                        if (err.response?.status === 404) {
-                            navigate('/chat', { replace: true });
-                        }
-                    })
-                    .finally(() => {
-                        setIsLoading(false);
-                    });
+                return;
             }
+
+            if (isFetchingHistoryRef.current) return;
+
+            initializationRef.current.hasRestoredFromUrl = true;
+            setCurrentChatId(chatId);
+            setIsNewChat(false);
+            setIsLoading(true);
+            setError(null);
+            isFetchingHistoryRef.current = true;
+
+            console.log("🔍 [CHAT PAGE] Fetching history for:", chatId);
+            api.get(`/api/ai/history/${chatId}`)
+                .then(response => {
+                    if (response.data && Array.isArray(response.data.messages)) {
+                        const processedMessages = response.data.messages.map(msg => processMessageContent(msg));
+                        setMessages(processedMessages);
+                    } else {
+                        setMessages([]);
+                    }
+                })
+                .catch(err => {
+                    console.error("❌ Failed to restore chat from URL:", err);
+                    if (err.response?.status === 404) {
+                        navigate('/chat', { replace: true });
+                    }
+                })
+                .finally(() => {
+                    setIsLoading(false);
+                    isFetchingHistoryRef.current = false;
+                });
         }
     }, [chatId, isAuthenticated, isGuest, messages.length, currentChatId, navigate]);
 
@@ -428,6 +439,9 @@ const ChatPage = () => {
             setMessages(prev => [...prev, botMessage]);
 
             if (response.conversationId) {
+                // IMPORTANT: Mark as restored BEFORE navigating/setting currentChatId
+                // to prevent the Restoration Effect from triggering again redundant fetch
+                initializationRef.current.hasRestoredFromUrl = true;
                 setCurrentChatId(response.conversationId);
 
                 if (shouldCreateNewChat) {
@@ -435,9 +449,8 @@ const ChatPage = () => {
                     navigate(`/chat/${response.conversationId}`, { replace: true });
                 }
 
-                setTimeout(() => {
-                    loadChatHistory(true);
-                }, 500);
+                // Refresh sidebar
+                loadChatHistory(true);
             }
 
         } catch (error) {
@@ -759,16 +772,10 @@ const ChatPage = () => {
 
     // EFFECT LOAD HISTORY
     useEffect(() => {
-        if (isAuthenticated && user && user.id) {
-            if (isGuest) {
-                const locationIsGuest = location.state?.isGuest;
-                if (locationIsGuest === false || locationIsGuest === undefined) {
-                    setIsGuest(false);
-                }
-            }
+        if (isAuthenticated && user && user.id && !loading) {
             loadChatHistory();
         }
-    }, [isAuthenticated, user, isGuest, loadChatHistory, location.state]);
+    }, [isAuthenticated, user?.id, isGuest, loadChatHistory, loading]);
 
     useEffect(() => {
         if (chatContainerRef.current) {

@@ -14,15 +14,15 @@ const cleanMessageContent = (text) => {
 // ✅ 2. Deteksi dan format teks Arabic
 const formatMessageWithArabic = (text) => {
   const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-  
+
   return text.split('\n').map((line, index) => {
     const hasArabic = arabicRegex.test(line);
-    
+
     return (
-      <div 
-        key={index} 
+      <div
+        key={index}
         className={hasArabic ? 'arabic-text' : 'regular-text'}
-        style={{ 
+        style={{
           marginBottom: '0.5rem',
           unicodeBidi: hasArabic ? 'plaintext' : 'normal'
         }}
@@ -37,11 +37,11 @@ const formatMessageWithArabic = (text) => {
 const formatMessageWithBold = (text) => {
   return text.split('\n').map((line, lineIndex) => {
     if (!line.trim()) return <div key={lineIndex} className="h-3"></div>;
-    
+
     const parts = [];
     let currentIndex = 0;
     let boldStart = line.indexOf('**');
-    
+
     while (boldStart !== -1) {
       if (boldStart > currentIndex) {
         parts.push(
@@ -50,21 +50,21 @@ const formatMessageWithBold = (text) => {
           </span>
         );
       }
-      
+
       const boldEnd = line.indexOf('**', boldStart + 2);
       if (boldEnd === -1) break;
-      
+
       const boldText = line.substring(boldStart + 2, boldEnd);
       parts.push(
         <strong key={`${lineIndex}-bold-${boldStart}`} className="font-semibold text-gray-900">
           {boldText}
         </strong>
       );
-      
+
       currentIndex = boldEnd + 2;
       boldStart = line.indexOf('**', currentIndex);
     }
-    
+
     if (currentIndex < line.length) {
       parts.push(
         <span key={`${lineIndex}-end`}>
@@ -72,7 +72,7 @@ const formatMessageWithBold = (text) => {
         </span>
       );
     }
-    
+
     return (
       <div key={lineIndex} className="mb-2 last:mb-0">
         {parts.length > 0 ? parts : line}
@@ -87,11 +87,11 @@ const formatMessageContent = (text) => {
 
   const cleanedText = cleanMessageContent(text);
   const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-  
+
   if (arabicRegex.test(cleanedText)) {
     return formatMessageWithArabic(cleanedText);
   }
-  
+
   return formatMessageWithBold(cleanedText);
 };
 
@@ -110,7 +110,7 @@ const ChatMessage = ({ message }) => {
   // EFFECT: Logika Typing vs Instant Load
   useEffect(() => {
     const fullContent = message.content || '';
-    
+
     // 1. Jika User, langsung tampilkan
     if (isUser) {
       setDisplayContent(fullContent);
@@ -121,7 +121,7 @@ const ChatMessage = ({ message }) => {
     // 2. Cek apakah pesan ini "Baru"
     const msgTime = new Date(message.createdAt || message.timestamp || Date.now()).getTime();
     const now = Date.now();
-    const isRecent = (now - msgTime) < 5000; 
+    const isRecent = (now - msgTime) < 5000;
 
     // 3. Jika History Lama -> Langsung tampilkan
     if (!isRecent) {
@@ -135,14 +135,14 @@ const ChatMessage = ({ message }) => {
     setIsTyping(true);
 
     let index = 0;
-    
+
     // ⚡ PERCEPATAN DI SINI
     const speed = 10; // Jeda antar update lebih singkat (sebelumnya 20)
     const charsPerTick = 3; // Muncul 3 karakter sekaligus (biar ngebut)
 
     const intervalId = setInterval(() => {
       index += charsPerTick;
-      
+
       if (index <= fullContent.length) {
         setDisplayContent(fullContent.slice(0, index));
       } else {
@@ -166,26 +166,24 @@ const ChatMessage = ({ message }) => {
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6 group`}>
       <div className={`flex max-w-[75%] ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
         {/* Avatar */}
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-          isUser ? 'bg-blue-500 ml-3' : 'bg-gradient-to-br from-gray-400 to-gray-600 mr-3'
-        }`}>
-          {isUser ? 
-            <User size={16} className="text-white" /> : 
+        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isUser ? 'bg-blue-500 ml-3' : 'bg-gradient-to-br from-gray-400 to-gray-600 mr-3'
+          }`}>
+          {isUser ?
+            <User size={16} className="text-white" /> :
             <Bot size={16} className="text-white" />
           }
         </div>
-        
+
         {/* Message Content */}
         <div className="flex-1">
-          <div className={`relative px-4 py-3 rounded-2xl ${
-            isUser 
-              ? 'bg-blue-500 text-white rounded-tr-sm' 
+          <div className={`relative px-4 py-3 rounded-2xl ${isUser
+              ? 'bg-blue-500 text-white rounded-tr-sm'
               : 'glass-effect text-gray-800 rounded-tl-sm'
-          }`}>
-            
+            }`}>
+
             <div className={`
-              ${isUser 
-                ? 'font-medium text-[15px] leading-relaxed' 
+              ${isUser
+                ? 'font-medium text-[15px] leading-relaxed'
                 : 'font-normal text-[15px] leading-[1.7] tracking-wide'
               }
             `}>
@@ -200,13 +198,13 @@ const ChatMessage = ({ message }) => {
                 className="glass-effect-copy absolute -bottom-2 -right-2 p-1.5 border border-gray-300 rounded-lg shadow-sm hover:bg-white/50 transition-all duration-300 opacity-0 group-hover:opacity-100 backdrop-blur-sm"
                 title="Salin teks"
               >
-                {copied ? 
-                  <CheckCheck size={14} className="text-green-500" /> : 
+                {copied ?
+                  <CheckCheck size={14} className="text-green-500" /> :
                   <Copy size={14} className="text-gray-600" />
                 }
               </button>
             )}
-            
+
             {/* PDF Download Button */}
             {message.hasPDF && !isTyping && (
               <button className="glass-effect-download mt-3 w-full flex items-center justify-center space-x-2 px-4 py-2 bg-white/30 hover:bg-white/40 rounded-lg transition-all duration-300 text-sm font-medium text-gray-700 backdrop-blur-sm border border-white/20">
@@ -215,7 +213,7 @@ const ChatMessage = ({ message }) => {
               </button>
             )}
           </div>
-          
+
           {/* Timestamp */}
           <p className={`text-xs text-gray-400 mt-2 ${isUser ? 'text-right' : 'text-left'}`}>
             {new Date(message.createdAt || message.timestamp || Date.now()).toLocaleTimeString('id-ID', {
@@ -227,7 +225,7 @@ const ChatMessage = ({ message }) => {
       </div>
 
       {/* CSS Styles */}
-      <style jsx>{`
+      <style>{`
         .glass-effect {
           background: rgba(255, 255, 255, 0.25);
           backdrop-filter: blur(12px);

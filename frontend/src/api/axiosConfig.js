@@ -13,7 +13,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    
+
     console.log('🔍 [AXIOS REQUEST]', {
       url: config.url,
       method: config.method,
@@ -25,12 +25,12 @@ api.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     // ✅ PERBAIKAN: Jangan timpa Content-Type jika sudah ada (untuk FormData dll)
     if (!config.headers['Content-Type']) {
       config.headers['Content-Type'] = 'application/json';
     }
-    
+
     return config;
   },
   (error) => {
@@ -54,7 +54,7 @@ api.interceptors.response.use(
   (error) => {
     // ✅ PERBAIKAN: Handle error lebih spesifik
     const originalRequest = error.config;
-    
+
     console.error('❌ [AXIOS RESPONSE ERROR DETAIL]', {
       url: originalRequest?.url,
       status: error.response?.status,
@@ -66,16 +66,16 @@ api.interceptors.response.use(
     // Handle error berdasarkan status code
     if (error.response) {
       const { status, data } = error.response;
-      
+
       // Unauthorized - token invalid/expired
       if (status === 401) {
         console.log('🛑 [AXIOS] 401 Unauthorized - Clearing auth data');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        
+
         // ✅ PERBAIKAN: Dispatch event untuk notify AuthContext
         window.dispatchEvent(new Event('authTokenExpired'));
-        
+
         // Redirect ke home page jika bukan di landing page
         if (!window.location.pathname.includes('/')) {
           setTimeout(() => {
@@ -83,22 +83,22 @@ api.interceptors.response.use(
           }, 1000);
         }
       }
-      
+
       // Not Found - endpoint tidak ada
       else if (status === 404) {
         console.log('🔍 [AXIOS] 404 Not Found - Endpoint tidak ada:', originalRequest?.url);
       }
-      
+
       // Bad Request - validation error
       else if (status === 400) {
         console.log(`🚫 [AXIOS] 400 Bad Request - ${data?.message || 'Validation error'}`);
       }
-      
+
       // Forbidden - akses ditolak
       else if (status === 403) {
         console.log('🚫 [AXIOS] 403 Forbidden - Access denied');
       }
-      
+
       // Server error
       else if (status >= 500) {
         console.log('💥 [AXIOS] Server error - Please try again later');
@@ -106,7 +106,7 @@ api.interceptors.response.use(
     } else if (error.request) {
       // Network error - tidak dapat terhubung ke server
       console.log('🌐 [AXIOS] Network error - Cannot connect to server');
-      
+
       // ✅ PERBAIKAN: Tampilkan notifikasi ke user
       if (window.showNotification) {
         window.showNotification('Tidak dapat terhubung ke server', 'error');
@@ -147,6 +147,6 @@ export const testConnection = async () => {
 };
 
 // ✅ PERBAIKAN: Test connection saat load (optional)
-testConnection();
+// testConnection();
 
 export default api;

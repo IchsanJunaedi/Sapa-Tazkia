@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
+
   // ✅ BARU: State untuk pending verification
   const [pendingVerification, setPendingVerification] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ✅ PERBAIKAN 2: Enhanced needsProfileCompletion function dengan loading state handling
-  const needsProfileCompletion = () => {
+  const needsProfileCompletion = React.useCallback(() => {
     if (loading) {
       console.log('🔍 [AUTH CONTEXT] Still loading, deferring profile check');
       return false;
@@ -109,10 +109,10 @@ export const AuthProvider = ({ children }) => {
 
     console.log('🔍 [AUTH CONTEXT] User needs profile completion');
     return true;
-  };
+  }, [loading, user, token]);
 
   // ✅ PERBAIKAN: Fungsi setAuthToken (tetap sama)
-  const setAuthToken = (newToken) => {
+  const setAuthToken = React.useCallback((newToken) => {
     console.log('🔍 [AUTH CONTEXT] setAuthToken called:', {
       hasNewToken: !!newToken,
       tokenType: typeof newToken,
@@ -132,20 +132,20 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(false);
       delete api.defaults.headers.common['Authorization'];
     }
-  };
+  }, []);
 
   // ✅ PERBAIKAN: Check logged in user - dengan validasi lengkap
   useEffect(() => {
     const checkLoggedInUser = async () => {
       const storedToken = localStorage.getItem('token');
       const storedUser = localStorage.getItem('user');
-      
+
       console.log('🔍 [AUTH CONTEXT] Checking stored auth data:', {
         hasToken: !!storedToken,
         tokenLength: storedToken?.length,
         hasUser: !!storedUser
       });
-      
+
       if (storedToken && storedUser) {
         try {
           if (typeof storedToken !== 'string' || storedToken.length < 20) {
@@ -154,7 +154,7 @@ export const AuthProvider = ({ children }) => {
           }
 
           const userData = JSON.parse(storedUser);
-          
+
           if (!userData || typeof userData !== 'object') {
             throw new Error('Invalid user data structure');
           }
@@ -163,7 +163,7 @@ export const AuthProvider = ({ children }) => {
           setToken(storedToken);
           setIsAuthenticated(true);
           api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-          
+
           console.log('✅ [AUTH CONTEXT] User restored from storage:', {
             name: userData.fullName || userData.name || 'No Name',
             email: userData.email,
@@ -182,7 +182,7 @@ export const AuthProvider = ({ children }) => {
         setAuthToken(null);
         setUser(null);
       }
-      
+
       setLoading(false);
     };
 
@@ -199,16 +199,16 @@ export const AuthProvider = ({ children }) => {
     };
 
     window.addEventListener('authTokenExpired', handleTokenExpired);
-    
+
     return () => {
       window.removeEventListener('authTokenExpired', handleTokenExpired);
     };
   }, []);
 
   // ✅ PERBAIKAN: Fungsi Login dengan enhanced state management
-  const login = async (token, userData) => {
+  const login = React.useCallback(async (token, userData) => {
     try {
-      console.log('🔍 [AUTH CONTEXT] Login function called with:', { 
+      console.log('🔍 [AUTH CONTEXT] Login function called with:', {
         tokenLength: token?.length,
         userData: userData
       });
@@ -220,20 +220,20 @@ export const AuthProvider = ({ children }) => {
       // Simpan token dan user data
       setAuthToken(token);
       setUser(userData);
-      
+
       // Simpan user data di localStorage untuk persistensi
       localStorage.setItem('user', JSON.stringify(userData));
-      
+
       console.log('✅ [AUTH CONTEXT] Login successful!', {
         userName: userData.fullName || userData.name || 'User',
         userEmail: userData.email,
         isProfileComplete: userData.isProfileComplete,
         isEmailVerified: userData.isEmailVerified
       });
-      
+
       // ✅ PERBAIKAN: Gunakan shouldCompleteProfile yang sudah ditingkatkan
       const needsProfileCompletion = shouldCompleteProfile(userData);
-      
+
       if (needsProfileCompletion) {
         console.log('🔍 [AUTH CONTEXT] User needs profile completion, setting flag');
         localStorage.setItem('needsProfileCompletion', 'true');
@@ -241,13 +241,13 @@ export const AuthProvider = ({ children }) => {
         console.log('🔍 [AUTH CONTEXT] User profile is complete, clearing flag');
         localStorage.removeItem('needsProfileCompletion');
       }
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         user: userData,
         needsProfileCompletion: needsProfileCompletion
       };
-      
+
     } catch (error) {
       console.error('❌ [AUTH CONTEXT] Login failed:', error);
       setAuthToken(null);
@@ -255,33 +255,33 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('user');
       throw error;
     }
-  };
+  }, [setAuthToken]);
 
   // ✅ PERBAIKAN: Fungsi Login dengan NIM & Password dengan debug lengkap
-  const loginWithCredentials = async (nim, password) => {
+  const loginWithCredentials = React.useCallback(async (nim, password) => {
     setLoading(true);
     try {
       console.log('🔍 [AUTH CONTEXT] loginWithCredentials called with NIM:', nim);
-      
+
       const response = await api.post('/api/auth/login', { nim, password });
-      
+
       console.log('🔍 [AUTH CONTEXT] Login API Response:', {
         status: response.status,
         data: response.data
       });
-      
+
       if (!response.data.success) {
         throw new Error(response.data.message || 'Login failed: No success flag');
       }
-      
+
       const { token, user } = response.data;
-      
+
       console.log('🔍 [AUTH CONTEXT] Extracted login data:', {
         tokenExists: !!token,
         userExists: !!user,
         tokenLength: token?.length,
         userStructure: user ? {
-          fullName: user.fullName, 
+          fullName: user.fullName,
           email: user.email,
           nim: user.nim,
           isProfileComplete: user.isProfileComplete,
@@ -291,25 +291,25 @@ export const AuthProvider = ({ children }) => {
           allKeys: Object.keys(user)
         } : 'NO USER'
       });
-      
+
       if (!token) {
         throw new Error('No token received from server');
       }
-      
+
       if (!user) {
         throw new Error('No user data received from server');
       }
-      
+
       const result = await login(token, user);
       console.log('✅ [AUTH CONTEXT] loginWithCredentials completed successfully');
-      
+
       return result;
     } catch (error) {
       console.error('❌ [AUTH CONTEXT] loginWithCredentials failed:', error);
       setAuthToken(null);
       setUser(null);
       localStorage.removeItem('user');
-      
+
       if (error.response) {
         // Handle email verification required case - ✅ PERBAIKAN: Gunakan Error object
         if (error.response.data?.requiresVerification) {
@@ -327,43 +327,43 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [login, setAuthToken]);
 
   // ✅ PERBAIKAN BESAR: Fungsi Register dengan Email Only - DENGAN VERIFICATION FLOW
-  const registerWithEmail = async (email) => {
+  const registerWithEmail = React.useCallback(async (email) => {
     setLoading(true);
     try {
       console.log('🔍 [AUTH CONTEXT] registerWithEmail called with email:', email);
-      
+
       const response = await api.post('/api/auth/register-email', { email });
-      
+
       console.log('🔍 [AUTH CONTEXT] Register with email response:', {
         status: response.status,
         data: response.data
       });
-      
+
       // ✅ PERBAIKAN: Handle response structure yang berbeda
       let responseData = response.data;
-      
+
       // Jika response memiliki data property, gunakan itu
       if (response.data.data) {
         responseData = response.data.data;
       }
-      
+
       if (!responseData.success && response.status !== 201) {
         throw new Error(responseData.message || 'Email registration failed');
       }
-      
+
       // ✅ PERBAIKAN: Set state untuk pending verification
       setPendingVerification(true);
       setPendingEmail(email);
-      
+
       // Simpan email untuk verifikasi
       localStorage.setItem('pendingVerificationEmail', email);
       localStorage.setItem('isNewUser', 'true');
-      
+
       console.log('✅ [AUTH CONTEXT] registerWithEmail completed successfully - Verification required');
-      
+
       return {
         success: true,
         message: responseData.message || 'Verification code sent to your email',
@@ -375,11 +375,11 @@ export const AuthProvider = ({ children }) => {
       };
     } catch (error) {
       console.error('❌ [AUTH CONTEXT] registerWithEmail failed:', error);
-      
+
       // Reset verification state on error
       setPendingVerification(false);
       setPendingEmail('');
-      
+
       if (error.response) {
         if (error.response.status === 409) {
           throw new Error('Email sudah terdaftar. Silakan login menggunakan NIM Anda.');
@@ -393,68 +393,68 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // ✅ PERBAIKAN: Fungsi untuk verifikasi email code
-  const verifyEmailCode = async (email, code) => {
+  const verifyEmailCode = React.useCallback(async (email, code) => {
     setLoading(true);
     try {
       console.log('🔍 [AUTH CONTEXT] verifyEmailCode called:', { email, code });
-      
+
       const response = await api.post('/api/auth/verify-email', {
         email,
         code
       });
-      
+
       console.log('🔍 [AUTH CONTEXT] Verify email response:', {
         status: response.status,
         data: response.data
       });
-      
+
       let responseData = response.data;
-      
+
       // Handle nested data structure
       if (response.data.data) {
         responseData = response.data.data;
       }
-      
+
       if (!responseData.success) {
         throw new Error(responseData.message || 'Email verification failed');
       }
-      
+
       const { token, user, requiresProfileCompletion } = responseData;
-      
+
       console.log('🔍 [AUTH CONTEXT] Email verification result:', {
         tokenExists: !!token,
         userExists: !!user,
         requiresProfileCompletion: requiresProfileCompletion,
         userStructure: user
       });
-      
+
       if (!token || !user) {
         throw new Error('Invalid verification response: missing token or user data');
       }
-      
+
       // Clear verification state
       setPendingVerification(false);
       setPendingEmail('');
-      
+
       // Clear temporary storage
       localStorage.removeItem('pendingVerificationEmail');
       localStorage.removeItem('isNewUser');
-      
+
       // Login user setelah verifikasi berhasil
       const result = await login(token, user);
-      
+
       console.log('✅ [AUTH CONTEXT] Email verification completed successfully');
-      
+
       return {
         ...result,
         requiresProfileCompletion: requiresProfileCompletion || false
       };
     } catch (error) {
       console.error('❌ [AUTH CONTEXT] verifyEmailCode failed:', error);
-      
+
       if (error.response) {
         throw new Error(error.response.data?.message || 'Email verification failed');
       } else if (error.request) {
@@ -465,39 +465,39 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [login]);
 
   // ✅ PERBAIKAN: Fungsi untuk kirim ulang kode verifikasi
-  const resendVerificationCode = async (email) => {
+  const resendVerificationCode = React.useCallback(async (email) => {
     try {
       console.log('🔍 [AUTH CONTEXT] resendVerificationCode called for:', email);
-      
+
       const response = await api.post('/api/auth/resend-verification', { email });
-      
+
       console.log('🔍 [AUTH CONTEXT] Resend verification response:', {
         status: response.status,
         data: response.data
       });
-      
+
       let responseData = response.data;
-      
+
       if (response.data.data) {
         responseData = response.data.data;
       }
-      
+
       if (!responseData.success) {
         throw new Error(responseData.message || 'Failed to resend verification code');
       }
-      
+
       console.log('✅ [AUTH CONTEXT] Verification code resent successfully');
-      
+
       return {
         success: true,
         message: responseData.message || 'Verification code resent successfully'
       };
     } catch (error) {
       console.error('❌ [AUTH CONTEXT] resendVerificationCode failed:', error);
-      
+
       if (error.response) {
         throw new Error(error.response.data?.message || 'Failed to resend verification code');
       } else if (error.request) {
@@ -506,37 +506,37 @@ export const AuthProvider = ({ children }) => {
         throw error;
       }
     }
-  };
+  }, []);
 
   // ✅ BARU: Fungsi untuk check status verifikasi email
-  const checkEmailVerificationStatus = async (email) => {
+  const checkEmailVerificationStatus = React.useCallback(async (email) => {
     try {
       console.log('🔍 [AUTH CONTEXT] checkEmailVerificationStatus called for:', email);
-      
+
       const response = await api.get(`/api/auth/check-verification/${email}`);
-      
+
       console.log('🔍 [AUTH CONTEXT] Check verification status response:', {
         status: response.status,
         data: response.data
       });
-      
+
       let responseData = response.data;
-      
+
       if (response.data.data) {
         responseData = response.data.data;
       }
-      
+
       if (!responseData.success) {
         throw new Error(responseData.message || 'Failed to check verification status');
       }
-      
+
       return {
         success: true,
         data: responseData.data
       };
     } catch (error) {
       console.error('❌ [AUTH CONTEXT] checkEmailVerificationStatus failed:', error);
-      
+
       if (error.response) {
         throw new Error(error.response.data?.message || 'Failed to check verification status');
       } else if (error.request) {
@@ -545,19 +545,19 @@ export const AuthProvider = ({ children }) => {
         throw error;
       }
     }
-  };
+  }, []);
 
   // ✅ BARU: Fungsi untuk clear pending verification
-  const clearPendingVerification = () => {
+  const clearPendingVerification = React.useCallback(() => {
     console.log('🔍 [AUTH CONTEXT] Clearing pending verification state');
     setPendingVerification(false);
     setPendingEmail('');
     localStorage.removeItem('pendingVerificationEmail');
     localStorage.removeItem('isNewUser');
-  };
+  }, []);
 
   // ✅ PERBAIKAN: Fungsi Register dengan debug lengkap
-  const registerWithCredentials = async (userData) => {
+  const registerWithCredentials = React.useCallback(async (userData) => {
     setLoading(true);
     try {
       console.log('🔍 [AUTH CONTEXT] Register called:', {
@@ -565,20 +565,20 @@ export const AuthProvider = ({ children }) => {
         nim: userData.nim,
         email: userData.email
       });
-      
+
       const response = await api.post('/api/auth/register', userData);
       console.log('🔍 [AUTH CONTEXT] Register response:', response.data);
-      
+
       const { token, user } = response.data;
-      
+
       if (!response.data.success) {
         throw new Error(response.data.message || 'Registration failed');
       }
-      
+
       if (!token || !user) {
         throw new Error('Invalid response: missing token or user data');
       }
-      
+
       console.log('🔍 [AUTH CONTEXT] Register user data structure:', {
         fullName: user.fullName,
         email: user.email,
@@ -586,12 +586,12 @@ export const AuthProvider = ({ children }) => {
         isProfileComplete: user.isProfileComplete,
         isEmailVerified: user.isEmailVerified
       });
-      
+
       const result = await login(token, user);
       return result;
     } catch (error) {
       console.error('❌ [AUTH CONTEXT] Registration failed:', error);
-      
+
       if (error.response) {
         throw new Error(error.response.data.message || 'Registration failed');
       } else if (error.request) {
@@ -602,10 +602,10 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [login]);
 
   // ✅ BARU: Fungsi untuk handle Google Auth Callback
-  const handleGoogleAuthCallback = async (token, userData) => {
+  const handleGoogleAuthCallback = React.useCallback(async (token, userData) => {
     try {
       console.log('🔍 [AUTH CONTEXT] handleGoogleAuthCallback called:', {
         tokenLength: token?.length,
@@ -637,7 +637,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       console.log('✅ [AUTH CONTEXT] Google auth callback completed successfully');
-      
+
       return {
         ...result,
         isNewUser: isNewUser
@@ -646,13 +646,13 @@ export const AuthProvider = ({ children }) => {
       console.error('❌ [AUTH CONTEXT] handleGoogleAuthCallback failed:', error);
       throw error;
     }
-  };
+  }, [login]);
 
   // ✅ PERBAIKAN: Fungsi untuk update user profile completion
-  const updateUserProfileCompletion = async (profileData) => {
+  const updateUserProfileCompletion = React.useCallback(async (profileData) => {
     try {
       console.log('🔍 [AUTH CONTEXT] updateUserProfileCompletion called with:', profileData);
-      
+
       if (!user) {
         throw new Error('No user found');
       }
@@ -685,88 +685,88 @@ export const AuthProvider = ({ children }) => {
 
       console.log('✅ [AUTH CONTEXT] User profile completion updated successfully');
       return { success: true, user: updatedUser };
-      
+
     } catch (error) {
       console.error('❌ [AUTH CONTEXT] updateUserProfileCompletion failed:', error);
       throw error;
     }
-  };
+  }, [user]);
 
   // ✅ PERBAIKAN: Fungsi untuk update user data
-  const updateUser = (updatedUserData) => {
+  const updateUser = React.useCallback((updatedUserData) => {
     console.log('🔍 [AUTH CONTEXT] updateUser called with:', updatedUserData);
-    
+
     setUser(prevUser => {
       const newUser = { ...prevUser, ...updatedUserData };
       localStorage.setItem('user', JSON.stringify(newUser));
-      
+
       console.log('✅ [AUTH CONTEXT] User updated:', {
         oldName: prevUser?.fullName || prevUser?.name,
         newName: newUser.fullName || newUser.name,
         isProfileComplete: newUser.isProfileComplete
       });
-      
+
       return newUser;
     });
-  };
+  }, []);
 
   // ✅ PERBAIKAN: Fungsi untuk check auth status
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = React.useCallback(async () => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
-    
+
     const isAuthenticated = !!(storedToken && storedUser);
-    
-    console.log('🔍 [AUTH CONTEXT] Auth check:', { 
-      hasToken: !!storedToken, 
+
+    console.log('🔍 [AUTH CONTEXT] Auth check:', {
+      hasToken: !!storedToken,
       tokenLength: storedToken?.length,
       hasUser: !!storedUser,
-      isAuthenticated 
+      isAuthenticated
     });
-    
+
     return isAuthenticated;
-  };
+  }, []);
 
   // ✅ BARU: Fungsi untuk check jika user adalah new user
-  const isNewUser = () => {
+  const isNewUser = React.useCallback(() => {
     return localStorage.getItem('isNewUser') === 'true';
-  };
+  }, []);
 
   // ✅ BARU: Fungsi untuk check jika email perlu diverifikasi
-  const needsEmailVerification = () => {
+  const needsEmailVerification = React.useCallback(() => {
     return localStorage.getItem('pendingVerificationEmail') !== null || pendingVerification;
-  };
+  }, [pendingVerification]);
 
   // ✅ BARU: Fungsi untuk mendapatkan email yang perlu diverifikasi
-  const getPendingVerificationEmail = () => {
+  const getPendingVerificationEmail = React.useCallback(() => {
     return pendingEmail || localStorage.getItem('pendingVerificationEmail');
-  };
+  }, [pendingEmail]);
 
   // ✅ PERBAIKAN: Fungsi untuk manually set profile completion status
-  const setProfileComplete = () => {
+  const setProfileComplete = React.useCallback(() => {
     console.log('🔍 [AUTH CONTEXT] Manually setting profile as complete');
     localStorage.removeItem('needsProfileCompletion');
     localStorage.removeItem('isNewUser');
-    
+
     if (user) {
       const updatedUser = { ...user, isProfileComplete: true };
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
     }
-  };
+  }, [user]);
 
   // ✅ PERBAIKAN: Fungsi Logout dengan cleanup lengkap
-  const logout = () => {
+  const logout = React.useCallback(() => {
     console.log('🔍 [AUTH CONTEXT] Logout called', {
       currentUser: user?.fullName || user?.name || 'Unknown'
     });
-    
+
     // Clear semua state
     setAuthToken(null);
     setUser(null);
     setPendingVerification(false);
     setPendingEmail('');
-    
+
     // Clear semua localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -774,13 +774,20 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('userEmail');
     localStorage.removeItem('pendingVerificationEmail');
     localStorage.removeItem('needsProfileCompletion');
-    
+
     delete api.defaults.headers.common['Authorization'];
-    
+
     console.log('✅ [AUTH CONTEXT] Logout successful');
-    
+
     window.location.replace('/');
-  };
+  }, [user, setAuthToken]);
+
+  const getUserName = React.useCallback(() => user?.fullName || user?.name || 'User', [user]);
+  const getUserShortName = React.useCallback(() => {
+    const fullName = user?.fullName || user?.name || 'User';
+    return fullName.split(' ')[0];
+  }, [user]);
+  const getUserNIM = React.useCallback(() => user?.nim || extractNIMFromEmail(user?.email), [user]);
 
   // ✅ PERBAIKAN: Value yang disediakan ke context
   const value = {
@@ -813,12 +820,9 @@ export const AuthProvider = ({ children }) => {
     // ✅ FUNGSI VERIFIKASI TAMBAHAN
     needsEmailVerification,
     getPendingVerificationEmail,
-    getUserName: () => user?.fullName || user?.name || 'User',
-    getUserShortName: () => {
-      const fullName = user?.fullName || user?.name || 'User';
-      return fullName.split(' ')[0];
-    },
-    getUserNIM: () => user?.nim || extractNIMFromEmail(user?.email),
+    getUserName,
+    getUserShortName,
+    getUserNIM,
     extractNIMFromEmail
   };
 

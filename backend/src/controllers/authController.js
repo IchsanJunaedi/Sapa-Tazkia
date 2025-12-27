@@ -13,8 +13,8 @@ const prisma = new PrismaClient();
 const googleAuth = (req, res, next) => {
   console.log('[DEBUG] Initiating Google OAuth');
   console.log('[DEBUG] Session before auth:', req.sessionID);
-  
-  authService.passport.authenticate('google', { 
+
+  authService.passport.authenticate('google', {
     scope: ['profile', 'email'],
     prompt: 'select_account'
   })(req, res, next);
@@ -23,8 +23,8 @@ const googleAuth = (req, res, next) => {
 const googleCallback = (req, res, next) => {
   console.log('[DEBUG] Google OAuth callback received');
   console.log('[DEBUG] Session ID in callback:', req.sessionID);
-  
-  authService.passport.authenticate('google', { 
+
+  authService.passport.authenticate('google', {
     failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`
   })(req, res, next);
 };
@@ -33,7 +33,7 @@ const googleCallback = (req, res, next) => {
 const googleCallbackSuccess = async (req, res) => {
   try {
     console.log('[DEBUG] Google callback success handler called');
-    
+
     if (!req.user) {
       console.error('[ERROR] No user in request after Google auth');
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=no_user_session`);
@@ -45,7 +45,7 @@ const googleCallbackSuccess = async (req, res) => {
     // Validasi domain
     const validDomains = ['student.tazkia.ac.id', 'student.stmik.tazkia.ac.id', 'tazkia.ac.id'];
     const userDomain = userEmail.split('@')[1];
-    
+
     if (!validDomains.includes(userDomain)) {
       console.log(`🚫 [AUTH CONTROLLER] Google login rejected - Invalid domain: ${userEmail}`);
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=invalid_domain&message=Hanya email Tazkia yang diizinkan&email=${encodeURIComponent(userEmail)}`);
@@ -67,9 +67,9 @@ const googleCallbackSuccess = async (req, res) => {
     console.log(`[DEBUG] Existing user query result:`, existingUser);
 
     // Logic deteksi new user (< 5 menit)
-    const isNewUser = !existingUser || 
-                      (existingUser.authMethod === 'google' && 
-                       (new Date() - new Date(existingUser.createdAt)) < 300000);
+    const isNewUser = !existingUser ||
+      (existingUser.authMethod === 'google' &&
+        (new Date() - new Date(existingUser.createdAt)) < 300000);
 
     console.log(`[DEBUG] User status - isNewUser: ${isNewUser}, existing: ${!!existingUser}`);
 
@@ -103,10 +103,10 @@ const googleCallbackSuccess = async (req, res) => {
 
     const encodedUserData = encodeURIComponent(JSON.stringify(userData));
     const verificationFlag = shouldVerifyEmail ? '&requires_verification=true' : '';
-    
+
     const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}&user=${encodedUserData}&success=true${verificationFlag}`;
     console.log(`[DEBUG] Redirecting to: ${redirectUrl}`);
-    
+
     res.redirect(redirectUrl);
 
   } catch (error) {
@@ -487,110 +487,128 @@ const checkAuth = (req, res) => {
 // 🚨 CHAT FEATURE (FIXED: TYPE SAFETY, DEBUGGING & SMART TITLE)
 // ============================================================================
 const chat = async (req, res) => {
-    try {
-        // ✅ FIX 1: Ensure User ID is an INTEGER
-        const userId = parseInt(req.user.id); 
-        const { message, conversationId } = req.body;
+  const abortController = new AbortController();
+  try {
+    // 🛑 Listener untuk pembatalan (Refresh/Cancel)
+    req.on('close', () => {
+      if (!res.writableEnded) {
+        console.log('⚠️ [AUTH CHAT CONTROLLER] Request closed by client before completion. Aborting AI...');
+        abortController.abort();
+      }
+    });
+    // ✅ FIX 1: Ensure User ID is an INTEGER
+    const userId = parseInt(req.user.id);
+    const { message, conversationId } = req.body;
 
-        if (!message || message.trim() === '') {
-            return res.status(400).json({ success: false, message: "Message is required" });
-        }
-
-        console.log(`👤 [AUTH CHAT] User: ${userId} | Msg: "${message}"`);
-
-        // Step 1: Retrieve History
-        let targetConversationId = conversationId ? parseInt(conversationId) : undefined;
-        let conversationHistory = [];
-
-        // Find last conversation
-        const lastConversation = await prisma.conversation.findFirst({
-            where: { 
-                userId: userId, // Ensure this matches DB type (Int)
-                id: targetConversationId 
-            },
-            orderBy: { updatedAt: 'desc' }, 
-            include: {
-                messages: {
-                    take: 6, 
-                    orderBy: { createdAt: 'desc' }
-                }
-            }
-        });
-
-        if (lastConversation) {
-            targetConversationId = lastConversation.id;
-            console.log(`📂 [AUTH CHAT] Found Conv ID: ${targetConversationId} | Msgs: ${lastConversation.messages.length}`);
-            
-            conversationHistory = lastConversation.messages.reverse().map(m => ({
-                role: m.role === 'bot' ? 'assistant' : 'user', 
-                content: m.content
-            }));
-        } else {
-            console.log(`📂 [AUTH CHAT] No previous conversation found. Starting new.`);
-        }
-
-        // Step 2: RAG Process
-        const ragResult = await ragService.answerQuestion(message, conversationHistory);
-        const finalAnswer = ragResult.answer;
-        const tokensUsed = ragResult.usage ? ragResult.usage.total_tokens : 0;
-
-        // Step 3: Save to DB
-        try {
-            if (!targetConversationId) {
-                
-                // ✨ LOGIC BARU: GENERATE SMART TITLE
-                let smartTitle = message.substring(0, 30) + "..."; // Default
-                try {
-                    // Panggil OpenAI Service untuk Judul
-                    if (openaiService.generateTitle) {
-                        smartTitle = await openaiService.generateTitle(message);
-                        console.log(`🏷️ [SMART TITLE] Generated: "${smartTitle}"`);
-                    }
-                } catch (e) {
-                    console.warn("⚠️ Gagal generate title, pakai default.", e.message);
-                }
-
-                const newConv = await prisma.conversation.create({
-                    data: {
-                        userId: userId,
-                        title: smartTitle // ✅ Pakai Judul Pintar
-                    }
-                });
-                targetConversationId = newConv.id;
-            } else {
-                await prisma.conversation.update({
-                    where: { id: targetConversationId },
-                    data: { updatedAt: new Date() }
-                });
-            }
-
-            // Save Chat Batch
-            await prisma.$transaction([
-                prisma.message.create({
-                    data: { conversationId: targetConversationId, role: 'user', content: message }
-                }),
-                prisma.message.create({
-                    data: { conversationId: targetConversationId, role: 'bot', content: finalAnswer, responseTime: parseFloat(ragResult.metrics?.genTime || 0) }
-                })
-            ]);
-            
-            console.log(`💾 [AUTH CHAT] Saved to Conv ID: ${targetConversationId}`);
-
-        } catch (saveError) {
-            console.error(`❌ [AUTH CHAT] DB Save Error:`, saveError.message);
-        }
-
-        res.json({
-            success: true,
-            reply: finalAnswer,
-            conversationId: targetConversationId, 
-            usage: { total_tokens: tokensUsed }
-        });
-
-    } catch (error) {
-        console.error("❌ [AUTH CHAT ERROR]", error);
-        res.status(500).json({ success: false, message: "Server Error" });
+    if (!message || message.trim() === '') {
+      return res.status(400).json({ success: false, message: "Message is required" });
     }
+
+    console.log(`👤 [AUTH CHAT] User: ${userId} | Msg: "${message}"`);
+
+    // Step 1: Retrieve History
+    let targetConversationId = conversationId ? parseInt(conversationId) : undefined;
+    let conversationHistory = [];
+
+    // Find last conversation
+    const lastConversation = await prisma.conversation.findFirst({
+      where: {
+        userId: userId, // Ensure this matches DB type (Int)
+        id: targetConversationId
+      },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        messages: {
+          take: 6,
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    if (lastConversation) {
+      targetConversationId = lastConversation.id;
+      console.log(`📂 [AUTH CHAT] Found Conv ID: ${targetConversationId} | Msgs: ${lastConversation.messages.length}`);
+
+      conversationHistory = lastConversation.messages.reverse().map(m => ({
+        role: m.role === 'bot' ? 'assistant' : 'user',
+        content: m.content
+      }));
+    } else {
+      console.log(`📂 [AUTH CHAT] No previous conversation found. Starting new.`);
+    }
+
+    // Step 2: RAG Process
+    const ragResult = await ragService.answerQuestion(
+      message,
+      conversationHistory,
+      { abortSignal: abortController.signal }
+    );
+    const finalAnswer = ragResult.answer;
+    const tokensUsed = ragResult.usage ? ragResult.usage.total_tokens : 0;
+
+    // Step 3: Save to DB
+    try {
+      // 🛑 ABORT CHECK: Jika client sudah batalin (Cancel), jangan simpan ke DB
+      if (req.socket.destroyed || abortController.signal.aborted) {
+        console.log('🛑 [AUTH CHAT CONTROLLER] Request aborted. Skipping DB save & history update.');
+        return;
+      }
+
+      if (!targetConversationId) {
+
+        // ✨ LOGIC BARU: GENERATE SMART TITLE
+        let smartTitle = message.substring(0, 30) + "..."; // Default
+        try {
+          // Panggil OpenAI Service untuk Judul
+          if (openaiService.generateTitle) {
+            smartTitle = await openaiService.generateTitle(message);
+            console.log(`🏷️ [SMART TITLE] Generated: "${smartTitle}"`);
+          }
+        } catch (e) {
+          console.warn("⚠️ Gagal generate title, pakai default.", e.message);
+        }
+
+        const newConv = await prisma.conversation.create({
+          data: {
+            userId: userId,
+            title: smartTitle // ✅ Pakai Judul Pintar
+          }
+        });
+        targetConversationId = newConv.id;
+      } else {
+        await prisma.conversation.update({
+          where: { id: targetConversationId },
+          data: { updatedAt: new Date() }
+        });
+      }
+
+      // Save Chat Batch
+      await prisma.$transaction([
+        prisma.message.create({
+          data: { conversationId: targetConversationId, role: 'user', content: message }
+        }),
+        prisma.message.create({
+          data: { conversationId: targetConversationId, role: 'bot', content: finalAnswer, responseTime: parseFloat(ragResult.metrics?.genTime || 0) }
+        })
+      ]);
+
+      console.log(`💾 [AUTH CHAT] Saved to Conv ID: ${targetConversationId}`);
+
+    } catch (saveError) {
+      console.error(`❌ [AUTH CHAT] DB Save Error:`, saveError.message);
+    }
+
+    res.json({
+      success: true,
+      reply: finalAnswer,
+      conversationId: targetConversationId,
+      usage: { total_tokens: tokensUsed }
+    });
+
+  } catch (error) {
+    console.error("❌ [AUTH CHAT ERROR]", error);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
 };
 
 module.exports = {

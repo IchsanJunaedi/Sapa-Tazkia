@@ -7,8 +7,17 @@ const guestSessions = new Map();
 
 const guestChat = async (req, res) => {
   try {
+    const abortController = new AbortController();
     const { message, sessionId } = req.body;
     const ipAddress = req.ip || '127.0.0.1';
+
+    // 🛑 Listener untuk pembatalan (Refresh/Cancel)
+    req.on('close', () => {
+      if (!res.writableEnded) {
+        console.log('⚠️ [GUEST CONTROLLER] Request closed by client before completion. Aborting AI...');
+        abortController.abort();
+      }
+    });
 
     if (!message || message.trim() === '') {
       return res.status(400).json({ success: false, message: "Message required" });
@@ -43,8 +52,12 @@ const guestChat = async (req, res) => {
     let realTokenUsage = 0;
 
     try {
-      // ✅ PASS HISTORY KE SINI (Agar logic 'Ada dalilnya ga?' jalan)
-      ragResult = await ragService.answerQuestion(message, conversationHistory);
+      // ✅ PASS HISTORY & ABORT SIGNAL
+      ragResult = await ragService.answerQuestion(
+        message,
+        conversationHistory,
+        { abortSignal: abortController.signal }
+      );
 
       finalAnswer = ragResult.answer;
 
@@ -92,8 +105,8 @@ const guestChat = async (req, res) => {
     // =================================================================
 
     // 🛑 ABORT CHECK: Jika client sudah batalin (Cancel), jangan simpan ke history
-    if (req.socket.destroyed) {
-      console.log('🛑 [GUEST CONTROLLER] Request aborted by client (socket destroyed). Skipping session update.');
+    if (req.socket.destroyed || abortController.signal.aborted) {
+      console.log('🛑 [GUEST CONTROLLER] Request aborted. Skipping session update.');
       return;
     }
 
@@ -143,7 +156,12 @@ const guestChat = async (req, res) => {
           fallbackHistory = msgs.map(m => ({ role: m.role === 'bot' ? 'assistant' : 'user', content: m.content }));
         }
 
-        const fallbackResponse = await generateAIResponse(message, fallbackHistory, null, 'general');
+        const fallbackResponse = await generateAIResponse(
+          message,
+          fallbackHistory,
+          null,
+          { abortSignal: abortController.signal, mode: 'general' }
+        );
 
         const replyText = typeof fallbackResponse === 'object' ? fallbackResponse.content : fallbackResponse;
         const fallbackUsage = fallbackResponse.usage ? fallbackResponse.usage.total_tokens : 0;
