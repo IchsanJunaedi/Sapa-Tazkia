@@ -33,43 +33,74 @@ const formatMessageWithArabic = (text) => {
   });
 };
 
-// 3. Format teks dengan link clickable
+// 3. Format teks dengan link clickable (Support Markdown & Raw URL)
 const formatMessageWithLinks = (text) => {
   if (typeof text !== 'string') return text;
 
-  // Regex untuk mendeteksi URL (mendukung http/https dan domain umum seperti .id, .com, .ac.id)
-  const urlRegex = /(https?:\/\/[^\s]+)|(\b(?:[a-z0-9-]+\.)+(?:ac\.id|id|com|net|org|edu|gov)\b(?:[^\s,.]*[^\s,])?)/gi;
+  // Regex untuk Markdown [label](url)
+  const markdownRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  // Regex untuk URL mentah (mendukung domain umum)
+  const rawUrlRegex = /(https?:\/\/[^\s<]+[^.,\s<)])|(\b(?:[a-z0-9-]+\.)+(?:ac\.id|id|com|net|org|edu|gov)\b(?:[^\s,.<)]*[^\s,.<)])?)/gi;
 
   const parts = [];
   let lastIndex = 0;
+  const matches = [];
+
+  // Cari semua Link Markdown
   let match;
+  while ((match = markdownRegex.exec(text)) !== null) {
+    matches.push({
+      index: match.index,
+      length: match[0].length,
+      label: match[1],
+      url: match[2],
+      type: 'markdown'
+    });
+  }
 
-  while ((match = urlRegex.exec(text)) !== null) {
-    const start = match.index;
-    const end = urlRegex.lastIndex;
+  // Cari semua URL mentah yang tidak berada di dalam Link Markdown
+  while ((match = rawUrlRegex.exec(text)) !== null) {
+    const isOverlapping = matches.some(m =>
+      (match.index >= m.index && match.index < m.index + m.length) ||
+      (m.index >= match.index && m.index < match.index + match[0].length)
+    );
 
-    // Tambahkan teks sebelum link
-    if (start > lastIndex) {
-      parts.push(text.substring(lastIndex, start));
+    if (!isOverlapping) {
+      matches.push({
+        index: match.index,
+        length: match[0].length,
+        label: match[0],
+        url: match[0],
+        type: 'raw'
+      });
+    }
+  }
+
+  // Urutkan berdasarkan posisi index
+  matches.sort((a, b) => a.index - b.index);
+
+  // Susun output
+  matches.forEach((m, i) => {
+    if (m.index > lastIndex) {
+      parts.push(text.substring(lastIndex, m.index));
     }
 
-    const url = match[0];
-    const href = url.startsWith('http') ? url : `https://${url}`;
+    const href = m.url.startsWith('http') ? m.url : `https://${m.url}`;
 
     parts.push(
       <a
-        key={`link-${start}`}
+        key={`link-${m.index}-${i}`}
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-blue-600 hover:text-blue-800 underline decoration-blue-500/30 hover:decoration-blue-700 transition-all font-medium"
+        className="text-blue-600 hover:text-blue-800 underline decoration-blue-500/30 hover:decoration-blue-700 transition-all font-medium px-0.5"
       >
-        {url}
+        {m.label}
       </a>
     );
 
-    lastIndex = end;
-  }
+    lastIndex = m.index + m.length;
+  });
 
   if (lastIndex < text.length) {
     parts.push(text.substring(lastIndex));
@@ -293,28 +324,6 @@ const SingleChatMessage = ({ message, onDownloadPDF, onRetry }) => {
         </div>
       </div>
 
-      {/* CSS Styles Local (Embedded) */}
-      <style>{`
-        .glass-effect {
-          background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(229, 231, 235, 0.5);
-        }
-        
-        .arabic-text {
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          font-size: 18px;
-          font-weight: 500;
-          text-align: right;
-          line-height: 1.8;
-          direction: rtl;
-        }
-        
-        .regular-text {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-      `}</style>
     </div>
   );
 };
@@ -424,6 +433,29 @@ const ChatWindow = ({ messages, isLoading, error, onDownloadPDF, onRetry }) => {
 
       {/* Invisible element for auto-scroll */}
       <div ref={messagesEndRef} className="h-1" />
+
+      {/* CSS Styles - Moved to Window level to avoid redundancy */}
+      <style>{`
+        .glass-effect {
+          background: rgba(255, 255, 255, 0.85);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(229, 231, 235, 0.5);
+        }
+        
+        .arabic-text {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          font-size: 18px;
+          font-weight: 500;
+          text-align: right;
+          line-height: 1.8;
+          direction: rtl;
+        }
+        
+        .regular-text {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+      `}</style>
     </div>
   );
 };

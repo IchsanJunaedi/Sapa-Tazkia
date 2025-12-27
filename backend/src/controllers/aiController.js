@@ -12,8 +12,17 @@ const prisma = require('../../config/prisma');
  */
 
 const sendChat = async (req, res) => {
+    const abortController = new AbortController();
     let currentConversationId = null;
     let shouldCreateNewConversation = false;
+
+    // 🛑 Listener untuk pembatalan (Refresh/Cancel)
+    req.on('close', () => {
+        if (!res.writableEnded) {
+            console.log('⚠️ [AI CONTROLLER] Request closed by client before completion. Aborting AI...');
+            abortController.abort();
+        }
+    });
 
     try {
         const { message, conversationId, isNewChat } = req.body;
@@ -109,7 +118,12 @@ const sendChat = async (req, res) => {
              `;
 
                 // C. Kirim ke OpenAI (Tanpa RAG)
-                const aiRes = await generateAIResponse(academicPrompt, conversationHistory, 'general');
+                const aiRes = await generateAIResponse(
+                    academicPrompt,
+                    conversationHistory,
+                    null,
+                    { abortSignal: abortController.signal, mode: 'general' }
+                );
                 finalAnswer = typeof aiRes === 'object' ? aiRes.content : aiRes;
                 realTokenUsage = 1500; // Estimasi token
                 console.log('✅ [MODE] Academic Answer Generated directly via OpenAI.');
@@ -124,7 +138,11 @@ const sendChat = async (req, res) => {
             console.log('🌍 [MODE] GENERAL QUERY. USING RAG SERVICE...');
 
             try {
-                const ragResult = await ragService.answerQuestion(cleanMessage, conversationHistory);
+                const ragResult = await ragService.answerQuestion(
+                    cleanMessage,
+                    conversationHistory,
+                    { abortSignal: abortController.signal }
+                );
                 finalAnswer = ragResult.answer;
 
                 // ✅ FIX: Handle kasus {} (objek kosong) dari greeting/fast-path
@@ -149,8 +167,8 @@ const sendChat = async (req, res) => {
         // =================================================================
 
         // 🛑 ABORT CHECK: Jika client sudah putus koneksi (Cancel), jangan simpan ke DB
-        if (req.socket.destroyed) {
-            console.log('🛑 [AI CONTROLLER] Request aborted by client (socket destroyed). Skipping DB save.');
+        if (req.socket.destroyed || abortController.signal.aborted) {
+            console.log('🛑 [AI CONTROLLER] Request aborted. Skipping DB save & further processing.');
             return;
         }
 

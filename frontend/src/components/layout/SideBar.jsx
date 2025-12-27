@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PenSquare, User, Settings, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 
-const Sidebar = ({ 
+const Sidebar = ({
   user,
   onLogin,
   onLogout,
@@ -22,7 +22,7 @@ const Sidebar = ({
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [isProfilePopupVisible, setIsProfilePopupVisible] = useState(false);
   const [isChatsSectionOpen, setIsChatsSectionOpen] = useState(true);
-  
+
   // ✅ FUNGSI: Helper
   const getUserName = () => {
     const fullName = user?.name || user?.fullName || user?.username || 'User';
@@ -145,7 +145,7 @@ const Sidebar = ({
   // Helper Render Group
   const renderChatGroup = (chats) => (
     chats.map(chat => (
-      <ChatItem 
+      <ChatItem
         key={chat.id}
         chat={chat}
         currentChatId={currentChatId}
@@ -162,12 +162,12 @@ const Sidebar = ({
   return (
     <>
       <div className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative ${className}`}>
-        
+
         {/* Header */}
         {isSidebarOpen ? (
           <div className="flex justify-between items-center mb-8 flex-shrink-0">
-            <button 
-              className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3" 
+            <button
+              className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3"
               title="Settings"
               onClick={onSettingsClick}
               disabled={isStartingNewChat || isDeleting}
@@ -200,11 +200,10 @@ const Sidebar = ({
         <div className="flex flex-col flex-shrink-0">
           <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
             <button
-              className={`${isSidebarOpen ? 'w-full justify-center p-3' : 'w-12 h-12 justify-center'} h-12 bg-white border border-gray-300 text-gray-700 rounded-full transition-all flex items-center group relative gap-3 shadow-sm ${
-                (isDeleting || isStartingNewChat) 
-                  ? 'opacity-50 cursor-not-allowed' 
+              className={`${isSidebarOpen ? 'w-full justify-center p-3' : 'w-12 h-12 justify-center'} h-12 bg-white border border-gray-300 text-gray-700 rounded-full transition-all flex items-center group relative gap-3 shadow-sm ${(isDeleting || isStartingNewChat)
+                  ? 'opacity-50 cursor-not-allowed'
                   : 'hover:bg-gray-50 hover:shadow-md'
-              }`}
+                }`}
               title={isStartingNewChat ? "Memulai chat baru..." : "New Chat"}
               onClick={handleNewChat}
               disabled={isDeleting || isStartingNewChat}
@@ -302,11 +301,9 @@ const Sidebar = ({
         <div className="mt-8 flex-shrink-0">
           <div className="flex justify-center">
             <button
-              className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${
-                user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c80]'
-              } text-white rounded-xl shadow-lg transition-all flex items-center ${
-                (isStartingNewChat || isDeleting) ? 'opacity-70 cursor-not-allowed' : ''
-              }`}
+              className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c80]'
+                } text-white rounded-xl shadow-lg transition-all flex items-center ${(isStartingNewChat || isDeleting) ? 'opacity-70 cursor-not-allowed' : ''
+                }`}
               title={user ? `Logged in as ${getUserName()}` : 'Login as Mahasiswa'}
               onClick={handleProfileClick}
               disabled={isStartingNewChat || isDeleting}
@@ -330,7 +327,7 @@ const Sidebar = ({
           </div>
         </div>
 
-        <style jsx>{`
+        <style>{`
           .custom-scrollbar::-webkit-scrollbar { width: 6px; }
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
           .custom-scrollbar::-webkit-scrollbar-thumb { background: #9CA3AF; border-radius: 3px; }
@@ -386,17 +383,17 @@ const Sidebar = ({
 };
 
 // ✅ FIX: ChatItem Tanpa Kotak di Tombol Titik Tiga
-const ChatItem = ({ 
-  chat, 
-  currentChatId, 
-  onSelectChat, 
-  onDeleteChat, 
-  isDeleting, 
+const ChatItem = ({
+  chat,
+  currentChatId,
+  onSelectChat,
+  onDeleteChat,
+  isDeleting,
   isStartingNewChat,
-  handleMoreClick, 
-  isSidebarOpen 
+  handleMoreClick,
+  isSidebarOpen
 }) => {
-  
+
   const handleChatClick = (e) => {
     e.preventDefault(); e.stopPropagation();
     if (isDeleting || isStartingNewChat) return;
@@ -415,18 +412,18 @@ const ChatItem = ({
 
   return (
     // Container utama (Parent) yang memiliki background abu-abu saat aktif
-    <div 
+    <div
       onClick={handleChatClick}
       className={`
         flex items-center group rounded-lg p-2 transition-colors cursor-pointer relative
-        ${isActive 
-          ? 'bg-gray-200 text-gray-800 font-semibold' 
+        ${isActive
+          ? 'bg-gray-200 text-gray-800 font-semibold'
           : 'hover:bg-gray-100 text-gray-700'
         } 
         ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
       `}
     >
-      <div 
+      <div
         className="flex-1 text-left truncate text-sm"
         title={chat.title}
       >
