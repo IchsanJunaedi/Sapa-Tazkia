@@ -96,6 +96,23 @@ async function createEmbedding(text) {
 }
 
 /**
+ * 2. MOCK STREAM GENERATOR (FOR STATIC REPLIES)
+ */
+async function* createMockStream(content) {
+  // Yield content chunk
+  yield {
+    choices: [{ delta: { content: content } }],
+    usage: null
+  };
+
+  // Yield final usage chunk
+  yield {
+    choices: [],
+    usage: { total_tokens: Math.ceil(content.length / 4) } // Estimate tokens
+  };
+}
+
+/**
  * 3. RESPONSE GENERATOR (FINAL ANSWER)
  */
 async function generateAIResponse(userMessage, conversationHistory = [], customContext = null, options = {}) {
@@ -103,17 +120,20 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
     const { maxTokens = 600, temperature = 0.3 } = options;
 
     // --- Safety Checks ---
+    const handleStaticResponse = (reply) => {
+      if (options.stream) return createMockStream(reply);
+      return {
+        content: reply,
+        usage: { total_tokens: Math.ceil(reply.length / 4) }
+      };
+    };
+
     if (isIdentityQuestion(userMessage)) {
-      return {
-        content: "Assalamualaikum! 👋 Saya **Kia**, asisten virtual Universitas Tazkia. Kia siap bantu Kakak seputar informasi kampus, prodi, dan akademik. Ada yang bisa dibantu? 😊",
-        usage: { total_tokens: 0 }
-      };
+      return handleStaticResponse("Assalamualaikum! 👋 Saya **Kia**, asisten virtual Universitas Tazkia. Kia siap bantu Kakak seputar informasi kampus, prodi, dan akademik. Ada yang bisa dibantu? 😊");
     }
+
     if (isBannedTopicQuestion(userMessage)) {
-      return {
-        content: "Mohon maaf Kak, Kia hanya fokus menjawab seputar informasi **Akademik & Kampus Tazkia** ya. 🙏 Silakan tanya tentang pendaftaran, biaya, atau prodi.",
-        usage: { total_tokens: 0 }
-      };
+      return handleStaticResponse("Mohon maaf Kak, Kia hanya fokus menjawab seputar informasi **Akademik & Kampus Tazkia** ya. 🙏 Silakan tanya tentang pendaftaran, biaya, atau prodi.");
     }
 
     // --- Construct Messages ---
@@ -233,7 +253,9 @@ async function generateTitle(userMessage, aiResponse = null) {
 // --- Utils (Safety Filters) ---
 function isIdentityQuestion(text) {
   const t = text.toLowerCase();
-  return ["siapa kamu", "kamu siapa", "admin", "robot", "human", "manusia"].some(k => t.includes(k));
+  // Removed "human" and "manusia" to avoid false positives (e.g., "humaniora")
+  // Only target direct identity questions
+  return ["siapa kamu", "kamu siapa", "apakah kamu robot", "apakah anda robot", "admin siapa"].some(k => t.includes(k));
 }
 
 function isBannedTopicQuestion(text) {

@@ -487,34 +487,38 @@ const checkAuth = (req, res) => {
 // ============================================================================
 // 🚨 CHAT FEATURE (FIXED: TYPE SAFETY, DEBUGGING & SMART TITLE)
 // ============================================================================
+// ============================================================================
+// 🚨 CHAT FEATURE (FIXED: TYPE SAFETY, DEBUGGING & SMART TITLE & STREAMING)
+// ============================================================================
 const chat = async (req, res) => {
   const abortController = new AbortController();
+
+  // 🛑 Listener untuk pembatalan (Refresh/Cancel)
+  req.on('close', () => {
+    if (!res.writableEnded) {
+      console.log('⚠️ [AUTH CHAT CONTROLLER] Request closed by client before completion. Aborting AI...');
+      abortController.abort();
+    }
+  });
+
   try {
-    // 🛑 Listener untuk pembatalan (Refresh/Cancel)
-    req.on('close', () => {
-      if (!res.writableEnded) {
-        console.log('⚠️ [AUTH CHAT CONTROLLER] Request closed by client before completion. Aborting AI...');
-        abortController.abort();
-      }
-    });
-    // ✅ FIX 1: Ensure User ID is an INTEGER
     const userId = parseInt(req.user.id);
-    const { message, conversationId } = req.body;
+    const { message, conversationId, stream = true } = req.body; // Default stream: true
 
     if (!message || message.trim() === '') {
       return res.status(400).json({ success: false, message: "Message is required" });
     }
 
-    console.log(`👤 [AUTH CHAT] User: ${userId} | Msg: "${message}"`);
+    console.log(`👤 [AUTH CHAT] User: ${userId} | Msg: "${message}" | Stream: ${stream}`);
 
     // Step 1: Retrieve History
     let targetConversationId = conversationId ? parseInt(conversationId) : undefined;
     let conversationHistory = [];
 
-    // Find last conversation
+    // Find last conversation to get history
     const lastConversation = await prisma.conversation.findFirst({
       where: {
-        userId: userId, // Ensure this matches DB type (Int)
+        userId: userId,
         id: targetConversationId
       },
       orderBy: { updatedAt: 'desc' },
@@ -528,8 +532,7 @@ const chat = async (req, res) => {
 
     if (lastConversation) {
       targetConversationId = lastConversation.id;
-      console.log(`📂 [AUTH CHAT] Found Conv ID: ${targetConversationId} | Msgs: ${lastConversation.messages.length}`);
-
+      // console.log(`📂 [AUTH CHAT] Found Conv ID: ${targetConversationId} | Msgs: ${lastConversation.messages.length}`);
       conversationHistory = lastConversation.messages.reverse().map(m => ({
         role: m.role === 'bot' ? 'assistant' : 'user',
         content: m.content
@@ -538,79 +541,147 @@ const chat = async (req, res) => {
       console.log(`📂 [AUTH CHAT] No previous conversation found. Starting new.`);
     }
 
-    // Step 2: RAG Process
+    // Step 2: RAG Process (Calling Service)
     const ragResult = await ragService.answerQuestion(
       message,
       conversationHistory,
-      { abortSignal: abortController.signal }
+      { abortSignal: abortController.signal, stream: stream }
     );
+
+    // ===================================
+    // A. STREAMING HANDLER
+    // ===================================
+    if (stream && ragResult.isStream) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      let fullBotAnswer = "";
+      let tokenUsage = 0;
+
+      // Send Meta
+      res.write(`data: ${JSON.stringify({ type: 'meta', docs: ragResult.docsDetail, conversationId: targetConversationId })}\n\n`);
+
+      // Stream Loop
+      try {
+        for await (const chunk of ragResult.stream) {
+          const content = chunk.choices[0]?.delta?.content || "";
+          if (content) {
+            fullBotAnswer += content;
+            res.write(`data: ${JSON.stringify({ type: 'content', chunk: content })}\n\n`);
+          }
+          if (chunk.usage) tokenUsage = chunk.usage.total_tokens;
+        }
+      } catch (streamErr) {
+        console.error("Stream interrupted", streamErr);
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream interrupted' })}\n\n`);
+      }
+
+      if (!tokenUsage) tokenUsage = Math.ceil((message.length + fullBotAnswer.length) / 4) + 100;
+
+      // Finalize
+      res.write(`data: ${JSON.stringify({ type: 'done', usage: tokenUsage })}\n\n`);
+      res.end();
+
+      // --- START BACKGROUND SAVE ---
+      // Save to DB AFTER Response is sent (Non-blocking)
+      const metricsGenTime = ragResult.metrics?.genTime || 0; // Might be missing in stream, can use 0 or estimate
+
+      await handleDbSave(userId, targetConversationId, message, fullBotAnswer, tokenUsage, metricsGenTime, req, abortController);
+      return;
+    }
+
+    // ===================================
+    // B. FALLBACK (JSON)
+    // ===================================
     const finalAnswer = ragResult.answer;
     const tokensUsed = ragResult.usage ? ragResult.usage.total_tokens : 0;
+    const metricsGenTime = ragResult.metrics?.genTime || 0;
 
-    // Step 3: Save to DB
-    try {
-      // 🛑 ABORT CHECK: Jika client sudah batalin (Cancel), jangan simpan ke DB
-      if (req.socket.destroyed || abortController.signal.aborted) {
-        console.log('🛑 [AUTH CHAT CONTROLLER] Request aborted. Skipping DB save & history update.');
-        return;
-      }
+    // Use Helper for DB Save
+    // Note: For JSON response, we specifically need the ID to return it, so we must await save FIRST if new chat
+    // But helper approach might need adjustment. Let's keep logic inline for JSON to be safe about Conversation ID return.
 
-      if (!targetConversationId) {
-
-        // ✨ LOGIC BARU: GENERATE SMART TITLE
-        let smartTitle = message.substring(0, 30) + "..."; // Default
-        try {
-          // Panggil OpenAI Service untuk Judul
-          if (openaiService.generateTitle) {
-            smartTitle = await openaiService.generateTitle(message);
-            console.log(`🏷️ [SMART TITLE] Generated: "${smartTitle}"`);
-          }
-        } catch (e) {
-          console.warn("⚠️ Gagal generate title, pakai default.", e.message);
-        }
-
-        const newConv = await prisma.conversation.create({
-          data: {
-            userId: userId,
-            title: smartTitle // ✅ Pakai Judul Pintar
-          }
-        });
-        targetConversationId = newConv.id;
-      } else {
-        await prisma.conversation.update({
-          where: { id: targetConversationId },
-          data: { updatedAt: new Date() }
-        });
-      }
-
-      // Save Chat Batch
-      await prisma.$transaction([
-        prisma.message.create({
-          data: { conversationId: targetConversationId, role: 'user', content: message }
-        }),
-        prisma.message.create({
-          data: { conversationId: targetConversationId, role: 'bot', content: finalAnswer, responseTime: parseFloat(ragResult.metrics?.genTime || 0) }
-        })
-      ]);
-
-      console.log(`💾 [AUTH CHAT] Saved to Conv ID: ${targetConversationId}`);
-
-    } catch (saveError) {
-      console.error(`❌ [AUTH CHAT] DB Save Error:`, saveError.message);
-    }
+    // ... Logic saving reused from Helper but we need the ID immediately ...
+    const savedInfo = await handleDbSave(userId, targetConversationId, message, finalAnswer, tokensUsed, metricsGenTime, req, abortController);
 
     res.json({
       success: true,
       reply: finalAnswer,
-      conversationId: targetConversationId,
-      usage: { total_tokens: tokensUsed }
+      conversationId: savedInfo.conversationId,
+      usage: { total_tokens: tokensUsed },
+      title: savedInfo.title // Return title if new
     });
 
   } catch (error) {
     console.error("❌ [AUTH CHAT ERROR]", error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    if (!res.headersSent) res.status(500).json({ success: false, message: "Server Error" });
+    else res.end();
   }
 };
+
+// Helper: Handle DB Persistence (New Chat Creation / Message Saving)
+async function handleDbSave(userId, conversationId, userMsg, botMsg, tokens, responseTime, req, abortController) {
+  try {
+    // 🛑 Abort Check
+    if (req.socket.destroyed || abortController.signal.aborted) {
+      console.log('🛑 [DB SAVE] Request aborted. Skipping DB save.');
+      return { conversationId };
+    }
+
+    let finalConvId = conversationId;
+    let titleResult = null;
+
+    // Create Conversation if needed
+    if (!finalConvId) {
+      let smartTitle = userMsg.substring(0, 30) + "...";
+      try {
+        if (openaiService.generateTitle) {
+          smartTitle = await openaiService.generateTitle(userMsg); // Generate from User Msg only (Fast)
+        }
+      } catch (e) { }
+
+      const newConv = await prisma.conversation.create({
+        data: {
+          userId: userId,
+          title: smartTitle
+        }
+      });
+      finalConvId = newConv.id;
+      titleResult = smartTitle;
+      console.log(`✅ [DB] New Conversation Created: ${finalConvId}`);
+    } else {
+      await prisma.conversation.update({
+        where: { id: finalConvId },
+        data: { updatedAt: new Date() }
+      });
+    }
+
+    // Save Messages
+    await prisma.$transaction([
+      prisma.message.create({
+        data: { conversationId: finalConvId, role: 'user', content: userMsg }
+      }),
+      prisma.message.create({
+        data: { conversationId: finalConvId, role: 'bot', content: botMsg, responseTime: parseFloat(responseTime || 0) }
+      })
+    ]);
+
+    // Track Token Usage (Rate Limit Service)
+    // Note: We don't await this to block return if we are in background mode, but for helper we await.
+    // It's low latency DB call usually.
+    // await rateLimitService.trackTokenUsage(...) -> Already imported top of file? No?
+    // Check imports... `rateLimitService` IS imported?
+    const rateLimitService = require('../services/rateLimitService'); // Ensure persistence
+    await rateLimitService.trackTokenUsage(userId, req.ip, tokens);
+
+    return { conversationId: finalConvId, title: titleResult };
+
+  } catch (e) {
+    console.error("❌ [DB SAVE ERROR]", e.message);
+    return { conversationId };
+  }
+}
 
 module.exports = {
   googleAuth, googleCallback, googleCallbackSuccess,
