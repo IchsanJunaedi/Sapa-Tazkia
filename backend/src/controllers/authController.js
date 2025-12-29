@@ -48,7 +48,8 @@ const googleCallbackSuccess = async (req, res) => {
 
     if (!validDomains.includes(userDomain)) {
       console.log(`🚫 [AUTH CONTROLLER] Google login rejected - Invalid domain: ${userEmail}`);
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=invalid_domain&message=Hanya email Tazkia yang diizinkan&email=${encodeURIComponent(userEmail)}`);
+      // ✅ PERBAIKAN: Redirect ke landing page dengan auth_error agar error ditampilkan di modal
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/?auth_error=invalid_domain&message=${encodeURIComponent('Login gagal! Silakan gunakan email kampus Tazkia (@student.tazkia.ac.id, @student.stmik.tazkia.ac.id, atau @tazkia.ac.id)')}&email=${encodeURIComponent(userEmail)}`);
     }
 
     console.log(`[DEBUG] Checking if user is new for: ${userEmail}`);
