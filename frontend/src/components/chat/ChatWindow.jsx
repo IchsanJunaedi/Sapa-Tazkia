@@ -213,7 +213,14 @@ const SingleChatMessage = ({ message, onDownloadPDF, onRetry }) => {
       return;
     }
 
-    // 4. Jika Pesan Baru -> Jalankan Efek Mengetik
+    // 4. Jika Streaming / Selesai Streaming -> Langsung tampilkan (bypass typewriter)
+    if (message.isStreaming || message.isStreamComplete) {
+      setDisplayContent(fullContent);
+      setIsTyping(false);
+      return;
+    }
+
+    // 5. Jika Pesan Baru (Non-Stream) -> Jalankan Efek Mengetik
     setDisplayContent('');
     setIsTyping(true);
 
