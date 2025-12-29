@@ -395,7 +395,7 @@ const ChatPage = () => {
         }
     };
 
-    // HANDLE AI MESSAGE UPDATED
+    // HANDLE AI MESSAGE UPDATED (STREAMING SUPPORT)
     const handleAIMessage = useCallback(async (messageText, isGuestMode = false, isInitialMessage = false, forceNewChat = false) => {
         if (initializationRef.current.hasUserInitiatedNewChat && isInitialMessage) {
             initializationRef.current.hasUserInitiatedNewChat = false;
@@ -405,20 +405,62 @@ const ChatPage = () => {
         setIsLoading(true);
         setError(null);
 
+        // Placeholder ID for streaming message to update effectively
+        const streamingMessageId = Date.now() + 1;
+        let hasStartedStreaming = false;
+
         try {
             const effectiveCurrentChatId = forceNewChat ? null : currentChatId;
             const shouldCreateNewChat = forceNewChat || (!effectiveCurrentChatId && isNewChat);
 
-            console.log('🤖 [CHAT PAGE] Sending to AI...');
+            console.log('🤖 [CHAT PAGE] Sending to AI (Stream)...');
+
+            // STREAM CALLBACK
+            const onStream = (chunk, isDone) => {
+                if (isDone) return; // We handle finalization with the resolved promise
+
+                // ✅ FIX: Hide "Thinking..." indicator as soon as stream starts
+                setIsLoading(prev => {
+                    if (prev) return false;
+                    return prev;
+                });
+
+                setMessages(prev => {
+                    // Check if streaming message already exists
+                    const existingIndex = prev.findIndex(m => m.id === streamingMessageId);
+
+                    if (existingIndex !== -1) {
+                        // Update existing
+                        const updatedMessages = [...prev];
+                        updatedMessages[existingIndex] = {
+                            ...updatedMessages[existingIndex],
+                            content: updatedMessages[existingIndex].content + chunk
+                        };
+                        return updatedMessages;
+                    } else {
+                        // Create new (First Chunk)
+                        hasStartedStreaming = true;
+                        return [...prev, {
+                            id: streamingMessageId,
+                            content: chunk,
+                            sender: 'ai',
+                            role: 'bot',
+                            timestamp: new Date().toISOString(),
+                            isStreaming: true
+                        }];
+                    }
+                });
+            };
 
             const response = await sendMessageToAI(
                 messageText,
                 isGuestMode,
                 shouldCreateNewChat,
-                effectiveCurrentChatId
+                effectiveCurrentChatId,
+                onStream // Pass callback
             );
 
-            // ✅ PROCESS RESPONSE FOR PDF TAG
+            // ✅ FINALIZATION
             let botContent = response.message || response.reply || 'Maaf, tidak ada respons dari AI.';
             let hasPdfButton = false;
 
@@ -427,20 +469,31 @@ const ChatPage = () => {
                 hasPdfButton = true;
             }
 
-            const botMessage = {
-                id: Date.now() + 1,
-                content: botContent,
-                sender: 'ai',
-                role: 'bot',
-                timestamp: response.timestamp || new Date().toISOString(),
-                hasPdfButton: hasPdfButton // ✅ Simpan flag di state
-            };
+            // Replace/Update the streaming message with final authoritative version
+            setMessages(prev => {
+                const existingIndex = prev.findIndex(m => m.id === streamingMessageId);
+                const finalMessage = {
+                    id: streamingMessageId, // Keep same ID
+                    content: botContent,
+                    sender: 'ai',
+                    role: 'bot',
+                    timestamp: response.timestamp || new Date().toISOString(),
+                    hasPdfButton: hasPdfButton,
+                    isStreaming: false,
+                    isStreamComplete: true // ✅ Prevent re-triggering typewriter effect
+                };
 
-            setMessages(prev => [...prev, botMessage]);
+                if (existingIndex !== -1) {
+                    const updated = [...prev];
+                    updated[existingIndex] = finalMessage;
+                    return updated;
+                } else {
+                    return [...prev, finalMessage];
+                }
+            });
 
             if (response.conversationId) {
-                // IMPORTANT: Mark as restored BEFORE navigating/setting currentChatId
-                // to prevent the Restoration Effect from triggering again redundant fetch
+                // IMPORTANT: Mark as restored BEFORE navigating
                 initializationRef.current.hasRestoredFromUrl = true;
                 setCurrentChatId(response.conversationId);
 
@@ -456,6 +509,11 @@ const ChatPage = () => {
         } catch (error) {
             console.error('❌ [CHAT PAGE] Error sending message:', error);
 
+            // Removing incomplete streaming message if error occurs
+            if (hasStartedStreaming) {
+                setMessages(prev => prev.filter(m => m.id !== streamingMessageId));
+            }
+
             // ✅ Handle cancelled request
             if (error.isCancelled) {
                 const cancelledMessage = {
@@ -467,7 +525,7 @@ const ChatPage = () => {
                     isCancelled: true
                 };
                 setMessages(prev => [...prev, cancelledMessage]);
-                return; // Jangan process error lainnya
+                return;
             }
 
             if (error.status === 429 || error.code === 'rate_limit_exceeded') {
@@ -764,6 +822,12 @@ const ChatPage = () => {
         };
 
         const timeoutId = setTimeout(() => {
+            // ✅ Double-check ref inside callback to prevent StrictMode race condition
+            if (initializationRef.current.hasProcessedInitialState ||
+                initializationRef.current.isProcessingInitialMessage ||
+                initializationRef.current.hasUserInitiatedNewChat) {
+                return;
+            }
             processInitialState();
         }, 50);
 
