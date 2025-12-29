@@ -621,10 +621,16 @@ const LandingPage = () => {
         // Clear URL parameters first
         window.history.replaceState({}, document.title, window.location.pathname);
 
-        // ✅ REDESIGN: Popup yang lebih Gen Z, clean, dan eye-catching
+        // ✅ REDESIGN v2: Glassmorphism + Pill Button + Modern Icon
         Swal.fire({
-          icon: 'error',
-          iconColor: '#ef4444',
+          iconHtml: `
+            <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M15 9l-6 6M9 9l6 6"/>
+              </svg>
+            </div>
+          `,
           title: 'Oops! Email Tidak Valid',
           html: `
             <div style="text-align: center; padding: 8px 0;">
@@ -632,42 +638,60 @@ const LandingPage = () => {
                 <strong style="color: #1e293b;">${failedEmail || 'Email kamu'}</strong> bukan email kampus
               </p>
               
-              <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 16px; margin: 16px 0;">
-                <p style="font-size: 13px; color: #94a3b8; margin-bottom: 10px; font-weight: 500;">Gunakan email kampus yuk!</p>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                  <span style="background: white; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1a1a1a; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">@student.tazkia.ac.id</span>
-                  <span style="background: white; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1a1a1a; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">@tazkia.ac.id</span>
-                  <span style="background: white; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1a1a1a; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">@student.stmik.tazkia.ac.id</span>
+              <div style="background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); border-radius: 16px; padding: 16px; margin: 16px 0; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+                <p style="font-size: 12px; color: #94a3b8; margin-bottom: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Gunakan email kampus</p>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <span style="background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); padding: 10px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #1e293b; border: 1px solid rgba(0,0,0,0.06);">@student.tazkia.ac.id</span>
+                  <span style="background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); padding: 10px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #1e293b; border: 1px solid rgba(0,0,0,0.06);">@tazkia.ac.id</span>
+                  <span style="background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); padding: 10px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #1e293b; border: 1px solid rgba(0,0,0,0.06);">@student.stmik.tazkia.ac.id</span>
                 </div>
               </div>
             </div>
           `,
           confirmButtonText: 'Coba Lagi',
-          confirmButtonColor: '#111827',
           showCancelButton: false,
           allowOutsideClick: true,
-          backdrop: 'rgba(0,0,0,0.4)',
+          backdrop: 'rgba(15, 23, 42, 0.6)',
+          background: 'rgba(255, 255, 255, 0.95)',
           customClass: {
-            popup: 'animate__animated animate__fadeInUp',
-            title: 'swal-title-custom',
-            confirmButton: 'swal-confirm-custom'
+            popup: 'swal-glassmorphism',
+            icon: 'swal-custom-icon'
           },
           didOpen: () => {
+            // Glassmorphism untuk popup
+            const popup = document.querySelector('.swal2-popup');
+            if (popup) {
+              popup.style.backdropFilter = 'blur(16px)';
+              popup.style.webkitBackdropFilter = 'blur(16px)';
+              popup.style.borderRadius = '24px';
+              popup.style.border = '1px solid rgba(255,255,255,0.2)';
+              popup.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.25)';
+            }
+            // Hide default icon container
+            const iconContainer = document.querySelector('.swal2-icon');
+            if (iconContainer) {
+              iconContainer.style.border = 'none';
+              iconContainer.style.margin = '20px auto 0';
+            }
             // Custom styling untuk title
             const title = document.querySelector('.swal2-title');
             if (title) {
-              title.style.fontSize = '20px';
+              title.style.fontSize = '22px';
               title.style.fontWeight = '700';
-              title.style.color = '#1e293b';
+              title.style.color = '#0f172a';
+              title.style.marginTop = '8px';
             }
-            // Custom styling untuk button
+            // Pill button dengan gradient
             const btn = document.querySelector('.swal2-confirm');
             if (btn) {
-              btn.style.borderRadius = '10px';
-              btn.style.padding = '12px 32px';
+              btn.style.borderRadius = '999px';
+              btn.style.padding = '14px 40px';
               btn.style.fontSize = '14px';
               btn.style.fontWeight = '600';
-              btn.style.boxShadow = '0 4px 14px rgba(17, 24, 39, 0.25)';
+              btn.style.background = 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)';
+              btn.style.border = 'none';
+              btn.style.boxShadow = '0 10px 30px rgba(15, 23, 42, 0.3)';
+              btn.style.transition = 'all 0.2s ease';
             }
           }
         }).then((result) => {
