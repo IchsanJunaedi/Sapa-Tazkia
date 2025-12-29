@@ -1,206 +1,159 @@
 const ragService = require('../services/ragService');
 const rateLimitService = require('../services/rateLimitService');
 const { generateAIResponse } = require('../services/openaiService');
+const redisService = require('../services/redisService');
 
-// In-memory storage untuk Guest (Hilang saat restart server)
+// In-memory storage untuk Guest
 const guestSessions = new Map();
 
 const guestChat = async (req, res) => {
-  try {
-    const abortController = new AbortController();
-    const { message, sessionId } = req.body;
-    const ipAddress = req.ip || '127.0.0.1';
+  const abortController = new AbortController();
+  const { message, sessionId, stream = true } = req.body; // Default stream: true
+  const ipAddress = req.ip || '127.0.0.1';
 
-    // 🛑 Listener untuk pembatalan (Refresh/Cancel)
-    req.on('close', () => {
-      if (!res.writableEnded) {
-        console.log('⚠️ [GUEST CONTROLLER] Request closed by client before completion. Aborting AI...');
-        abortController.abort();
-      }
-    });
-
-    if (!message || message.trim() === '') {
-      return res.status(400).json({ success: false, message: "Message required" });
+  // 🛑 Listener untuk pembatalan
+  req.on('close', () => {
+    if (!res.writableEnded) {
+      abortController.abort();
     }
+  });
 
-    const currentSessionId = sessionId || `guest-${Date.now()}`;
-    console.log(`👤 [GUEST] Chat from IP: ${ipAddress}`);
+  if (!message || message.trim() === '') {
+    return res.status(400).json({ success: false, message: "Message required" });
+  }
 
-    // =================================================================
-    // 1. 🧠 HISTORY RETRIEVAL (LOGIC BARU)
-    // =================================================================
+  const currentSessionId = sessionId || `guest-${Date.now()}`;
+  console.log(`👤 [GUEST] Chat from IP: ${ipAddress} | Stream: ${stream}`);
+
+  try {
+    // 1. Prepare History
     let conversationHistory = [];
-
-    // Cek apakah ada sesi sebelumnya
     if (guestSessions.has(currentSessionId)) {
       const session = guestSessions.get(currentSessionId);
-
-      // Ambil 6 pesan terakhir agar hemat token & tetap relevan
-      const lastMessages = session.messages.slice(-6);
-
-      // Format ulang agar sesuai standar OpenAI (user & assistant)
-      conversationHistory = lastMessages.map(msg => ({
-        role: msg.role === 'bot' ? 'assistant' : 'user', // Convert 'bot' ke 'assistant'
+      conversationHistory = session.messages.slice(-6).map(msg => ({
+        role: msg.role === 'bot' ? 'assistant' : 'user',
         content: msg.content
       }));
     }
+
+    // 2. Call RAG Service
+    const ragResult = await ragService.answerQuestion(
+      message,
+      conversationHistory,
+      { abortSignal: abortController.signal, stream: stream }
+    );
+
     // =================================================================
+    // A. STREAMING HANDLER
+    // =================================================================
+    if (stream && ragResult.isStream) {
 
-    // 2. RAG Process
-    let ragResult;
-    let finalAnswer;
-    let realTokenUsage = 0;
+      // Set Headers for SSE
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
 
-    try {
-      // ✅ PASS HISTORY & ABORT SIGNAL
-      ragResult = await ragService.answerQuestion(
-        message,
-        conversationHistory,
-        { abortSignal: abortController.signal }
-      );
+      let fullAnswer = "";
+      let tokenUsage = 0;
 
-      finalAnswer = ragResult.answer;
+      // Send Initial Data (Docs Info)
+      res.write(`data: ${JSON.stringify({ type: 'meta', docs: ragResult.docsDetail })}\n\n`);
 
-      // Ambil token usage real
-      realTokenUsage = ragResult.usage ? ragResult.usage.total_tokens : 0;
+      try {
+        for await (const chunk of ragResult.stream) {
+          const content = chunk.choices[0]?.delta?.content || "";
 
-      // Fallback estimasi jika null
-      if (!realTokenUsage) {
-        const inputChars = message.length;
-        const outputChars = finalAnswer ? finalAnswer.length : 0;
-        realTokenUsage = Math.ceil((inputChars + outputChars) / 4) + 100;
+          if (content) {
+            fullAnswer += content;
+            res.write(`data: ${JSON.stringify({ type: 'content', chunk: content })}\n\n`);
+          }
+
+          // Beberapa provider mengirim usage di chunk terakhir
+          if (chunk.usage) {
+            tokenUsage = chunk.usage.total_tokens;
+          }
+        }
+      } catch (streamError) {
+        console.error("Stream interrupted", streamError);
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream interrupted' })}\n\n`);
       }
 
-    } catch (ragError) {
-      console.error("RAG Error:", ragError.message);
-      throw ragError;
-    }
-
-    // =================================================================
-    // 3. TOKEN TRACKING & BALANCE UPDATE
-    // =================================================================
-    let currentRemaining = null;
-
-    if (realTokenUsage > 0) {
-      // A. Potong Saldo DAN ambil total usage langsung dari hasil operasi
-      const trackResult = await rateLimitService.trackTokenUsage(null, ipAddress, realTokenUsage);
-      console.log(`📉 [GUEST LIMIT] Deducted REAL usage: ${realTokenUsage} tokens`);
-
-      // B. Hitung remaining LANGSUNG dari hasil trackTokenUsage
-      // Ini lebih akurat daripada memanggil getQuotaStatus terpisah
-      if (trackResult && trackResult.success) {
-        const guestLimits = rateLimitService.getLimits('guest');
-        currentRemaining = Math.max(0, guestLimits.tokenLimitDaily - trackResult.totalUsage);
-        console.log(`📊 [GUEST LIMIT] Total Usage: ${trackResult.totalUsage} | Remaining: ${currentRemaining}`);
-      } else {
-        // Fallback ke getQuotaStatus jika trackTokenUsage gagal
-        const quotaStatus = await rateLimitService.getQuotaStatus(ipAddress, 'guest');
-        currentRemaining = quotaStatus.remaining;
-        console.log(`📊 [GUEST LIMIT] (Fallback) Updated Balance: ${currentRemaining}`);
+      // Estimate Usage if not provided
+      if (!tokenUsage) {
+        tokenUsage = Math.ceil((message.length + fullAnswer.length) / 4) + 100;
       }
-    }
 
-    // =================================================================
-    // 4. SAVE SESSION (UPDATE HISTORY)
-    // =================================================================
+      // Finalize Request
+      res.write(`data: ${JSON.stringify({ type: 'done', usage: tokenUsage })}\n\n`);
+      res.end();
 
-    // 🛑 ABORT CHECK: Jika client sudah batalin (Cancel), jangan simpan ke history
-    if (req.socket.destroyed || abortController.signal.aborted) {
-      console.log('🛑 [GUEST CONTROLLER] Request aborted. Skipping session update.');
+      // Post-Processing (Async): Save Session & Rate Limit
+      await handlePostChat(currentSessionId, message, fullAnswer, ipAddress, tokenUsage, ragResult.cacheKey);
       return;
     }
 
-    // Jika sesi belum ada, buat baru
-    if (!guestSessions.has(currentSessionId)) {
-      guestSessions.set(currentSessionId, {
-        messages: [],
-        createdAt: new Date(),
-        lastActivity: new Date()
-      });
-    }
+    // =================================================================
+    // B. NON-STREAMING FALLBACK (JSON)
+    // =================================================================
 
-    const session = guestSessions.get(currentSessionId);
+    // Send JSON Response
+    const finalAnswer = ragResult.answer;
+    const realTokenUsage = ragResult.usage ? ragResult.usage.total_tokens : 0;
 
-    // Simpan pesan baru
-    session.messages.push({ role: 'user', content: message });
-    session.messages.push({ role: 'bot', content: finalAnswer });
-    session.lastActivity = new Date(); // Update activity time
-
-    // Cleanup otomatis
-    cleanupOldSessions();
-
-    // 5. Kirim Response
     res.json({
       success: true,
       reply: finalAnswer,
       sessionId: currentSessionId,
-      timestamp: new Date().toISOString(),
-      usage: {
-        tokensUsed: realTokenUsage,
-        policy: 'guest',
-        remaining: currentRemaining
-      }
+      usage: { tokensUsed: realTokenUsage }
     });
+
+    await handlePostChat(currentSessionId, message, finalAnswer, ipAddress, realTokenUsage);
 
   } catch (error) {
     console.error('❌ [GUEST ERROR]', error.message);
-
-    // --- FALLBACK LOGIC ---
-    // Jika RAG mati total, switch ke OpenAI direct (tetap pakai history)
-    if (error.message.includes('Qdrant') || error.message.includes('fetch')) {
-      try {
-        // Ambil history lagi (karena scope variabel di atas)
-        let fallbackHistory = [];
-        if (guestSessions.has(req.body.sessionId)) {
-          const msgs = guestSessions.get(req.body.sessionId).messages.slice(-6);
-          fallbackHistory = msgs.map(m => ({ role: m.role === 'bot' ? 'assistant' : 'user', content: m.content }));
-        }
-
-        const fallbackResponse = await generateAIResponse(
-          message,
-          fallbackHistory,
-          null,
-          { abortSignal: abortController.signal, mode: 'general' }
-        );
-
-        const replyText = typeof fallbackResponse === 'object' ? fallbackResponse.content : fallbackResponse;
-        const fallbackUsage = fallbackResponse.usage ? fallbackResponse.usage.total_tokens : 0;
-
-        // Track usage fallback dengan pattern yang sama seperti main flow
-        let fallbackRemaining = null;
-        if (fallbackUsage > 0) {
-          const trackResult = await rateLimitService.trackTokenUsage(null, req.ip, fallbackUsage);
-          if (trackResult && trackResult.success) {
-            const guestLimits = rateLimitService.getLimits('guest');
-            fallbackRemaining = Math.max(0, guestLimits.tokenLimitDaily - trackResult.totalUsage);
-          } else {
-            const fallbackQuota = await rateLimitService.getQuotaStatus(req.ip, 'guest');
-            fallbackRemaining = fallbackQuota.remaining;
-          }
-        }
-
-        return res.json({
-          success: true,
-          reply: replyText,
-          sessionId: req.body.sessionId || `guest-${Date.now()}`,
-          fallback: true,
-          usage: {
-            tokensUsed: fallbackUsage,
-            remaining: fallbackRemaining
-          }
-        });
-      } catch (e) { console.error("Fallback error", e); }
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: "System Error" });
+    } else {
+      res.end(); // Close stream if error occurs mid-stream
     }
-
-    if (error.message.includes('rate_limit')) {
-      return res.status(429).json({ success: false, message: "Terlalu banyak permintaan. Kuota habis." });
-    }
-
-    res.status(500).json({ success: false, message: "System Error" });
   }
 };
 
-// ... (Helper functions getter/cleanup di bawah tidak perlu diubah, tetap sama) ...
+// Helper: Save Session & Track Usage
+async function handlePostChat(sessionId, userMsg, botMsg, ip, usage, cacheKey = null) {
+  try {
+    // 1. Save Session
+    if (!guestSessions.has(sessionId)) {
+      guestSessions.set(sessionId, { messages: [], createdAt: new Date(), lastActivity: new Date() });
+    }
+    const session = guestSessions.get(sessionId);
+    session.messages.push({ role: 'user', content: userMsg });
+    session.messages.push({ role: 'bot', content: botMsg });
+    session.lastActivity = new Date();
+
+    // 2. Track Usage
+    if (usage > 0) {
+      await rateLimitService.trackTokenUsage(null, ip, usage);
+    }
+
+    // 3. Cache the full result (If streaming, we construct the cache object manually here)
+    if (cacheKey && botMsg) {
+      const cachePayload = {
+        answer: botMsg,
+        usage: { total_tokens: usage },
+        docsFound: 0 // We don't have docs info easily here without passing it down, but it's optional for cache display
+      };
+      //  await redisService.set(cacheKey, cachePayload, 3600 * 6); 
+      // Note: Caching streamed response is tricky because we need the docs info too. 
+      // For now, we skip caching streamed responses or accept we lose docs info in cache.
+    }
+
+  } catch (e) {
+    console.error("Post Chat Error:", e.message);
+  }
+}
+
+// ... (Rest of the controller methods: getGuestConversation, etc. - UNCHANGED) ...
 const getGuestConversation = async (req, res) => {
   try {
     const { sessionId } = req.params;

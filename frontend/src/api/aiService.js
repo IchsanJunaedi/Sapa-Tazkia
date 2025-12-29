@@ -314,12 +314,113 @@ export const getRateLimitStatus = async () => {
   }
 };
 
-export const sendGuestMessage = async (message, sessionId = null) => {
-  // Buat AbortController baru untuk request ini
+// ✅ NEW: Helper for Streaming Request (Fetch API)
+const streamFetch = async (endpoint, payload, onStream, isGuest = false) => {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && !isGuest ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+
   currentAbortController = new AbortController();
 
   try {
-    const response = await guestApi.post('/guest/chat', { message, sessionId }, {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...payload, stream: true }),
+      signal: currentAbortController.signal
+    });
+
+    if (!response.ok) {
+      const error = new Error(`HTTP Error: ${response.status}`);
+      error.status = response.status;
+      try {
+        const errData = await response.json();
+        error.response = { data: errData };
+        if (response.status === 429) {
+          const rateLimitError = handleRateLimitError({ response: { data: errData, headers: {} } }); // Mock axios error struct
+          showRateLimitModal(rateLimitError.resetTime, isGuest ? 'guest' : 'user');
+          throw rateLimitError;
+        }
+      } catch (e) { }
+      throw error;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullReply = "";
+    let conversationId = null;
+    let finalUsage = {};
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const jsonStr = line.slice(6);
+            if (jsonStr.trim() === '[DONE]') continue; // Standard SSE done
+
+            const data = JSON.parse(jsonStr);
+
+            if (data.type === 'meta') {
+              conversationId = data.conversationId;
+              // Could invoke onStream for docs if needed
+            } else if (data.type === 'content') {
+              fullReply += data.chunk;
+              if (onStream) onStream(data.chunk, false);
+            } else if (data.type === 'done') {
+              finalUsage = { total_tokens: data.usage };
+            } else if (data.type === 'error') {
+              throw new Error(data.message);
+            }
+          } catch (e) {
+            // Ignore parse errors for partial chunks
+          }
+        }
+      }
+    }
+
+    if (onStream) onStream('', true); // Signal done
+    return {
+      success: true,
+      reply: fullReply,
+      conversationId,
+      usage: finalUsage,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      const cancelError = new Error('Request dibatalkan oleh pengguna');
+      cancelError.isCancelled = true;
+      throw cancelError;
+    }
+    throw error;
+  } finally {
+    currentAbortController = null;
+  }
+};
+
+export const sendGuestMessage = async (message, sessionId = null, onStream = null) => {
+  // Use Streaming if callback provided
+  if (onStream) {
+    const response = await streamFetch('/guest/chat', { message, sessionId }, onStream, true);
+    if (response && response.sessionId) {
+      localStorage.setItem('guestSessionId', response.sessionId);
+    }
+    return response;
+  }
+
+  // Fallback to Axios (Legacy/No-stream)
+  currentAbortController = new AbortController();
+  try {
+    const response = await guestApi.post('/guest/chat', { message, sessionId, stream: false }, {
       signal: currentAbortController.signal
     });
     processRateLimitData(response);
@@ -328,7 +429,6 @@ export const sendGuestMessage = async (message, sessionId = null) => {
     }
     return response.data;
   } catch (error) {
-    // Handle cancelled request
     if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
       const cancelError = new Error('Request dibatalkan oleh pengguna');
       cancelError.isCancelled = true;
@@ -345,18 +445,19 @@ export const sendGuestMessage = async (message, sessionId = null) => {
   }
 };
 
-export const sendAuthenticatedMessage = async (message, isNewChat = false, conversationId = null) => {
-  // Buat AbortController baru untuk request ini
-  currentAbortController = new AbortController();
+export const sendAuthenticatedMessage = async (message, isNewChat = false, conversationId = null, onStream = null) => {
+  if (onStream) {
+    return await streamFetch('/ai/chat', { message, isNewChat, conversationId }, onStream, false);
+  }
 
+  currentAbortController = new AbortController();
   try {
-    const response = await api.post('/ai/chat', { message, isNewChat, conversationId }, {
+    const response = await api.post('/ai/chat', { message, isNewChat, conversationId, stream: false }, {
       signal: currentAbortController.signal
     });
     processRateLimitData(response);
     return response.data;
   } catch (error) {
-    // Handle cancelled request
     if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
       const cancelError = new Error('Request dibatalkan oleh pengguna');
       cancelError.isCancelled = true;
@@ -373,10 +474,9 @@ export const sendAuthenticatedMessage = async (message, isNewChat = false, conve
   }
 };
 
-export const sendMessageToAI = async (message, isGuest = false, isNewChat = false, conversationId = null) => {
+export const sendMessageToAI = async (message, isGuest = false, isNewChat = false, conversationId = null, onStream = null) => {
   const currentState = getRateLimitState();
   if (currentState.remaining === 0) {
-    // Cek apakah waktu sekarang sudah melewati waktu reset
     if (Date.now() < currentState.resetTime) {
       showRateLimitModal(currentState.resetTime, currentState.userType);
       throw new Error(`Limit habis. Reset pada jam ${formatClockTime(currentState.resetTime)}`);
@@ -385,9 +485,9 @@ export const sendMessageToAI = async (message, isGuest = false, isNewChat = fals
 
   if (isGuest) {
     const sessionId = localStorage.getItem('guestSessionId');
-    return await sendGuestMessage(message, sessionId);
+    return await sendGuestMessage(message, sessionId, onStream);
   } else {
-    return await sendAuthenticatedMessage(message, isNewChat, conversationId);
+    return await sendAuthenticatedMessage(message, isNewChat, conversationId, onStream);
   }
 };
 

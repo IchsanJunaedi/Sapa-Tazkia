@@ -14,8 +14,8 @@ const QDRANT_PORT = process.env.QDRANT_PORT || 6333;
 const COLLECTION_NAME = 'sapa_tazkia_knowledge';
 const VECTOR_SIZE = 1536;
 
-const MAX_CONTEXT_TOKENS = 800; // ✅ Menggunakan limit TOKEN (estimasi)
-const SCORE_THRESHOLD = 0.30;
+const MAX_CONTEXT_TOKENS = 800;
+const SCORE_THRESHOLD = 0.35; // Sedikit lebih ketat agar hasil lebih relevan
 const CACHE_TTL_SECONDS = 3600 * 6; // 6 Jam Cache
 
 const client = new QdrantClient({ host: QDRANT_HOST, port: QDRANT_PORT });
@@ -26,7 +26,7 @@ class RagService {
   }
 
   // =============================================================================
-  // 1. QUERY OPTIMIZATION & SEMANTIC CACHE 🧠
+  // 1. QUERY OPTIMIZATION 🧠
   // =============================================================================
 
   async generateSearchQueries(userQuery, history = []) {
@@ -35,41 +35,38 @@ class RagService {
       const cleanQuery = userQuery.toLowerCase().trim();
 
       // --- LOGIC: CONTEXT INJECTION (FAST & STABLE) ⚡ ---
-      let contextAdded = false;
 
+      // 1. Base Query
+      finalQueries.add(userQuery);
+
+      // 2. Context from History (Optional)
       if (history.length > 0) {
-        // ✅ FIX: Ambil pesan user TERAKHIR (bukan yang pertama)
         const lastUserMessage = [...history].reverse().find(m => m.role === 'user')?.content || "";
 
-        const isShort = cleanQuery.split(' ').length < 6;
-        const triggers = ['nya', 'itu', 'tersebut', 'tadi', 'ini', 'dia', 'beliau', 'dimana', 'berapa', 'kapan', 'dalil', 'hukum'];
+        // Cek jika pertanyaan ambigu (pendek/kata ganti)
+        const isShort = cleanQuery.split(' ').length < 4;
+        const triggers = ['nya', 'itu', 'tersebut', 'tadi', 'ini', 'dia', 'beliau', 'dimana', 'berapa', 'kapan', 'dalil', 'hukum', 'biaya'];
         const hasTrigger = triggers.some(w => cleanQuery.includes(w));
 
+        // Jika ambigu dan ada history, gabungkan
         if ((isShort || hasTrigger) && lastUserMessage.length > 2) {
-          const combinedQuery = `${userQuery} ${lastUserMessage}`;
-          console.log(`🔗 [CONTEXT FIX] Combined Query: "${combinedQuery}"`);
+          const combinedQuery = `${userQuery} (Konteks: ${lastUserMessage})`;
+          // console.log(`🔗 [CONTEXT FIX] Combined Query: "${combinedQuery}"`); // Debug log reduced
           finalQueries.add(combinedQuery);
-          contextAdded = true;
-
-          // 💡 Jika query sangat pendek (seperti "dalilnya?"), 
-          // JANGAN masukkan query aslinya ke pencarian agar tidak "nyasar" ke dokumen lain.
-          if (cleanQuery.split(' ').length <= 2) {
-            console.log(`🚫 [RAG] Skipping raw ambiguous query: "${userQuery}"`);
-          } else {
-            finalQueries.add(userQuery);
-          }
-        } else {
-          finalQueries.add(userQuery);
         }
-      } else {
-        finalQueries.add(userQuery);
       }
 
-      const manualQueries = this.expandQueryManually(userQuery);
-      if (manualQueries.length > 0) manualQueries.forEach(q => finalQueries.add(q));
+      // 3. Keyword Extraction (Simple fallback)
+      // Jika query panjang, ambil keywords penting saja untuk pencarian backup
+      if (cleanQuery.length > 50) {
+        // Hapus kata sambung umum (naive stopword removal)
+        const keywords = cleanQuery.replace(/\b(dan|yang|di|ke|dari|untuk|pada|adalah|itu|ini|saya|ingin|mau|tanya|apakah|bagaimana)\b/g, '').replace(/\s+/g, ' ').trim();
+        if (keywords.length > 5 && keywords !== cleanQuery) {
+          finalQueries.add(keywords);
+        }
+      }
 
-      const queryArray = Array.from(finalQueries).slice(0, 4);
-      console.log(`✅ [RAG] Queries Ready: ${JSON.stringify(queryArray)}`);
+      const queryArray = Array.from(finalQueries).slice(0, 3); // Limit 3 queries max
       return queryArray;
 
     } catch (error) {
@@ -78,45 +75,24 @@ class RagService {
     }
   }
 
-  expandQueryManually(query) {
-    const normalized = query.toLowerCase().trim();
-    const expanded = [];
-    let cleanQuery = normalized.replace(/taozkia|tazkya|taskia/g, 'tazkia');
-
-    if (cleanQuery.includes('dimana') || cleanQuery.includes('lokasi') || cleanQuery.includes('alamat')) {
-      expanded.push('alamat lengkap lokasi kampus stmik tazkia sentul');
-    }
-    if (cleanQuery.includes('prodi') || cleanQuery.includes('jurusan') || cleanQuery.includes('studi')) {
-      expanded.push('daftar program studi jurusan stmik tazkia');
-    }
-    return expanded;
-  }
-
   // =============================================================================
-  // 2. SEARCH ENGINE (HYBRID & RE-RANKING) 🚀
+  // 2. SEARCH ENGINE (HYBRID) 🚀
   // =============================================================================
 
   async searchRelevantDocs(userQuery, history = [], category = null, abortSignal = null) {
     const startSearchTotal = Date.now();
     try {
       const queries = await this.generateSearchQueries(userQuery, history);
-      let allCandidates = [];
 
-      console.log('🔍 [RAG] Executing Parallel Vector Search...');
-      const startVector = Date.now();
+      console.log(`🔍 [RAG] Search Queries: ${JSON.stringify(queries)}`);
 
-      // ✅ optimization: Embedding Cost Check
-      // Jika queries mirip satu sama lain, skip embedding redundan
-      const uniqueQueries = Array.from(new Set(queries));
-
-      const searchPromises = uniqueQueries.map(async (q) => {
-        // ✅ Cek Abort mid-loop
+      // Parallel Search
+      const searchPromises = queries.map(async (q) => {
         if (abortSignal?.aborted) throw new Error('AbortError');
 
         try {
           const vector = await openaiService.createEmbedding(q);
 
-          // ✅ Hybrid Search logic: Vector + Filter Metadata
           const searchOptions = {
             vector: vector,
             limit: 5,
@@ -124,15 +100,13 @@ class RagService {
             score_threshold: SCORE_THRESHOLD,
           };
 
-          // Tambahkan filtering berdasarkan kategori jika tersedia
           if (category) {
             searchOptions.filter = {
               must: [{ key: "category", match: { value: category } }]
             };
           }
 
-          const result = await client.search(COLLECTION_NAME, searchOptions);
-          return result;
+          return await client.search(COLLECTION_NAME, searchOptions);
         } catch (e) {
           console.warn(`⚠️ [RAG] Sub-search failed for "${q}":`, e.message);
           return [];
@@ -140,52 +114,36 @@ class RagService {
       });
 
       const results = await Promise.allSettled(searchPromises);
-      console.log(`⏱️ [Perf] Vector DB Search completed in ${(Date.now() - startVector)}ms`);
+
+      // Flatten & Deduplicate
+      const uniqueDocs = new Map();
 
       results.forEach(res => {
-        if (res.status === 'fulfilled') {
-          allCandidates.push(...res.value);
+        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+          res.value.forEach(item => {
+            // Use payload.text hash or ID as key
+            const content = (item.payload.text || "").trim();
+            const docHash = this.calculateTextHash(content);
+
+            if (!uniqueDocs.has(docHash)) {
+              uniqueDocs.set(docHash, item);
+            } else {
+              // Keep the one with higher score
+              if (item.score > uniqueDocs.get(docHash).score) {
+                uniqueDocs.set(docHash, item);
+              }
+            }
+          });
         }
       });
 
-      // Deduplication & Initial Scoring
-      const uniqueDocs = new Map();
-      for (const item of allCandidates) {
-        const content = (item.payload.text || "").trim();
-        const docId = this.calculateTextHash(content);
-
-        if (uniqueDocs.has(docId)) {
-          const existing = uniqueDocs.get(docId);
-          if (item.score > existing.score) {
-            uniqueDocs.set(docId, { ...item, cleanContent: content });
-          }
-        } else {
-          uniqueDocs.set(docId, { ...item, cleanContent: content });
-        }
-      }
-
-      // ✅ RE-RANKING LAYER: Simple Keyword Score Boost
+      // Sort by Score
       const finalDocs = Array.from(uniqueDocs.values())
-        .map(doc => {
-          let rerankScore = doc.score;
-          // Boost jika judul atau konten mengandung kata yang sama persis dengan query
-          const words = userQuery.toLowerCase().split(' ');
-          words.forEach(word => {
-            if (word.length > 3) {
-              if (doc.payload.title?.toLowerCase().includes(word)) rerankScore += 0.05;
-              if (doc.cleanContent?.toLowerCase().includes(word)) rerankScore += 0.02;
-            }
-          });
-          return { ...doc, rerankScore };
-        })
-        .sort((a, b) => b.rerankScore - a.rerankScore)
+        .sort((a, b) => b.score - a.score)
         .slice(0, 5);
 
       if (finalDocs.length > 0) {
-        console.log(`📄 [RAG] Found ${finalDocs.length} unique docs. Total Retrieval Time: ${(Date.now() - startSearchTotal)}ms`);
-        finalDocs.forEach((d, i) => {
-          console.log(`   ${i + 1}. [Rerank Score: ${d.rerankScore.toFixed(4)}] ${d.payload.title}`);
-        });
+        console.log(`📄 [RAG] Retrieved ${finalDocs.length} docs in ${(Date.now() - startSearchTotal)}ms`);
       }
 
       return finalDocs;
@@ -197,95 +155,95 @@ class RagService {
   }
 
   // =============================================================================
-  // 3. CONTEXT & ANSWERING (WITH SEMANTIC CACHE)
+  // 3. CONTEXT & ANSWERING (STREAMING SUPPORT)
   // =============================================================================
 
   compileContext(docs) {
     if (!docs || docs.length === 0) return "";
-    const contextChunks = [];
+
+    let contextString = "";
     let currentTokens = 0;
 
     for (const doc of docs) {
       const title = doc.payload.title || "Informasi";
-      let text = doc.cleanContent || "";
-      const formattedChunk = `[[Sumber: ${title}]]\n${text}`;
+      const text = doc.payload.text || "";
 
-      // ✅ Estimasi Token (Chars / 4)
-      const estimatedTokens = formattedChunk.length / 4;
-      if ((currentTokens + estimatedTokens) > MAX_CONTEXT_TOKENS) break;
+      const chunk = `[[Sumber: ${title}]]\n${text}\n\n`;
 
-      contextChunks.push(formattedChunk);
-      currentTokens += estimatedTokens;
+      // Rough token check (char / 4)
+      if ((currentTokens + (chunk.length / 4)) > MAX_CONTEXT_TOKENS) break;
+
+      contextString += chunk;
+      currentTokens += (chunk.length / 4);
     }
-    return contextChunks.join('\n\n---\n\n');
+
+    return contextString;
   }
 
   async answerQuestion(userMessage, conversationHistory = [], options = {}) {
+    const { stream = false, abortSignal = null } = options;
     const startTotal = Date.now();
+
+    // 1. Cache Check (Hanya untuk non-streaming atau jika streaming support cache flag nanti) 
+    // Saat ini kita skip cache untuk streaming agar simple, atau return cache langsung.
+    // Untuk streaming, kita bisa return "fake stream" dari cache, tapi kompleks. 
+    // Sederhana: jika cache hit, return JSON biasa (Frontend harus bisa handle JSON or Stream).
+
     const cacheKey = `rag_cache:${this.calculateTextHash(userMessage + JSON.stringify(conversationHistory.slice(-2)))}`;
 
     try {
-      // ✅ 1. Semantic Cache Check (Redis)
+      // ✅ Cache Check (Redis)
       const cachedResponse = await redisService.get(cacheKey);
       if (cachedResponse) {
-        console.log('⚡ [CACHE] Cache Hit! Returning stored answer.');
+        // console.log('⚡ [CACHE] Cache Hit!');
+        // Jika minta stream tapi ada cache, sebaiknya kita tetap return JSON saja 
+        // karena frontend harusnya hybrid. Tapi jika strict stream, kita kirim text langsung.
         return JSON.parse(cachedResponse);
       }
 
-      // ✅ ABORT CHECK 1
-      if (options.abortSignal?.aborted) throw new Error('AbortError');
+      if (abortSignal?.aborted) throw new Error('AbortError');
 
-      // 2. Fast Path Check untuk Salam/Basa-basi
-      if (userMessage.length < 15 && conversationHistory.length === 0) {
-        const lower = userMessage.toLowerCase();
-        if (['halo', 'hi', 'assalamualaikum', 'pagi', 'tes'].some(w => lower.includes(w))) {
-          return {
-            answer: "Waalaikumsalam! Halo, saya Kia. Ada yang bisa dibantu seputar Tazkia?",
-            usage: {}, docsFound: 0, metrics: { totalTime: 0.01, genTime: 0 }
-          };
-        }
-      }
-
-      // 3. Search (With Category Filtering if provided)
-      const relevantDocs = await this.searchRelevantDocs(userMessage, conversationHistory, options.category, options.abortSignal);
-
-      // ✅ ABORT CHECK 2
-      if (options.abortSignal?.aborted) throw new Error('AbortError');
-
+      // 2. Search
+      const relevantDocs = await this.searchRelevantDocs(userMessage, conversationHistory, options.category, abortSignal);
       const contextString = this.compileContext(relevantDocs);
 
-      // 4. Generate Answer
-      const startGen = Date.now();
+      // 3. Generate Answer (Streaming or Promise)
       const aiResult = await openaiService.generateAIResponse(
         userMessage,
         conversationHistory,
         contextString,
-        { ...options, forceContextUsage: relevantDocs.length > 0 }
+        { ...options, forceContextUsage: relevantDocs.length > 0, stream: stream }
       );
 
-      const genTime = ((Date.now() - startGen) / 1000).toFixed(2);
-      const totalTime = ((Date.now() - startTotal) / 1000).toFixed(2);
+      // A. Jika Streaming, return stream object langsung
+      if (stream) {
+        return {
+          isStream: true,
+          stream: aiResult, // Ini adalah AsyncIterable
+          docsDetail: relevantDocs.map(d => ({ title: d.payload.title, score: d.score })),
+          cacheKey: cacheKey // User harus cache sendiri nanti setelah stream selesai (di controller)
+        };
+      }
+
+      // B. Jika Regular (JSON)
+      const genTime = ((Date.now() - startTotal) / 1000).toFixed(2);
 
       const response = {
         answer: aiResult.content,
         usage: aiResult.usage,
         docsFound: relevantDocs.length,
         docsDetail: relevantDocs.map(d => ({ title: d.payload.title, score: d.score })),
-        metrics: { totalTime: totalTime, genTime: (totalTime - (Date.now() - startTotal) / 1000).toFixed(2) } // Approximate
+        metrics: { totalTime: genTime, genTime: genTime } // Compatibility: genTime ~= totalTime for now
       };
 
-      // ✅ Store in Cache
+      // Store Cache (Background)
       await redisService.set(cacheKey, response, CACHE_TTL_SECONDS);
 
       return response;
 
     } catch (error) {
       console.error('❌ [RAG] Answer Process Error:', error.message);
-      return {
-        answer: "Mohon maaf, sistem Sapa Tazkia sedang mengalami gangguan teknis.",
-        usage: {},
-        docsFound: 0
-      };
+      throw error;
     }
   }
 
@@ -320,11 +278,12 @@ class RagService {
   async deleteCollection() { try { await client.deleteCollection(COLLECTION_NAME); } catch { } }
 
   // =============================================================================
-  // 5. INGESTION (DATA LOADING - ORIGINAL LOGIC PRESERVED)
+  // 5. INGESTION (DATA LOADING)
   // =============================================================================
 
   async ingestData() {
-    console.log('🔄 [RAG] Ingestion Start... (Updating Knowledge Base)');
+    // ... (Ingestion logic kept same but simplified logging if needed)
+    console.log('🔄 [RAG] Ingestion Start...');
 
     await this.deleteCollection();
     await new Promise(r => setTimeout(r, 1000));
@@ -333,7 +292,6 @@ class RagService {
     const dataDir = path.join(__dirname, '../../data');
 
     if (!fs.existsSync(dataDir)) {
-      console.error(`❌ [RAG] Data directory not found at: ${dataDir}`);
       return { success: false, message: "Folder data missing" };
     }
 
@@ -344,15 +302,11 @@ class RagService {
       try {
         const rawData = fs.readFileSync(path.join(dataDir, file), 'utf-8');
         const jsonItems = JSON.parse(rawData);
-        console.log(`📥 Processing ${file}: ${jsonItems.length} items`);
-
         const points = [];
 
         for (const item of jsonItems) {
           const rawContent = item.semantic_content || item.text || '';
           const topic = item.topic || 'General Info';
-
-          // Format text embedding agar 'topic' menyatu dengan 'isi' plus KEYWORDS
           const keywordStr = item.keywords ? `\n[Keywords: ${item.keywords.join(', ')}]` : '';
           const richText = `[Topik: ${topic}]${keywordStr}\n${rawContent}`;
 
