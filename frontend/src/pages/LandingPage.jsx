@@ -78,10 +78,10 @@ const VerificationForm = ({ email, onVerify, onResend, onBack, isLoading, error 
       e.preventDefault();
       e.stopPropagation();
     }
-    
+
     setResendLoading(true);
     setResendSuccess(false);
-    
+
     try {
       await onResend();
       setResendSuccess(true);
@@ -115,7 +115,7 @@ const VerificationForm = ({ email, onVerify, onResend, onBack, isLoading, error 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
           <span className="block sm:inline">{error}</span>
-          <button 
+          <button
             type="button"
             onClick={() => error && typeof error === 'object' && error.onClose ? error.onClose() : null}
             className="absolute top-2 right-2 text-red-500 hover:text-red-700"
@@ -143,9 +143,8 @@ const VerificationForm = ({ email, onVerify, onResend, onBack, isLoading, error 
 
       <button
         type="submit"
-        className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-3 ${
-          code.trim().length >= 4 && !isLoading ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
-        }`}
+        className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-3 ${code.trim().length >= 4 && !isLoading ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
+          }`}
         disabled={code.trim().length < 4 || isLoading}
       >
         {isLoading ? 'Memverifikasi...' : 'Verifikasi'}
@@ -160,7 +159,7 @@ const VerificationForm = ({ email, onVerify, onResend, onBack, isLoading, error 
         >
           {resendLoading ? 'Mengirim...' : 'Kirim Ulang Kode'}
         </button>
-        
+
         <button
           type="button"
           onClick={onBack}
@@ -182,10 +181,10 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
   const [error, setError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const { 
-    loginWithCredentials, 
-    registerWithEmail, 
-    verifyEmailCode, 
+  const {
+    loginWithCredentials,
+    registerWithEmail,
+    verifyEmailCode,
     resendVerificationCode,
     pendingVerification,
     pendingEmail,
@@ -223,7 +222,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
       e.preventDefault();
       e.stopPropagation();
     }
-    
+
     if (!email) {
       setError('Email atau NIM harus diisi');
       return;
@@ -232,33 +231,33 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
     setIsLoading(true);
     setError('');
     setShowSuccess(false);
-    
+
     try {
       // Check if input is email or NIM
       const isEmail = email.includes('@');
-      
+
       if (isEmail) {
         // Email input - proceed with registration/sign up
         console.log('🔍 [AUTH MODAL] Email detected, proceeding with registration:', email);
-        
+
         // Validasi domain email Tazkia
         const validDomains = [
           '@student.tazkia.ac.id',
-          '@student.stmik.tazkia.ac.id', 
+          '@student.stmik.tazkia.ac.id',
           '@tazkia.ac.id'
         ];
-        
+
         const isValidDomain = validDomains.some(domain => email.toLowerCase().includes(domain));
-        
+
         if (!isValidDomain) {
           throw new Error('Silakan gunakan email Tazkia (@student.tazkia.ac.id, @student.stmik.tazkia.ac.id, atau @tazkia.ac.id)');
         }
 
         // Call register function for email
         const result = await registerWithEmail(email);
-        
+
         console.log('🔍 [AUTH MODAL] Register result:', result);
-        
+
         // Jika memerlukan verifikasi, pindah ke step verifikasi
         if (result.requiresVerification) {
           setStep(1);
@@ -270,7 +269,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
             handleClose();
           }, 1500);
         }
-        
+
       } else {
         // NIM input - proceed with login
         console.log('🔍 [AUTH MODAL] NIM detected, proceeding with login:', email);
@@ -287,7 +286,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
 
       // ✅ TAMBAHAN: POP UP SWEETALERT jika email sudah terdaftar
       if (
-        errorMessage.toLowerCase().includes('already registered') || 
+        errorMessage.toLowerCase().includes('already registered') ||
         errorMessage.toLowerCase().includes('sudah terdaftar')
       ) {
         Swal.fire({
@@ -326,13 +325,13 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
   const handleVerification = async (code) => {
     setIsLoading(true);
     setError('');
-    
+
     try {
       console.log('🔍 [AUTH MODAL] Verifying code for email:', email);
       const result = await verifyEmailCode(email, code);
-      
+
       console.log('🔍 [AUTH MODAL] Verification result:', result);
-      
+
       if (result.success) {
         setShowSuccess(true);
         setTimeout(() => {
@@ -353,11 +352,11 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
     try {
       console.log('🔍 [AUTH MODAL] Resending code to:', email);
       const result = await resendVerificationCode(email);
-      
+
       if (!result.success) {
         throw new Error(result.error || 'Gagal mengirim ulang kode');
       }
-      
+
       return result;
     } catch (err) {
       console.error('❌ [AUTH MODAL] Resend failed:', err);
@@ -376,7 +375,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
       e.preventDefault();
       e.stopPropagation();
     }
-    
+
     setIsLoading(true);
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
     window.location.href = `${API_URL}/api/auth/google`;
@@ -410,20 +409,20 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
                 <span className="block sm:inline">{error}</span>
                 {error.includes('sudah terdaftar') && (
-                  <div style={{marginTop: '10px', fontSize: '14px'}}>
-                    <button 
+                  <div style={{ marginTop: '10px', fontSize: '14px' }}>
+                    <button
                       type="button"
                       onClick={() => {
                         setEmail('');
                         setError('');
                       }}
-                      style={{background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', textDecoration: 'underline'}}
+                      style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', textDecoration: 'underline' }}
                     >
                       Klik di sini untuk masuk dengan NIM
                     </button>
                   </div>
                 )}
-                <button 
+                <button
                   type="button"
                   onClick={() => setError(null)}
                   className="absolute top-2 right-2 text-red-500 hover:text-red-700"
@@ -432,7 +431,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
                 </button>
               </div>
             )}
-            
+
             <div className="space-y-3">
               <button
                 type="button"
@@ -468,18 +467,17 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
 
             <button
               type="submit"
-              className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${
-                email && !isLoading ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
-              }`}
+              className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${email && !isLoading ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
+                }`}
               disabled={!email || isLoading}
             >
               {isLoading ? 'Memproses...' : 'Lanjutkan'}
             </button>
 
-            <button 
+            <button
               type="button"
-              onClick={handleClose} 
-              className="w-full text-sm text-gray-500 hover:text-gray-900 mt-2" 
+              onClick={handleClose}
+              className="w-full text-sm text-gray-500 hover:text-gray-900 mt-2"
               disabled={isLoading}
             >
               Tutup
@@ -509,9 +507,9 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm relative transform transition-all duration-300 scale-100">
-        <button 
+        <button
           type="button"
-          onClick={handleClose} 
+          onClick={handleClose}
           className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-900 rounded-full hover:bg-gray-100"
           disabled={isLoading}
         >
@@ -529,9 +527,9 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
 const LandingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { 
-    user, 
-    logout, 
+  const {
+    user,
+    logout,
     loading: authLoading,
     isAuthenticated,
     handleGoogleAuthCallback,
@@ -542,13 +540,13 @@ const LandingPage = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [initialModalStep, setInitialModalStep] = useState(0);
-  
+
   // ✅ PERBAIKAN: Ubah default state menjadi true agar sidebar terbuka saat load
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const [message, setMessage] = useState('');
   const [greeting, setGreeting] = useState('');
-  
+
   // State untuk riwayat chat
   const [chatHistory, setChatHistory] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
@@ -580,7 +578,7 @@ const LandingPage = () => {
       setChatHistory(response.data.conversations || []);
     } catch (error) {
       console.error('❌ [LANDING PAGE] Error loading chat history:', error);
-      
+
       if (error.response?.status === 401) {
         console.log('🛑 [LANDING PAGE] 401 Unauthorized - Token invalid');
       } else if (error.response?.status === 404) {
@@ -602,27 +600,103 @@ const LandingPage = () => {
       const success = urlParams.get('success');
       const error = urlParams.get('error');
 
+      // ✅ BARU: Handle auth_error untuk invalid domain (Gmail login attempt)
+      const authError = urlParams.get('auth_error');
+      const errorMessage = urlParams.get('message');
+      const failedEmail = urlParams.get('email');
+
       console.log('🔍 [LANDING PAGE] Auth callback params:', {
         token: !!token,
         userData: !!userData,
         success,
-        error
+        error,
+        authError,
+        failedEmail
       });
+
+      // ✅ BARU: Tampilkan SweetAlert2 untuk invalid domain error
+      if (authError === 'invalid_domain') {
+        console.log('🚫 [LANDING PAGE] Invalid domain detected:', failedEmail);
+
+        // Clear URL parameters first
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        // ✅ REDESIGN: Popup yang lebih Gen Z, clean, dan eye-catching
+        Swal.fire({
+          icon: 'error',
+          iconColor: '#ef4444',
+          title: 'Oops! Email Tidak Valid',
+          html: `
+            <div style="text-align: center; padding: 8px 0;">
+              <p style="font-size: 15px; color: #64748b; margin-bottom: 16px;">
+                <strong style="color: #1e293b;">${failedEmail || 'Email kamu'}</strong> bukan email kampus
+              </p>
+              
+              <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 16px; margin: 16px 0;">
+                <p style="font-size: 13px; color: #94a3b8; margin-bottom: 10px; font-weight: 500;">Gunakan email kampus yuk!</p>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <span style="background: white; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1a1a1a; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">@student.tazkia.ac.id</span>
+                  <span style="background: white; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1a1a1a; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">@tazkia.ac.id</span>
+                  <span style="background: white; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1a1a1a; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">@student.stmik.tazkia.ac.id</span>
+                </div>
+              </div>
+            </div>
+          `,
+          confirmButtonText: 'Coba Lagi',
+          confirmButtonColor: '#111827',
+          showCancelButton: false,
+          allowOutsideClick: true,
+          backdrop: 'rgba(0,0,0,0.4)',
+          customClass: {
+            popup: 'animate__animated animate__fadeInUp',
+            title: 'swal-title-custom',
+            confirmButton: 'swal-confirm-custom'
+          },
+          didOpen: () => {
+            // Custom styling untuk title
+            const title = document.querySelector('.swal2-title');
+            if (title) {
+              title.style.fontSize = '20px';
+              title.style.fontWeight = '700';
+              title.style.color = '#1e293b';
+            }
+            // Custom styling untuk button
+            const btn = document.querySelector('.swal2-confirm');
+            if (btn) {
+              btn.style.borderRadius = '10px';
+              btn.style.padding = '12px 32px';
+              btn.style.fontSize = '14px';
+              btn.style.fontWeight = '600';
+              btn.style.boxShadow = '0 4px 14px rgba(17, 24, 39, 0.25)';
+            }
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            // Buka modal login ketika user klik "Coba Lagi"
+            setIsModalOpen(true);
+          }
+        });
+
+        return; // Stop processing, error already handled
+      }
 
       if (token && userData && success === 'true') {
         try {
           console.log('🔍 [LANDING PAGE] Processing Google auth callback...');
           await handleGoogleAuthCallback(token, userData);
-          
+
           // Clear URL parameters
           window.history.replaceState({}, document.title, window.location.pathname);
-          
+
           console.log('✅ [LANDING PAGE] Google auth callback processed successfully');
         } catch (error) {
           console.error('❌ [LANDING PAGE] Google auth callback failed:', error);
         }
       } else if (error) {
         console.error('❌ [LANDING PAGE] Auth callback error:', error);
+
+        // Clear URL parameters
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
     };
 
@@ -646,19 +720,19 @@ const LandingPage = () => {
 
       if (shouldCompleteProfile) {
         console.log('🔍 [LANDING PAGE] User needs profile completion, checking current page...');
-        
+
         const currentPath = window.location.pathname;
         const isComingFromAboutYou = location.state?.from === 'profile-completion';
         const isOnAboutYouPage = currentPath === '/about-you' || currentPath.includes('/about-you');
         const isSubmitting = location.state?.isSubmitting;
-        
+
         // Hanya redirect jika BENAR-BENAR belum di AboutYouPage dan tidak berasal dari submission
         if (!isOnAboutYouPage && !isComingFromAboutYou && !isSubmitting) {
           console.log('🔍 [LANDING PAGE] Redirecting to AboutYouPage');
-          navigate('/about-you', { 
-            state: { 
+          navigate('/about-you', {
+            state: {
               from: 'landing-page',
-              userEmail: user.email 
+              userEmail: user.email
             },
             replace: true // ✅ DITAMBAHKAN: replace: true untuk mencegah redirect loop
           });
@@ -682,23 +756,23 @@ const LandingPage = () => {
   // ✅ FIXED: Refresh greeting function
   const refreshGreeting = useCallback(() => {
     const userShortName = getUserName();
-    
+
     const greetingsForUser = [
-    `Assalamu'alaikum, ${userShortName}!`,
-    `Ahlan wa sahlan, ${userShortName}!`,
-    `Bismillah, ${userShortName}! Apa yang bisa kita kerjakan hari ini?`,
-    `Assalamu'alaikum wa rahmatullah, ${userShortName}! Senang berjumpa dengan Anda.`,
-    `Marhaban, ${userShortName}!`,
+      `Assalamu'alaikum, ${userShortName}!`,
+      `Ahlan wa sahlan, ${userShortName}!`,
+      `Bismillah, ${userShortName}! Apa yang bisa kita kerjakan hari ini?`,
+      `Assalamu'alaikum wa rahmatullah, ${userShortName}! Senang berjumpa dengan Anda.`,
+      `Marhaban, ${userShortName}!`,
     ];
 
     const greetingsForGuest = [
-    `Assalamu'alaikum! Selamat datang di Sapa Tazkia. Ada yang bisa kami bantu?`,
-    `Ahlan wa sahlan! Di mana sebaiknya kita mulai perbincangan ini?`,
-    `Bismillah, mari kita mulai! Apa yang ingin Anda ketahui hari ini?`,
-    `Assalamu'alaikum. Senang Anda berkunjung! Apa yang membawa Anda ke sini hari ini?`,
-    `Marhaban! Kami siap membantu. Silakan beritahu kami kebutuhan Anda.`,
+      `Assalamu'alaikum! Selamat datang di Sapa Tazkia. Ada yang bisa kami bantu?`,
+      `Ahlan wa sahlan! Di mana sebaiknya kita mulai perbincangan ini?`,
+      `Bismillah, mari kita mulai! Apa yang ingin Anda ketahui hari ini?`,
+      `Assalamu'alaikum. Senang Anda berkunjung! Apa yang membawa Anda ke sini hari ini?`,
+      `Marhaban! Kami siap membantu. Silakan beritahu kami kebutuhan Anda.`,
     ];
-    
+
     const availableGreetings = user ? greetingsForUser : greetingsForGuest;
     const randomGreeting = availableGreetings[Math.floor(Math.random() * availableGreetings.length)];
     setGreeting(randomGreeting);
@@ -740,10 +814,10 @@ const LandingPage = () => {
     }
 
     setIsDeleting(true);
-    
+
     const previousChatHistory = [...chatHistory];
     setChatHistory(prev => prev.filter(chat => chat.id !== chatToDelete));
-    
+
     if (currentChatId === chatToDelete) {
       setCurrentChatId(null);
     }
@@ -755,9 +829,9 @@ const LandingPage = () => {
 
     } catch (error) {
       console.error('❌ [LANDING PAGE] Error deleting chat:', error);
-      
+
       setChatHistory(previousChatHistory);
-      
+
       if (error.response?.status === 401) {
         console.log('🛑 [LANDING PAGE] 401 Unauthorized');
       } else if (error.response?.status === 404) {
@@ -780,9 +854,9 @@ const LandingPage = () => {
   // ✅ PERBAIKAN: Handle select chat - navigasi ke chat page dengan chat yang dipilih - DIPERBAIKI
   const handleSelectChat = (chatId) => {
     console.log('🔍 [LANDING PAGE] Selecting chat:', chatId);
-    navigate('/chat', { 
-      state: { 
-        selectedChatId: chatId 
+    navigate('/chat', {
+      state: {
+        selectedChatId: chatId
       }
     });
   };
@@ -791,11 +865,11 @@ const LandingPage = () => {
   const handleSendMessage = () => {
     if (message.trim()) {
       console.log('🔍 [LANDING PAGE] Sending message to chat page:', message.trim());
-      
+
       // ✅ PERBAIKAN: Clear input field immediately
       const messageToSend = message.trim();
       setMessage('');
-      
+
       // Simpan state navigation dengan benar
       const navigationState = {
         initialMessage: messageToSend,
@@ -805,7 +879,7 @@ const LandingPage = () => {
       };
 
       // Navigate ke chat page dengan state
-      navigate('/chat', { 
+      navigate('/chat', {
         state: navigationState,
         replace: false // Biarkan replace: false agar user bisa kembali ke landing page
       });
@@ -822,9 +896,9 @@ const LandingPage = () => {
   // ✅ PERBAIKAN: Fungsi untuk langsung ke chat sebagai guest - DIPERBAIKI
   const handleGuestChat = () => {
     console.log('🔍 [LANDING PAGE] Starting guest chat');
-    navigate('/chat', { 
-      state: { 
-        isGuest: true 
+    navigate('/chat', {
+      state: {
+        isGuest: true
       }
     });
   };
@@ -872,18 +946,18 @@ const LandingPage = () => {
       <div className="flex-1 flex flex-col overflow-hidden">
         <nav className="flex items-center justify-between p-6 flex-shrink-0">
           <div className="flex items-center">
-            <button 
+            <button
               onClick={() => navigate('/')}
               className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
             >
-              <img 
-                src="/a2.png" 
-                alt="Sapa Tazkia Logo" 
+              <img
+                src="/a2.png"
+                alt="Sapa Tazkia Logo"
                 className="h-8 w-auto hover:scale-105 transition-transform duration-200"
               />
             </button>
           </div>
-          
+
           <div className="flex items-center space-x-3">
             {authLoading ? (
               <span className="text-gray-500">Loading...</span>
@@ -942,7 +1016,7 @@ const LandingPage = () => {
                 <ArrowUp size={20} />
               </button>
             </div>
-            
+
             {/* Guest mode info */}
             <div className="mt-4 text-center">
               <p className="text-gray-500 text-sm">
