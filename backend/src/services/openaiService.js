@@ -132,6 +132,16 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
       return handleStaticResponse("Assalamualaikum! 👋 Saya **Kia**, asisten virtual Universitas Tazkia. Kia siap bantu Kakak seputar informasi kampus, prodi, dan akademik. Ada yang bisa dibantu? 😊");
     }
 
+    // --- Greeting Handler (NEW) ---
+    if (isGreeting(userMessage)) {
+      const lower = userMessage.toLowerCase();
+      // Special response for Islamic greeting
+      if (lower.includes('assalamualaikum') || lower.includes('assalamu')) {
+        return handleStaticResponse("Waalaikumussalam! 👋 Halo Kak, selamat datang di layanan Sapa Tazkia. Ada yang bisa Kia bantu hari ini seputar informasi kampus, prodi, atau akademik? 😊");
+      }
+      return handleStaticResponse("Halo Kak! 👋 Selamat datang di layanan Sapa Tazkia. Kia siap bantu Kakak seputar informasi kampus, pendaftaran, dan akademik. Ada yang bisa dibantu? 😊");
+    }
+
     if (isBannedTopicQuestion(userMessage)) {
       return handleStaticResponse("Mohon maaf Kak, Kia hanya fokus menjawab seputar informasi **Akademik & Kampus Tazkia** ya. 🙏 Silakan tanya tentang pendaftaran, biaya, atau prodi.");
     }
@@ -251,6 +261,19 @@ async function generateTitle(userMessage, aiResponse = null) {
 }
 
 // --- Utils (Safety Filters) ---
+function isGreeting(text) {
+  const t = text.toLowerCase().trim();
+  const greetings = [
+    'halo', 'hai', 'hi', 'hello', 'hey',
+    'assalamualaikum', 'assalamu alaikum', 'assalamualaikum wr wb',
+    'pagi', 'selamat pagi', 'selamat siang', 'selamat sore', 'selamat malam',
+    'good morning', 'good afternoon', 'good evening',
+    'permisi', 'punten', 'tes', 'test'
+  ];
+  // Check exact match or starts with greeting word followed by space/punctuation
+  return greetings.some(g => t === g || t.startsWith(g + ' ') || t.startsWith(g + ',') || t.startsWith(g + '.'));
+}
+
 function isIdentityQuestion(text) {
   const t = text.toLowerCase();
   // Removed "human" and "manusia" to avoid false positives (e.g., "humaniora")
@@ -278,5 +301,6 @@ module.exports = {
   generateAIResponse,
   createEmbedding,
   testOpenAIConnection,
-  generateTitle
+  generateTitle,
+  isGreeting
 };

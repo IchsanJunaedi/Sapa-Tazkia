@@ -59,7 +59,7 @@ const ChatInput = ({ onSend, disabled, isGenerating, onCancel }) => {
     const canSend = input.trim() && !isTooLong && !disabled && !isGenerating;
 
     return (
-        <div className="p-4 md:p-6 border-t border-gray-200 flex justify-center bg-[#fef6e4]">
+        <div className="p-4 md:p-6 border-t border-gray-200 flex flex-col items-center justify-center bg-[#fef6e4]">
             <form
                 ref={formRef}
                 onSubmit={handleSubmit}
@@ -116,6 +116,11 @@ const ChatInput = ({ onSend, disabled, isGenerating, onCancel }) => {
                     )}
                 </div>
             </form>
+
+            {/* ✅ AI Disclaimer */}
+            <p className="text-xs text-gray-500 mt-3 text-center font-medium opacity-80">
+                AI can make mistakes. Cross-check academic information with official sources.
+            </p>
         </div>
     );
 };

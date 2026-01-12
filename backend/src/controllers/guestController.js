@@ -83,8 +83,22 @@ const guestChat = async (req, res) => {
         tokenUsage = Math.ceil((message.length + fullAnswer.length) / 4) + 100;
       }
 
+      // ✅ FIX: Calculate remaining tokens real-time for UI
+      let remainingTokens = null;
+      let limitTokens = null;
+      try {
+        const quota = await rateLimitService.getQuotaStatus(ipAddress, 'guest');
+        remainingTokens = Math.max(0, quota.remaining - tokenUsage);
+        limitTokens = quota.limit;
+      } catch (e) { }
+
       // Finalize Request
-      res.write(`data: ${JSON.stringify({ type: 'done', usage: tokenUsage })}\n\n`);
+      res.write(`data: ${JSON.stringify({
+        type: 'done',
+        usage: tokenUsage,
+        remaining: remainingTokens,
+        limit: limitTokens
+      })}\n\n`);
       res.end();
 
       // Post-Processing (Async): Save Session & Rate Limit
