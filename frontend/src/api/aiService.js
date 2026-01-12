@@ -376,6 +376,15 @@ const streamFetch = async (endpoint, payload, onStream, isGuest = false) => {
               if (onStream) onStream(data.chunk, false);
             } else if (data.type === 'done') {
               finalUsage = { total_tokens: data.usage };
+
+              // ✅ FIX: Update rate limit state immediately after stream
+              if (data.remaining !== undefined && data.remaining !== null) {
+                updateRateLimitState({
+                  remaining: data.remaining,
+                  limit: data.limit || rateLimitState.limit
+                });
+              }
+              if (data.conversationId) conversationId = data.conversationId;
             } else if (data.type === 'error') {
               throw new Error(data.message);
             }

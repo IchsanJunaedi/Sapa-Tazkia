@@ -1,6 +1,6 @@
 const ragService = require('../services/ragService');
 // ✅ FIX 1: Import generateTitle yang sudah kita buat di service
-const { generateAIResponse, testOpenAIConnection, generateTitle } = require('../services/openaiService');
+const { generateAIResponse, testOpenAIConnection, generateTitle, isGreeting } = require('../services/openaiService');
 const academicService = require('../services/academicService');
 const rateLimitService = require('../services/rateLimitService');
 const prisma = require('../../config/prisma');
@@ -14,29 +14,21 @@ const prisma = require('../../config/prisma');
 const sendChat = async (req, res) => {
     const abortController = new AbortController();
     let currentConversationId = null;
-    let shouldCreateNewConversation = false;
 
-    // 🛑 Listener untuk pembatalan (Refresh/Cancel)
+    // 🛑 Listener untuk pembatalan
     req.on('close', () => {
         if (!res.writableEnded) {
-            console.log('⚠️ [AI CONTROLLER] Request closed by client before completion. Aborting AI...');
             abortController.abort();
         }
     });
 
     try {
-        const { message, conversationId, isNewChat } = req.body;
+        const { message, conversationId, isNewChat, stream = true } = req.body;
         const userId = req.user?.id || null;
 
-        // 1. AUTH CHECK
-        if (!userId) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
-        }
+        if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+        if (!message || message.trim() === '') return res.status(400).json({ success: false, message: "Pesan tidak boleh kosong" });
 
-        // 2. VALIDASI INPUT
-        if (!message || message.trim() === '') {
-            return res.status(400).json({ success: false, message: "Pesan tidak boleh kosong" });
-        }
         const cleanMessage = message.trim();
 
         // 3. LOAD HISTORY
@@ -59,183 +51,132 @@ const sendChat = async (req, res) => {
         // =================================================================
         // 🧠 LOGIC: SMART ROUTING (AKADEMIK vs UMUM)
         // =================================================================
-
-        // Kata kunci pemicu mode Akademik
         const academicKeywords = ['nilai', 'ipk', 'grade', 'transkrip', 'skor', 'hasil studi', 'pdf', 'download', 'unduh', 'semester'];
         const isAcademicQuery = academicKeywords.some(keyword => cleanMessage.toLowerCase().includes(keyword));
 
+        let aiStream = null;
         let finalAnswer = "";
         let realTokenUsage = 0;
+        let docsDetail = [];
 
         if (isAcademicQuery) {
-            // ---------------------------------------------------------
-            // JALUR 1: PERTANYAAN AKADEMIK (Database -> OpenAI Langsung)
-            // ---------------------------------------------------------
-            console.log('🎓 [MODE] ACADEMIC QUERY DETECTED. BYPASSING RAG...');
-
-            // A. Ambil Data DB
+            console.log('🎓 [MODE] ACADEMIC QUERY DETECTED');
             const [userSummary, userGrades] = await Promise.all([
-                prisma.user.findUnique({
-                    where: { id: userId },
-                    include: { academicSummary: true, programStudi: true }
-                }),
-                prisma.academicGrade.findMany({
-                    where: { userId: userId },
-                    include: { course: true },
-                    orderBy: { semester: 'asc' }
-                })
+                prisma.user.findUnique({ where: { id: userId }, include: { academicSummary: true, programStudi: true } }),
+                prisma.academicGrade.findMany({ where: { userId: userId }, include: { course: true }, orderBy: { semester: 'asc' } })
             ]);
 
             if (userSummary) {
                 const ipk = userSummary.academicSummary?.ipk || "0.00";
                 const sks = userSummary.academicSummary?.totalSks || 0;
                 const prodi = userSummary.programStudi?.name || "Tidak diketahui";
+                const gradeList = userGrades.length > 0 ? userGrades.map(g => `- Sem ${g.semester}: ${g.course.name} (${g.grade})`).join('\n') : "Belum ada data nilai.";
 
-                const gradeList = userGrades.length > 0
-                    ? userGrades.map(g => `- Sem ${g.semester}: ${g.course.name} (${g.grade})`).join('\n')
-                    : "Belum ada data nilai.";
-
-                // B. Buat Prompt Spesifik (Sangat Tegas)
                 const academicPrompt = `
              KAMU ADALAH ASISTEN AKADEMIK PRIBADI. JANGAN CARI DATA DI INTERNET/DOKUMEN LAIN.
              GUNAKAN DATA DI BAWAH INI UNTUK MENJAWAB:
+             [DATA VALID] Nama: ${userSummary.fullName}, Prodi: ${prodi}, IPK: ${ipk}, Total SKS: ${sks}
+             Rincian Nilai: ${gradeList}
+             [INSTRUKSI WAJIB] Jawab pertanyaan user dengan ramah. Jika tanya PDF, jawab "Bisa" & tag [DOWNLOAD_PDF] di akhir.
+             Pertanyaan User: "${cleanMessage}"`;
 
-             [DATA VALID DARI DATABASE]
-             Nama: ${userSummary.fullName}
-             Prodi: ${prodi}
-             IPK: ${ipk}
-             Total SKS: ${sks}
-             
-             Rincian Nilai:
-             ${gradeList}
-             
-             [INSTRUKSI WAJIB]
-             1. Jawab pertanyaan user dengan ramah berdasarkan data di atas.
-             2. Jika user bertanya "Bisa download PDF?" atau "Minta PDF", JAWAB "Bisa" dan TAMBAHKAN TAG INI DI AKHIR JAWABAN: [DOWNLOAD_PDF]
-             3. JANGAN PERNAH MENOLAK PERMINTAAN DOWNLOAD PDF.
-             
-             Pertanyaan User: "${cleanMessage}"
-             `;
-
-                // C. Kirim ke OpenAI (Tanpa RAG)
-                const aiRes = await generateAIResponse(
-                    academicPrompt,
-                    conversationHistory,
-                    null,
-                    { abortSignal: abortController.signal, mode: 'general' }
-                );
-                finalAnswer = typeof aiRes === 'object' ? aiRes.content : aiRes;
-                realTokenUsage = 1500; // Estimasi token
-                console.log('✅ [MODE] Academic Answer Generated directly via OpenAI.');
+                const response = await generateAIResponse(academicPrompt, conversationHistory, null, { abortSignal: abortController.signal, stream });
+                if (stream) aiStream = response;
+                else finalAnswer = response.content;
+                realTokenUsage = 1500; // Est
             } else {
                 finalAnswer = "Maaf, data akademik Anda tidak ditemukan di database.";
             }
 
         } else {
-            // ---------------------------------------------------------
-            // JALUR 2: PERTANYAAN UMUM (RAG -> OpenAI)
-            // ---------------------------------------------------------
-            console.log('🌍 [MODE] GENERAL QUERY. USING RAG SERVICE...');
+            console.log('🌍 [MODE] GENERAL QUERY (RAG)');
+            const ragResult = await ragService.answerQuestion(cleanMessage, conversationHistory, { abortSignal: abortController.signal, stream });
 
-            try {
-                const ragResult = await ragService.answerQuestion(
-                    cleanMessage,
-                    conversationHistory,
-                    { abortSignal: abortController.signal }
-                );
+            if (stream && ragResult.isStream) {
+                aiStream = ragResult.stream;
+                docsDetail = ragResult.docsDetail;
+            } else {
                 finalAnswer = ragResult.answer;
-
-                // ✅ FIX: Handle kasus {} (objek kosong) dari greeting/fast-path
-                // Jika usage.total_tokens tidak ada atau NaN, gunakan estimasi
-                const tokenFromUsage = ragResult.usage?.total_tokens;
-                if (tokenFromUsage && !isNaN(tokenFromUsage) && tokenFromUsage > 0) {
-                    realTokenUsage = tokenFromUsage;
-                } else {
-                    // Fallback: estimasi berdasarkan panjang output + minimal overhead
-                    const estimatedTokens = Math.ceil((cleanMessage.length + (finalAnswer?.length || 0)) / 4) + 50;
-                    realTokenUsage = Math.max(estimatedTokens, 100); // Minimal 100 token
-                    console.log(`📊 [TOKEN] Using estimated tokens: ${realTokenUsage}`);
-                }
-            } catch (err) {
-                console.error('RAG Error:', err);
-                finalAnswer = "Maaf, saya sedang mengalami gangguan koneksi ke server pengetahuan kampus.";
+                realTokenUsage = ragResult.usage?.total_tokens || 100;
+                docsDetail = ragResult.docsDetail;
             }
         }
 
         // =================================================================
-        // 4. SAVE TO DB & TOKEN TRACKING
+        // A. STREAMING HANDLER
         // =================================================================
+        if (stream && (aiStream || finalAnswer)) {
+            // Jika finalAnswer ada tapi stream diminta (fallback/academic error case)
+            // Kita kirim static stream jika aiStream null
+            if (!aiStream && finalAnswer) {
+                // Manual SSE for static text
+                res.setHeader('Content-Type', 'text/event-stream');
+                res.write(`data: ${JSON.stringify({ type: 'content', chunk: finalAnswer })}\n\n`);
+                res.write(`data: ${JSON.stringify({ type: 'done', usage: 100 })}\n\n`);
+                res.end();
+                // Save (async)
+                await handleSaveAndTrack(userId, currentConversationId, conversationId, isNewChat, cleanMessage, finalAnswer, 100, req.ip);
+                return;
+            }
 
-        // 🛑 ABORT CHECK: Jika client sudah putus koneksi (Cancel), jangan simpan ke DB
-        if (req.socket.destroyed || abortController.signal.aborted) {
-            console.log('🛑 [AI CONTROLLER] Request aborted. Skipping DB save & further processing.');
-            return;
+            if (aiStream) {
+                res.setHeader('Content-Type', 'text/event-stream');
+                res.setHeader('Cache-Control', 'no-cache');
+
+                if (docsDetail.length > 0) res.write(`data: ${JSON.stringify({ type: 'meta', docs: docsDetail })}\n\n`);
+
+                let streamedText = "";
+                let streamUsage = 0;
+
+                for await (const chunk of aiStream) {
+                    const content = chunk.choices[0]?.delta?.content || "";
+                    if (content) {
+                        streamedText += content;
+                        res.write(`data: ${JSON.stringify({ type: 'content', chunk: content })}\n\n`);
+                    }
+                    if (chunk.usage) streamUsage = chunk.usage.total_tokens;
+                }
+
+                if (!streamUsage) streamUsage = Math.ceil(streamedText.length / 4);
+
+                // Track & Calc Remaining
+                let remaining = null;
+                if (streamUsage > 0) {
+                    const track = await rateLimitService.trackTokenUsage(userId, req.ip, streamUsage);
+                    const limits = rateLimitService.getLimits('user');
+                    remaining = Math.max(0, limits.tokenLimitDaily - track.totalUsage);
+                }
+
+                const savedId = await handleSaveAndTrack(userId, currentConversationId, conversationId, isNewChat, cleanMessage, streamedText, 0, req.ip, true);
+
+                res.write(`data: ${JSON.stringify({ type: 'done', usage: streamUsage, remaining, conversationId: savedId })}\n\n`);
+                res.end();
+                return;
+            }
         }
 
-        // Track Token dan ambil total usage langsung dari hasil operasi
+        // =================================================================
+        // B. NON-STREAM HANDLER (JSON)
+        // =================================================================
+        // Logic for JSON response (Tracking + Saving)
         let currentRemaining = null;
         if (realTokenUsage > 0) {
             const trackResult = await rateLimitService.trackTokenUsage(userId, req.ip, realTokenUsage);
-            console.log(`📉 [USER LIMIT] Deducted REAL usage: ${realTokenUsage} tokens`);
-
             if (trackResult && trackResult.success) {
                 const userLimits = rateLimitService.getLimits('user');
                 currentRemaining = Math.max(0, userLimits.tokenLimitDaily - trackResult.totalUsage);
-                console.log(`📊 [USER LIMIT] Total Usage: ${trackResult.totalUsage} | Remaining: ${currentRemaining}`);
-            } else {
-                // Fallback ke getQuotaStatus jika trackTokenUsage gagal
-                const quotaStatus = await rateLimitService.getQuotaStatus(userId, 'user');
-                currentRemaining = quotaStatus.remaining;
-                console.log(`📊 [USER LIMIT] (Fallback) Updated Balance: ${currentRemaining}`);
             }
-        } else {
-            // Jika tidak ada token usage, ambil status saja
-            const quotaStatus = await rateLimitService.getQuotaStatus(userId, 'user');
-            currentRemaining = quotaStatus.remaining;
         }
 
-        // Save Conversation
-        currentConversationId = conversationId ? parseInt(conversationId) : null;
-        shouldCreateNewConversation = isNewChat || !currentConversationId;
+        const savedId = await handleSaveAndTrack(userId, currentConversationId, conversationId, isNewChat, cleanMessage, finalAnswer, 0, req.ip, true);
 
-        try {
-            let conversationTitle = "Percakapan Baru"; // Default title
-
-            // Auto Title untuk Chat Baru
-            if (shouldCreateNewConversation) {
-                // ✅ FIX 2: GUNAKAN FUNGSI DEDICATED DARI SERVICE
-                // Kita kirim pesan user DAN jawaban AI agar judulnya pintar & sesuai konteks
-                console.log("🏷️ Generating Smart Title...");
-                conversationTitle = await generateTitle(cleanMessage, finalAnswer);
-
-                const newConv = await prisma.conversation.create({
-                    data: {
-                        userId,
-                        title: conversationTitle, // Title hasil generateTitle
-                        messages: { create: [{ role: 'user', content: cleanMessage }, { role: 'bot', content: finalAnswer }] }
-                    }
-                });
-                currentConversationId = newConv.id;
-                console.log(`✅ New Conversation Created: [${newConv.id}] ${conversationTitle}`);
-            } else {
-                // Chat lama: update pesan saja
-                await prisma.message.createMany({
-                    data: [{ conversationId: currentConversationId, role: 'user', content: cleanMessage }, { conversationId: currentConversationId, role: 'bot', content: finalAnswer }]
-                });
-                // Update timestamp biar naik ke atas di sidebar
-                await prisma.conversation.update({ where: { id: currentConversationId }, data: { updatedAt: new Date() } });
-            }
-        } catch (e) { console.error('DB Save Error:', e); }
-
-        // 5. SEND RESPONSE
         res.json({
             success: true,
             reply: finalAnswer,
-            conversationId: currentConversationId,
+            conversationId: savedId,
             timestamp: new Date().toISOString(),
             isNewConversation: shouldCreateNewConversation,
-            // Jika chat baru, kirim title ke frontend agar UI bisa update realtime tanpa refresh
-            title: shouldCreateNewConversation ? (await prisma.conversation.findUnique({ where: { id: currentConversationId } }))?.title : null,
+            title: shouldCreateNewConversation ? (await prisma.conversation.findUnique({ where: { id: savedId } }))?.title : null,
             usage: {
                 tokensUsed: realTokenUsage,
                 remaining: currentRemaining
@@ -243,10 +184,65 @@ const sendChat = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ [AI CONTROLLER] Fatal Error:', error);
-        res.status(500).json({ success: false, message: "Terjadi kesalahan sistem." });
+        console.error('❌ [AI] Error:', error);
+        if (!res.headersSent) res.status(500).json({ success: false, message: "Error sistem." });
     }
 };
+
+// Helper internal untuk saving DB (karena dipakai Stream & JSON)
+async function handleSaveAndTrack(userId, currentId, reqConvId, isNewChat, userMsg, botMsg, usageToTrack, ip, alreadyTracked = false) {
+    // 1. Track if needed
+    let remaining = null;
+    if (!alreadyTracked && usageToTrack > 0) {
+        await rateLimitService.trackTokenUsage(userId, ip, usageToTrack);
+    }
+
+    // 2. Save DB
+    let convId = reqConvId ? parseInt(reqConvId) : null;
+    try {
+        if (isNewChat || !convId) {
+            const title = await generateTitle(userMsg, botMsg);
+            const newConv = await prisma.conversation.create({
+                data: {
+                    userId,
+                    title,
+                    messages: { create: [{ role: 'user', content: userMsg }, { role: 'bot', content: botMsg }] }
+                }
+            });
+            return newConv.id;
+        } else {
+            // Existing chat: Add messages
+            await prisma.message.createMany({
+                data: [{ conversationId: convId, role: 'user', content: userMsg }, { conversationId: convId, role: 'bot', content: botMsg }]
+            });
+
+            // ✅ Defer Title Generation Logic
+            try {
+                const existingConv = await prisma.conversation.findUnique({ where: { id: convId } });
+
+                // Cek apakah judul masih default dan pesan BUKAN greeting
+                if (existingConv && existingConv.title === 'Percakapan Baru' && !isGreeting(userMsg)) {
+                    console.log('🏷️ [TITLE] Updating deferred title for Conversation ID:', convId);
+
+                    const newTitle = await generateTitle(userMsg, botMsg);
+
+                    if (newTitle && newTitle !== 'Percakapan Baru') {
+                        await prisma.conversation.update({
+                            where: { id: convId },
+                            data: { title: newTitle }
+                        });
+                        console.log(`✅ [TITLE] Updated to: "${newTitle}"`);
+                    }
+                }
+            } catch (err) {
+                console.error("⚠️ [TITLE UPDATE] Error (Non-fatal):", err.message);
+            }
+
+            await prisma.conversation.update({ where: { id: convId }, data: { updatedAt: new Date() } });
+            return convId;
+        }
+    } catch (e) { console.error("DB Save Fail", e); return null; }
+}
 
 /**
  * ============================================================================
