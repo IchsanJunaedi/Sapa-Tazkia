@@ -55,7 +55,7 @@ const sendVerificationEmail = async (email, verificationCode) => {
 
     await emailService.sendEmail(email, subject, html);
     console.log('✅ [AUTH SERVICE] Verification email sent to:', email);
-    
+
     return true;
   } catch (error) {
     console.error('❌ [AUTH SERVICE] Failed to send verification email:', error);
@@ -151,9 +151,9 @@ const verifyEmailCode = async (email, code) => {
     await createSession(updatedUser.id, token, 'email-verification', 'email-verification');
 
     // ✅ PERBAIKAN: Return requiresProfileCompletion yang benar
-    const requiresProfileCompletion = !updatedUser.isProfileComplete || 
-                                    !updatedUser.fullName || 
-                                    updatedUser.fullName.trim() === '';
+    const requiresProfileCompletion = !updatedUser.isProfileComplete ||
+      !updatedUser.fullName ||
+      updatedUser.fullName.trim() === '';
 
     return {
       success: true,
@@ -220,12 +220,47 @@ const resendVerificationCode = async (email) => {
 };
 
 // ========================================================
+// ✅ HELPER: Generate Unique NIM dengan retry mechanism
+// ========================================================
+
+/**
+ * Generate unique NIM with retry mechanism
+ * @param {string} prefix - Prefix for NIM (e.g., 'E' for external users, 'S' for student fallback)
+ * @param {number} maxRetries - Maximum retry attempts
+ * @returns {Promise<string>} - Unique NIM
+ */
+const generateUniqueNIM = async (prefix = 'E', maxRetries = 10) => {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    // Generate random 8-digit number
+    const randomPart = Math.floor(10000000 + Math.random() * 90000000).toString();
+    const candidateNIM = `${prefix}${randomPart}`;
+
+    // Check if NIM already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { nim: candidateNIM }
+    });
+
+    if (!existingUser) {
+      console.log(`[AUTH SERVICE] Generated unique NIM: ${candidateNIM} (attempt ${attempt + 1})`);
+      return candidateNIM;
+    }
+
+    console.log(`[AUTH SERVICE] NIM collision detected: ${candidateNIM}, retrying...`);
+  }
+
+  // Fallback: Use timestamp-based NIM to guarantee uniqueness
+  const timestampNIM = `${prefix}${Date.now().toString().slice(-8)}`;
+  console.log(`[AUTH SERVICE] Fallback timestamp NIM: ${timestampNIM}`);
+  return timestampNIM;
+};
+
+// ========================================================
 // ✅ PERBAIKAN BESAR: FUNGSI FIND OR CREATE USER BY EMAIL - SEMUA USER BUTUH VERIFIKASI
 // ========================================================
 
 const findOrCreateUserByEmail = async (email, googleData = null) => {
   try {
-    console.log('🔍 [AUTH SERVICE] Find or create user by email:', email);
+    console.log('[AUTH SERVICE] Find or create user by email:', email);
 
     // Check if user exists
     let user = await prisma.user.findUnique({
@@ -233,7 +268,7 @@ const findOrCreateUserByEmail = async (email, googleData = null) => {
     });
 
     if (user) {
-      console.log('✅ [AUTH SERVICE] User found:', user.nim);
+      console.log('[AUTH SERVICE] User found:', user.nim);
       return { user, isNewUser: false };
     }
 
@@ -241,7 +276,7 @@ const findOrCreateUserByEmail = async (email, googleData = null) => {
     let nim = null;
     let userType = 'regular';
     let fullName = '';
-    
+
     if (email.includes('@student.tazkia.ac.id') || email.includes('@student.stmik.tazkia.ac.id')) {
       // Extract NIM from student email: 102834567812.gab@student.tazkia.ac.id
       const nimMatch = email.match(/^(\d+)\./);
@@ -249,15 +284,32 @@ const findOrCreateUserByEmail = async (email, googleData = null) => {
         nim = nimMatch[1];
         userType = 'student';
         fullName = ''; // Will be filled in AboutYouPage
-        console.log('🎓 [AUTH SERVICE] Student detected, NIM:', nim);
+        console.log('[AUTH SERVICE] Student detected, NIM:', nim);
+
+        // CHECK: Apakah NIM student ini sudah ada di database?
+        const existingNimUser = await prisma.user.findUnique({
+          where: { nim: nim }
+        });
+
+        if (existingNimUser) {
+          // NIM sudah ada tapi dengan email berbeda
+          console.log('[AUTH SERVICE] Student NIM already exists with different email:', {
+            existingEmail: existingNimUser.email,
+            newEmail: email
+          });
+
+          // Generate fallback NIM dengan prefix 'S' untuk student
+          nim = await generateUniqueNIM('S');
+          console.log('[AUTH SERVICE] Using fallback NIM for student:', nim);
+        }
       }
     }
 
-    // If not student email or NIM not extracted, generate random NIM
+    // If not student email or NIM not extracted, generate UNIQUE random NIM
     if (!nim) {
-      nim = 'E' + Math.floor(10000000 + Math.random() * 90000000).toString();
+      nim = await generateUniqueNIM('E');
       fullName = googleData?.name || '';
-      console.log('👤 [AUTH SERVICE] Regular user, generated NIM:', nim);
+      console.log('[AUTH SERVICE] Regular user, generated unique NIM:', nim);
     }
 
     // Use Google data if available
@@ -265,40 +317,53 @@ const findOrCreateUserByEmail = async (email, googleData = null) => {
       fullName = googleData.name;
     }
 
-    // ✅ ✅ ✅ PERBAIKAN KRITIS: Generate verification code untuk SEMUA new users (termasuk Google)
+    // Generate verification code untuk SEMUA new users (termasuk Google)
     const verificationCode = generateVerificationCode();
     const expirationTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // ✅ PERBAIKAN: Untuk new user, set isProfileComplete ke false
+    // Untuk new user, set isProfileComplete ke false
     const isProfileComplete = !!(googleData?.name && googleData.name.trim() !== '');
 
-    // ✅ ✅ ✅ PERBAIKAN PENTING: SEMUA new user (termasuk Google) harus through verification
+    // SEMUA new user (termasuk Google) harus through verification
     const userData = {
       nim: nim,
       email: email,
       fullName: fullName,
       authMethod: googleData ? 'google' : 'email',
       userType: userType,
-      isProfileComplete: isProfileComplete, // ✅ Hanya true jika ada nama dari Google
-      status: 'pending', // Set to pending until email verified
-      // ✅ ✅ ✅ KRITIS: SEMUA new user butuh verifikasi email
-      isEmailVerified: false, // ❗ UBAH: dari true menjadi false untuk Google users
-      verificationCode: verificationCode, // ❗ UBAH: dari null menjadi verificationCode untuk Google
-      verificationCodeExpires: expirationTime, // ❗ UBAH: dari null menjadi expirationTime untuk Google
+      isProfileComplete: isProfileComplete,
+      status: 'pending',
+      isEmailVerified: false,
+      verificationCode: verificationCode,
+      verificationCodeExpires: expirationTime,
       verificationAttempts: 0
     };
 
-    user = await prisma.user.create({
-      data: userData
-    });
+    // FIX: Wrap CREATE dengan try-catch untuk handle race condition
+    try {
+      user = await prisma.user.create({
+        data: userData
+      });
+    } catch (createError) {
+      // Handle race condition: jika NIM collision terjadi, regenerate dan retry
+      if (createError.code === 'P2002' && createError.meta?.target?.includes('nim')) {
+        console.log('[AUTH SERVICE] Race condition detected, regenerating NIM...');
+        userData.nim = await generateUniqueNIM('E');
+        user = await prisma.user.create({
+          data: userData
+        });
+      } else {
+        throw createError;
+      }
+    }
 
-    console.log('✅ [AUTH SERVICE] New user created:', { 
-      email: user.email, 
-      nim: user.nim, 
+    console.log('[AUTH SERVICE] New user created:', {
+      email: user.email,
+      nim: user.nim,
       type: userType,
       isProfileComplete: user.isProfileComplete,
-      isEmailVerified: user.isEmailVerified, // Harus false
-      hasVerificationCode: !!user.verificationCode // Harus true
+      isEmailVerified: user.isEmailVerified,
+      hasVerificationCode: !!user.verificationCode
     });
 
     // ✅ ✅ ✅ PERBAIKAN: Kirim verification email untuk SEMUA new users (termasuk Google)
@@ -337,7 +402,7 @@ const registerWithEmail = async (email) => {
     // EXTRACT NIM FROM EMAIL IF STUDENT EMAIL
     let nim = null;
     let userType = 'regular';
-    
+
     if (email.includes('@student.tazkia.ac.id') || email.includes('@student.stmik.tazkia.ac.id')) {
       // Extract NIM from student email: 102834567812.gab@student.tazkia.ac.id
       const nimMatch = email.match(/^(\d+)\./);
@@ -375,9 +440,9 @@ const registerWithEmail = async (email) => {
       }
     });
 
-    console.log('✅ [AUTH SERVICE] User created with email:', { 
-      email: newUser.email, 
-      nim: newUser.nim, 
+    console.log('✅ [AUTH SERVICE] User created with email:', {
+      email: newUser.email,
+      nim: newUser.nim,
       type: userType,
       isProfileComplete: newUser.isProfileComplete // Harus false
     });
@@ -429,7 +494,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           }
 
           const userEmail = profile.emails[0].value;
-          
+
           // ✅ PERBAIKAN: Gunakan fungsi findOrCreateUserByEmail yang sudah diperbaiki
           const { user, isNewUser } = await findOrCreateUserByEmail(userEmail, {
             name: profile.displayName,
@@ -446,7 +511,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           });
 
           return done(null, user);
-          
+
         } catch (error) {
           console.error(`[ERROR] Google Strategy error:`, error);
           return done(error, false);
@@ -464,8 +529,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.deserializeUser(async (id, done) => {
     try {
       console.log(`[DEBUG] Deserializing user:`, id);
-      
-      const user = await prisma.user.findUnique({ 
+
+      const user = await prisma.user.findUnique({
         where: { id: id },
         select: {
           id: true,
@@ -487,12 +552,12 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           lastLogin: true
         }
       });
-      
+
       if (!user) {
         console.error(`[ERROR] User not found during deserialization:`, id);
         return done(new Error('User not found'), null);
       }
-      
+
       console.log(`[DEBUG] User deserialized:`, user.email);
       done(null, user);
     } catch (error) {
@@ -500,7 +565,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       done(error, null);
     }
   });
-  
+
   console.log('[DEBUG] Google OAuth strategy configured successfully');
 } else {
   console.log('[WARNING] Google OAuth credentials not found. Google login will be disabled.');
@@ -531,7 +596,7 @@ const createSession = async (userId, token, ipAddress, userAgent) => {
   try {
     // PERBAIKAN: Hapus session lama untuk user ini terlebih dahulu
     await prisma.session.deleteMany({
-      where: { 
+      where: {
         userId: userId,
         expiresAt: { lt: new Date() } // Hapus yang sudah expired
       }
@@ -546,7 +611,7 @@ const createSession = async (userId, token, ipAddress, userAgent) => {
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 hari
       },
     });
-    
+
     console.log(`[DEBUG] Session created for user: ${userId}`);
     return session;
   } catch (error) {
@@ -560,7 +625,7 @@ const logoutAllUserSessions = async (userId) => {
     const result = await prisma.session.deleteMany({
       where: { userId: userId },
     });
-    
+
     console.log(`[DEBUG] Logged out ${result.count} sessions for user: ${userId}`);
     return true;
   } catch (error) {
@@ -575,7 +640,7 @@ const logoutAllUserSessions = async (userId) => {
 const verifySession = async (token) => {
   try {
     console.log(`[DEBUG] Verifying session token`);
-    
+
     // Verifikasi token JWT dasar dulu
     const decoded = verifyToken(token);
     if (!decoded) {
@@ -584,12 +649,12 @@ const verifySession = async (token) => {
 
     // Cek di session database
     const session = await prisma.session.findFirst({
-      where: { 
+      where: {
         token: token,
         expiresAt: { gt: new Date() },
         isActive: true
       },
-      include: { 
+      include: {
         user: {
           select: {
             id: true,
@@ -606,7 +671,7 @@ const verifySession = async (token) => {
             programStudiId: true,
             angkatan: true
           }
-        } 
+        }
       }
     });
 
@@ -620,8 +685,8 @@ const verifySession = async (token) => {
       data: { lastActivity: new Date() }
     });
 
-    return { 
-      valid: true, 
+    return {
+      valid: true,
       user: session.user
     };
   } catch (error) {
@@ -722,21 +787,21 @@ const checkNIMAvailability = async (nim) => {
     });
 
     if (existingUser) {
-      return { 
-        available: false, 
-        message: 'NIM sudah terdaftar' 
+      return {
+        available: false,
+        message: 'NIM sudah terdaftar'
       };
     }
 
-    return { 
-      available: true, 
-      message: 'NIM tersedia' 
+    return {
+      available: true,
+      message: 'NIM tersedia'
     };
   } catch (error) {
     console.error('[ERROR] Check NIM availability error:', error);
-    return { 
-      available: false, 
-      message: 'Terjadi kesalahan saat mengecek NIM' 
+    return {
+      available: false,
+      message: 'Terjadi kesalahan saat mengecek NIM'
     };
   }
 };
@@ -766,19 +831,19 @@ const register = async (userData) => {
     }
 
     // Cek apakah email sudah ada
-    const emailExists = await prisma.user.findUnique({ 
-      where: { email: email.trim() } 
+    const emailExists = await prisma.user.findUnique({
+      where: { email: email.trim() }
     });
-    
+
     if (emailExists) {
       return { success: false, message: 'User sudah terdaftar dengan email ini' };
     }
 
     // Cek apakah NIM sudah ada
-    const nimExists = await prisma.user.findUnique({ 
-      where: { nim: nim.trim() } 
+    const nimExists = await prisma.user.findUnique({
+      where: { nim: nim.trim() }
     });
-    
+
     if (nimExists) {
       return { success: false, message: 'User sudah terdaftar dengan NIM ini' };
     }
@@ -828,9 +893,9 @@ const register = async (userData) => {
     };
   } catch (error) {
     console.error('[ERROR] Register service error:', error);
-    return { 
-      success: false, 
-      message: error.message || 'Database error' 
+    return {
+      success: false,
+      message: error.message || 'Database error'
     };
   }
 };
@@ -855,9 +920,9 @@ const login = async (identifier, password, ipAddress, userAgent) => {
     if (isEmail) {
       // ✅ PERBAIKAN: Login dengan email
       console.log(`[DEBUG] Attempting email login for: ${identifier}`);
-      
+
       user = await prisma.user.findUnique({
-        where: { 
+        where: {
           email: identifier.trim()
         },
       });
@@ -872,7 +937,7 @@ const login = async (identifier, password, ipAddress, userAgent) => {
     } else {
       // Login dengan NIM (existing logic)
       user = await prisma.user.findUnique({
-        where: { 
+        where: {
           nim: identifier.trim()
         },
       });
@@ -896,7 +961,7 @@ const login = async (identifier, password, ipAddress, userAgent) => {
           email: user.email
         };
       }
-      
+
       console.log(`[DEBUG] User ${identifier} is not active`);
       return {
         success: false,
@@ -921,7 +986,7 @@ const login = async (identifier, password, ipAddress, userAgent) => {
     } else {
       // User dengan password, verifikasi normal
       const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-      
+
       if (!isPasswordValid) {
         console.log(`[DEBUG] Invalid password for user: ${user.email}`);
         return {
@@ -976,9 +1041,9 @@ const logout = async (token) => {
     await prisma.session.deleteMany({
       where: { token: token },
     });
-    
+
     console.log(`[DEBUG] Logout successful for token`);
-    
+
     return {
       success: true,
       message: 'Logout berhasil',
@@ -1013,7 +1078,7 @@ const getUserById = async (userId) => {
         createdAt: true
       }
     });
-    
+
     return user;
   } catch (error) {
     console.error('[ERROR] Get user by ID error:', error);
