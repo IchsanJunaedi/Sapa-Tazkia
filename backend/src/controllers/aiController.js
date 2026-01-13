@@ -77,7 +77,15 @@ const sendChat = async (req, res) => {
              GUNAKAN DATA DI BAWAH INI UNTUK MENJAWAB:
              [DATA VALID] Nama: ${userSummary.fullName}, Prodi: ${prodi}, IPK: ${ipk}, Total SKS: ${sks}
              Rincian Nilai: ${gradeList}
-             [INSTRUKSI WAJIB] Jawab pertanyaan user dengan ramah. Jika tanya PDF, jawab "Bisa" & tag [DOWNLOAD_PDF] di akhir.
+             [INSTRUKSI WAJIB - PENTING]:
+             1. Jawab pertanyaan user dengan ramah berdasarkan data di atas.
+             2. KHUSUS JIKA USER MINTA DOWNLOAD PDF/TRANSKRIP/RINCIAN NILAI:
+                - JANGAN bilang tidak bisa.
+                - JANGAN bilang data belum tersedia.
+                - KATAKAN: "Tentu, Kak. Ini transkrip nilai Kakak dalam format PDF."
+                - WAJIB AKHIRI respon dengan tag: [DOWNLOAD_PDF]
+                - Tag ini akan otomatis mengubah respon menjadi tombol download di aplikasi.
+             
              Pertanyaan User: "${cleanMessage}"`;
 
                 const response = await generateAIResponse(academicPrompt, conversationHistory, null, { abortSignal: abortController.signal, stream });
