@@ -70,25 +70,40 @@ const sendChat = async (req, res) => {
                 const ipk = userSummary.academicSummary?.ipk || "0.00";
                 const sks = userSummary.academicSummary?.totalSks || 0;
                 const prodi = userSummary.programStudi?.name || "Tidak diketahui";
-                const gradeList = userGrades.length > 0 ? userGrades.map(g => `- Sem ${g.semester}: ${g.course.name} (${g.grade})`).join('\n') : "Belum ada data nilai.";
+                const hasGrades = userGrades.length > 0;
+                const gradeList = hasGrades ? userGrades.map(g => `- Sem ${g.semester}: ${g.course.name} (${g.grade})`).join('\n') : "Belum ada data nilai.";
 
-                const academicPrompt = `
-             KAMU ADALAH ASISTEN AKADEMIK PRIBADI. JANGAN CARI DATA DI INTERNET/DOKUMEN LAIN.
-             GUNAKAN DATA DI BAWAH INI UNTUK MENJAWAB:
-             [DATA VALID] Nama: ${userSummary.fullName}, Prodi: ${prodi}, IPK: ${ipk}, Total SKS: ${sks}
-             Rincian Nilai: ${gradeList}
-             [INSTRUKSI WAJIB - PENTING]:
-             1. Jawab pertanyaan user dengan ramah berdasarkan data di atas.
-             2. KHUSUS JIKA USER MINTA DOWNLOAD PDF/TRANSKRIP/RINCIAN NILAI:
-                - JANGAN bilang tidak bisa.
-                - JANGAN bilang data belum tersedia.
-                - KATAKAN: "Tentu, Kak. Ini transkrip nilai Kakak dalam format PDF."
-                - WAJIB AKHIRI respon dengan tag: [DOWNLOAD_PDF]
-                - Tag ini akan otomatis mengubah respon menjadi tombol download di aplikasi.
+                let academicContext = `
+             [DATA AKADEMIK VALID]
+             Nama: ${userSummary.fullName}
+             Prodi: ${prodi}
+             IPK: ${ipk}
+             Total SKS: ${sks}
              
-             Pertanyaan User: "${cleanMessage}"`;
+             [RINCIAN NILAI]
+             ${gradeList}
+             
+             [INSTRUKSI KHUSUS]:
+             1. Anda sedang berbicara sebagai Asisten Akademik.
+             2. Gunakan data di atas untuk menjawab pertanyaan user.`;
 
-                const response = await generateAIResponse(academicPrompt, conversationHistory, null, { abortSignal: abortController.signal, stream });
+                // Logic Tambahan: Jika ada nilai, boleh download. Jika kosong, jujur.
+                if (hasGrades) {
+                    academicContext += `
+             3. KHUSUS JIKA USER MINTA DOWNLOAD PDF/TRANSKRIP atau LIHAT NILAI:
+                 - Jawab dengan format: "Tentu, Kak. Ini transkrip nilai Kakak dalam format PDF."
+                 - WAJIB AKHIRI respon dengan tag: [DOWNLOAD_PDF]
+                 - JANGAN bilang data tidak tersedia.`;
+                } else {
+                    academicContext += `
+             3. Jika User minta nilai tapi data kosong (Belum ada data nilai), katakan: "Mohon maaf, data nilai Kakak belum tersedia di sistem. Silakan hubungi bagian Akademik."`;
+                }
+
+                console.log(`🎓 [AI ACADEMIC Context] Grades Count: ${userGrades.length}, Prompt Size: ${academicContext.length}`);
+
+                // ✅ FIX: Pass cleanMessage sebagai userMessage, dan academicContext sebagai context
+                const response = await generateAIResponse(cleanMessage, conversationHistory, academicContext, { abortSignal: abortController.signal, stream });
+
                 if (stream) aiStream = response;
                 else finalAnswer = response.content;
                 realTokenUsage = 1500; // Est
