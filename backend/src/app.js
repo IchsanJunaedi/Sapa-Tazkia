@@ -22,6 +22,9 @@ const authService = require('./services/authService');
 const { rateLimitErrorHandler } = require('./utils/errorHandlers');
 
 const app = express();
+// ✅ REQUIRED: Trust proxy for Nginx & Rate Limiting
+app.set('trust proxy', 1);
+
 const prisma = new PrismaClient();
 
 // ========================================================
