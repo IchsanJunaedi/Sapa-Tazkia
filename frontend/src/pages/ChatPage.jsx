@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
 import { sendMessageToAI, cancelCurrentRequest } from '../api/aiService';
-import { Plus, ArrowUp, MoreHorizontal, Trash2, Square } from 'lucide-react';
+import { Plus, ArrowUp, MoreHorizontal, Trash2, Square, Menu } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Sidebar from '../components/layout/SideBar';
 import ChatWindow from '../components/chat/ChatWindow';
@@ -175,6 +175,9 @@ const ChatPage = () => {
     const [chatHistory, setChatHistory] = useState([]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // ✅ MOBILE: State untuk mobile sidebar overlay
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [chatToDelete, setChatToDelete] = useState(null);
@@ -911,11 +914,21 @@ const ChatPage = () => {
                 onNewChat={handleNewChat}
                 onSettingsClick={handleSettingsClick}
                 isStartingNewChat={isStartingNewChat}
+                isMobileSidebarOpen={isMobileSidebarOpen}
+                onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
             />
 
             <div className="flex-1 flex flex-col overflow-hidden relative">
                 <nav className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 flex-shrink-0">
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
+                        {/* Hamburger Menu - Mobile Only */}
+                        <button
+                            onClick={() => setIsMobileSidebarOpen(true)}
+                            className="p-2 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors md:hidden"
+                            title="Open Menu"
+                        >
+                            <Menu size={24} />
+                        </button>
                         <button
                             onClick={() => navigate('/', { replace: true, state: { from: 'chat-page' } })}
                             className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PenSquare, User, Settings, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { PenSquare, User, Settings, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2, Menu, X } from 'lucide-react';
 
 const Sidebar = ({
   user,
@@ -15,7 +15,10 @@ const Sidebar = ({
   onNewChat,
   onSettingsClick,
   isStartingNewChat = false,
-  className = ''
+  className = '',
+  // Mobile overlay props
+  isMobileSidebarOpen = false,
+  onCloseMobileSidebar
 }) => {
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const [selectedChatId, setSelectedChatId] = useState(null);
@@ -161,7 +164,7 @@ const Sidebar = ({
 
   return (
     <>
-      <div className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-amber-50 border-r border-gray-200 flex flex-col h-screen p-3 shadow-xl transition-all duration-300 relative ${className}`}>
+      <div className={`hidden md:flex ${isSidebarOpen ? 'md:w-64' : 'md:w-20'} bg-amber-50 border-r border-gray-200 flex-col h-screen p-3 shadow-xl transition-all duration-300 relative ${className}`}>
 
         {/* Header */}
         {isSidebarOpen ? (
@@ -201,8 +204,8 @@ const Sidebar = ({
           <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
             <button
               className={`${isSidebarOpen ? 'w-full justify-center p-3' : 'w-12 h-12 justify-center'} h-12 bg-white border border-gray-300 text-gray-700 rounded-full transition-all flex items-center group relative gap-3 shadow-sm ${(isDeleting || isStartingNewChat)
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'hover:bg-gray-50 hover:shadow-md'
+                ? 'opacity-50 cursor-not-allowed'
+                : 'hover:bg-gray-50 hover:shadow-md'
                 }`}
               title={isStartingNewChat ? "Memulai chat baru..." : "New Chat"}
               onClick={handleNewChat}
@@ -373,6 +376,156 @@ const Sidebar = ({
             <div className="p-2">
               <button onClick={handleLogout} disabled={isStartingNewChat || isDeleting} className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-red-600 hover:bg-red-50">
                 <LogOut size={16} /> <span>Log out</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Mobile Overlay Sidebar */}
+      {isMobileSidebarOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 z-50 md:hidden"
+            onClick={onCloseMobileSidebar}
+          />
+
+          {/* Mobile Sidebar Panel */}
+          <div className="fixed left-0 top-0 h-full w-72 bg-amber-50 z-50 md:hidden shadow-2xl transform transition-transform duration-300 ease-out flex flex-col p-3">
+            {/* Close Button Header */}
+            <div className="flex justify-between items-center mb-6 flex-shrink-0">
+              <button
+                className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
+                title="Settings"
+                onClick={onSettingsClick}
+              >
+                <Settings size={24} />
+              </button>
+              <button
+                onClick={onCloseMobileSidebar}
+                className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
+                title="Close Sidebar"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* New Chat Button */}
+            <div className="flex flex-col flex-shrink-0">
+              <button
+                className={`w-full justify-center p-3 h-12 bg-white border border-gray-300 text-gray-700 rounded-full transition-all flex items-center gap-3 shadow-sm ${(isDeleting || isStartingNewChat)
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-gray-50 hover:shadow-md'
+                  }`}
+                title={isStartingNewChat ? "Memulai chat baru..." : "New Chat"}
+                onClick={(e) => {
+                  handleNewChat(e);
+                  onCloseMobileSidebar?.();
+                }}
+                disabled={isDeleting || isStartingNewChat}
+              >
+                {isStartingNewChat ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <PenSquare size={20} />
+                )}
+                <span className="font-medium">
+                  {isStartingNewChat ? 'Memulai...' : 'New chat'}
+                </span>
+              </button>
+            </div>
+
+            {/* Chats Toggle */}
+            <div className="mt-6 flex-shrink-0">
+              <button
+                onClick={toggleChatsSection}
+                className="w-full flex items-center justify-between p-2 text-gray-700 hover:text-gray-900 rounded-lg transition-colors"
+                title={isChatsSectionOpen ? "Sembunyikan Chats" : "Tampilkan Chats"}
+              >
+                <span className="text-sm font-semibold">Chats</span>
+                {isChatsSectionOpen ? (
+                  <ChevronDown size={16} className="text-gray-500" />
+                ) : (
+                  <ChevronRight size={16} className="text-gray-500" />
+                )}
+              </button>
+            </div>
+
+            {/* Chat Lists */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {isChatsSectionOpen && (
+                <div className="flex-1 overflow-y-auto mt-4 space-y-4 custom-scrollbar">
+                  {groupedChats.today.length > 0 && (
+                    <div className="space-y-1">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Today</h3>
+                      {groupedChats.today.map(chat => (
+                        <div
+                          key={chat.id}
+                          onClick={() => {
+                            handleSelectChat(chat.id);
+                            onCloseMobileSidebar?.();
+                          }}
+                          className={`flex items-center rounded-lg p-2 cursor-pointer ${currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
+                            }`}
+                        >
+                          <span className="truncate text-sm">{chat.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {groupedChats.yesterday.length > 0 && (
+                    <div className="space-y-1">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Yesterday</h3>
+                      {groupedChats.yesterday.map(chat => (
+                        <div
+                          key={chat.id}
+                          onClick={() => {
+                            handleSelectChat(chat.id);
+                            onCloseMobileSidebar?.();
+                          }}
+                          className={`flex items-center rounded-lg p-2 cursor-pointer ${currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
+                            }`}
+                        >
+                          <span className="truncate text-sm">{chat.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {chatHistory.length === 0 && user && (
+                    <p className="p-2 text-xs text-gray-500 text-center">Belum ada riwayat chat.</p>
+                  )}
+                  {!user && (
+                    <p className="p-2 text-xs text-gray-500 text-center">Login untuk melihat riwayat chat Anda.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Profile Footer */}
+            <div className="mt-4 flex-shrink-0">
+              <button
+                className={`w-full justify-start p-3 h-12 ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c80]'
+                  } text-white rounded-xl shadow-lg transition-all flex items-center`}
+                title={user ? `Logged in as ${getUserName()}` : 'Login as Mahasiswa'}
+                onClick={(e) => {
+                  handleProfileClick(e);
+                  if (!user) onCloseMobileSidebar?.();
+                }}
+              >
+                <div className="flex items-center gap-3 w-full">
+                  <User size={20} />
+                  <div className="flex flex-col items-start flex-1 min-w-0">
+                    <span className="text-sm font-semibold whitespace-nowrap truncate">
+                      {user ? getUserName() : 'Login Mahasiswa'}
+                    </span>
+                    {user && (
+                      <span className="text-xs text-gray-300 whitespace-nowrap truncate">
+                        {getUserNIM()}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </button>
             </div>
           </div>
