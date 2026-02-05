@@ -1,8 +1,12 @@
 const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
+const helmet = require('helmet'); // ✅ NEW: Security headers middleware
 const { PrismaClient } = require('@prisma/client');
 require('dotenv').config();
+
+// ✅ NEW: Environment-based logger
+const logger = require('./utils/logger');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -39,26 +43,26 @@ const initializeRateLimitSystem = async () => {
         // Jangan return dulu, coba lanjut inisialisasi service lain jika memungkinkan
       }
     }
-    
+
     if (rateLimitJobs && typeof rateLimitJobs.init === 'function') {
       rateLimitJobs.init();
       console.log('✅ [RATE LIMIT] Rate limit jobs initialized');
     }
-    
+
     // Test Redis connection
     const redisService = require('./services/redisService');
     const redisHealth = await redisService.healthCheck();
     console.log(`✅ [RATE LIMIT] Redis connection: ${redisHealth ? 'HEALTHY' : 'UNHEALTHY'}`);
-    
+
     // Initialize rate limit service check (optional but good for verification)
     try {
-        const rateLimitService = require('./services/rateLimitService');
-        // Jika ada method init atau check di service, panggil di sini
-        console.log('✅ [RATE LIMIT] Rate limit service ready');
+      const rateLimitService = require('./services/rateLimitService');
+      // Jika ada method init atau check di service, panggil di sini
+      console.log('✅ [RATE LIMIT] Rate limit service ready');
     } catch (serviceError) {
-         console.warn(`⚠️ [RATE LIMIT] Rate limit service load failed: ${serviceError.message}`);
+      console.warn(`⚠️ [RATE LIMIT] Rate limit service load failed: ${serviceError.message}`);
     }
-    
+
   } catch (error) {
     console.error('❌ [RATE LIMIT] Failed to initialize rate limit system:', error.message);
     console.log('⚠️ [RATE LIMIT] Continuing without rate limiting features');
@@ -70,14 +74,20 @@ const initializeRateLimitSystem = async () => {
 // ========================================================
 
 // CORS configuration - Enhanced with rate limit headers
-const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://localhost:3001',
-  'http://127.0.0.1:3001',
-  'http://192.168.100.48:3000',
-  'http://192.168.100.11:3000'
-];
+// ✅ SECURITY: Dynamic CORS origins based on environment
+const isProduction = process.env.NODE_ENV === 'production';
+const allowedOrigins = isProduction
+  ? [
+    process.env.FRONTEND_URL || 'https://sapa.tazkia.ac.id'
+  ]
+  : [
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+    'http://192.168.100.48:3000',
+    'http://192.168.100.11:3000'
+  ];
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -92,8 +102,8 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
+    'Content-Type',
+    'Authorization',
     'X-Requested-With',
     'Accept',
     'Origin',
@@ -105,7 +115,7 @@ app.use(cors({
     'X-RateLimit-User-Type'
   ],
   exposedHeaders: [
-    'Content-Length', 
+    'Content-Length',
     'Authorization',
     'X-RateLimit-Limit', // ✅ NEW: Expose rate limit headers
     'X-RateLimit-Remaining',
@@ -128,8 +138,8 @@ app.options('*', cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
+    'Content-Type',
+    'Authorization',
     'X-Requested-With',
     'Accept',
     'Origin',
@@ -143,33 +153,32 @@ app.options('*', cors({
 }));
 
 // Body parser middleware
-app.use(express.json({ 
+app.use(express.json({
   limit: '10mb',
   verify: (req, res, buf) => {
     req.rawBody = buf;
   }
 }));
-app.use(express.urlencoded({ 
-  extended: true, 
+app.use(express.urlencoded({
+  extended: true,
   limit: '10mb',
   parameterLimit: 100
 }));
 
-// Security headers middleware - Enhanced with rate limit headers
+// ✅ NEW: Helmet.js for comprehensive security headers
+app.use(helmet({
+  contentSecurityPolicy: isProduction ? undefined : false, // Disable CSP in dev for easier debugging
+  crossOriginEmbedderPolicy: false, // For embedding external resources
+}));
+
+// Rate limit headers middleware (separate from Helmet)
 app.use((req, res, next) => {
-  res.removeHeader('X-Powered-By');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  
-  // ✅ NEW: Add rate limit headers to all responses (Default values)
   if (!res.get('X-RateLimit-Limit')) {
     res.setHeader('X-RateLimit-Limit', 'unknown');
     res.setHeader('X-RateLimit-Remaining', 'unknown');
     res.setHeader('X-RateLimit-Reset', 'unknown');
     res.setHeader('X-RateLimit-User-Type', 'unknown');
   }
-  
   next();
 });
 
@@ -179,7 +188,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || 'fallback-session-secret-12345-change-in-production',
   resave: false,
   saveUninitialized: false,
-  cookie: { 
+  cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000,
@@ -192,16 +201,10 @@ app.use(session({
 app.use(authService.passport.initialize());
 app.use(authService.passport.session());
 
-// Request logging middleware - Enhanced with rate limit awareness
+// Request logging middleware - Uses environment-based logger
 app.use((req, res, next) => {
-  console.log('🌐 [REQUEST]', {
-    method: req.method,
-    url: req.url,
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString(),
-    rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== 'false'
-  });
+  // ✅ FIX: Use logger (hidden in production, visible in development)
+  logger.request(req.method, req.url, '-');
   next();
 });
 
@@ -266,7 +269,7 @@ app.get('/health', async (req, res) => {
     // Test database connection
     await prisma.$queryRaw`SELECT 1`;
     healthCheck.services.database = 'Connected';
-    
+
     // Test Redis connection for rate limiting
     try {
       const redisService = require('./services/redisService');
@@ -277,7 +280,7 @@ app.get('/health', async (req, res) => {
       healthCheck.rateLimiting.redis = `ERROR: ${error.message}`;
       healthCheck.services.redis = `Error: ${error.message}`;
     }
-    
+
     // Test rate limit service
     try {
       const rateLimitService = require('./services/rateLimitService');
@@ -319,7 +322,7 @@ app.get('/health', async (req, res) => {
     } else {
       healthCheck.services.email = 'Not Configured';
     }
-    
+
     res.json(healthCheck);
   } catch (error) {
     console.error('Health check error:', error);
@@ -407,8 +410,8 @@ app.get('/test', (req, res) => {
     'X-RateLimit-Reset': (Date.now() + 60000).toString(),
     'X-RateLimit-User-Type': 'guest'
   });
-  
-  res.json({ 
+
+  res.json({
     success: true,
     message: 'Test route working!',
     session: req.sessionID ? 'Active' : 'No session',
@@ -455,15 +458,15 @@ app.use(rateLimitErrorHandler);
 // 404 Handler - UPDATED dengan rate limit endpoints
 app.use('*', (req, res) => {
   console.log('❌ [404] Route not found:', req.method, req.originalUrl);
-  
-  res.status(404).json({ 
+
+  res.status(404).json({
     success: false,
     message: `Route not found: ${req.method} ${req.originalUrl}`,
     timestamp: new Date().toISOString(),
     availableEndpoints: {
       auth: [
         'POST /api/auth/login',
-        'POST /api/auth/register', 
+        'POST /api/auth/register',
         'POST /api/auth/register-email',
         'POST /api/auth/verify-email',
         'POST /api/auth/resend-verification',
@@ -549,7 +552,7 @@ app.use((err, req, res, next) => {
       timestamp: new Date().toISOString()
     });
   }
-  
+
   // CORS error
   if (err.message.includes('CORS')) {
     return res.status(403).json({
@@ -559,7 +562,7 @@ app.use((err, req, res, next) => {
       yourOrigin: req.headers.origin
     });
   }
-  
+
   // Prisma database error
   if (err.code && err.code.startsWith('P')) {
     console.error('🔴 [DATABASE ERROR]', err);
@@ -570,7 +573,7 @@ app.use((err, req, res, next) => {
       code: err.code
     });
   }
-  
+
   // Redis error (rate limiting related)
   if (err.message.includes('Redis') || err.message.includes('ECONNREFUSED')) {
     console.error('🔴 [REDIS ERROR]', err);
@@ -581,7 +584,7 @@ app.use((err, req, res, next) => {
       suggestion: 'Rate limits are disabled when Redis is unavailable'
     });
   }
-  
+
   // OpenAI API error
   if (err.code && (err.code === 'invalid_api_key' || err.code === 'rate_limit_exceeded')) {
     console.error('🔴 [OPENAI ERROR]', err);
@@ -592,7 +595,7 @@ app.use((err, req, res, next) => {
       code: err.code
     });
   }
-  
+
   // JWT error
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({
@@ -600,7 +603,7 @@ app.use((err, req, res, next) => {
       message: 'Invalid authentication token'
     });
   }
-  
+
   if (err.name === 'TokenExpiredError') {
     return res.status(401).json({
       success: false,
@@ -638,12 +641,12 @@ app.use((err, req, res, next) => {
 
 const gracefulShutdown = async (signal) => {
   console.log(`\n🔴 Received ${signal}. Shutting down gracefully...`);
-  
+
   try {
     // Close database connection
     await prisma.$disconnect();
     console.log('✅ Database disconnected.');
-    
+
     // ✅ NEW: Close Redis connection
     try {
       const redisService = require('./services/redisService');
@@ -652,7 +655,7 @@ const gracefulShutdown = async (signal) => {
     } catch (error) {
       console.log('⚠️ Redis cleanup skipped:', error.message);
     }
-    
+
     // Close server
     if (server) {
       server.close(() => {
@@ -700,14 +703,14 @@ const server = app.listen(PORT, async () => {
   console.log(`🧠 RAG: ✅ Knowledge Base System Enabled`);
   console.log(`🗄️ Database: ${process.env.DATABASE_URL ? '✅ Connected' : '❌ No DB Config'}`);
   console.log(`🛡️ Rate Limiting: ${process.env.RATE_LIMIT_ENABLED !== 'false' ? '✅ Enabled' : '❌ Disabled'}`);
-  
+
   // ✅ NEW: Rate limit system status
   try {
     await initializeRateLimitSystem();
   } catch (error) {
     console.log(`⚠️ Rate Limit: ❌ Initialization Failed - ${error.message}`);
   }
-  
+
   console.log('');
   console.log('📋 AVAILABLE ENDPOINTS:');
   console.log('   GET  / .......................... API Root (+Rate Limit Info)');
@@ -756,7 +759,7 @@ const server = app.listen(PORT, async () => {
   console.log('🛡️  SECURITY FEATURES:');
   console.log('   ✅ CORS Protection');
   console.log('   ✅ Session Management');
-  console.log('   ✅ Email Verification System'); 
+  console.log('   ✅ Email Verification System');
   console.log('   ✅ RAG Knowledge Base');
   console.log('   ✅ Input Validation');
   console.log('   ✅ Error Handling');
