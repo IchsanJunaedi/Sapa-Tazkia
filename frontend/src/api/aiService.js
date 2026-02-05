@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // 🚀 SYSTEM CHECK: v5.1 LOADED (Gen Z Style Modal)
-console.log("%c🚀 AI SERVICE v5.1 LOADED (Catchy UI)", "background: #222; color: #ff00ff; font-size: 12px; padding: 4px;");
+console.log("%cAI SERVICE v1.1 LOADED", "background: #222; color: #ff00ff; font-size: 12px; padding: 4px;");
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 const DEFAULT_LIMIT = 7000;
