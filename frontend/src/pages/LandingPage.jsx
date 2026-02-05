@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
-import { Plus, X, ArrowUp } from 'lucide-react';
+import { Plus, X, ArrowUp, Menu } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Sidebar from '../components/layout/SideBar';
 import Swal from 'sweetalert2'; // ✅ TAMBAHAN: Import SweetAlert2
@@ -554,6 +554,9 @@ const LandingPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [chatToDelete, setChatToDelete] = useState(null);
 
+  // ✅ MOBILE: State untuk mobile sidebar overlay
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   // ✅ TAMBAHAN: Auto open modal jika ada pending verification
   useEffect(() => {
     if (pendingVerification && pendingEmail && !isModalOpen) {
@@ -965,11 +968,21 @@ const LandingPage = () => {
         onToggleSidebar={handleToggleSidebar}
         onNewChat={handleNewChat}
         onSettingsClick={handleSettingsClick}
+        isMobileSidebarOpen={isMobileSidebarOpen}
+        onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <nav className="flex items-center justify-between p-6 flex-shrink-0">
-          <div className="flex items-center">
+        <nav className="flex items-center justify-between p-3 sm:p-4 md:p-6 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            {/* Hamburger Menu - Mobile Only */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="p-2 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors md:hidden"
+              title="Open Menu"
+            >
+              <Menu size={24} />
+            </button>
             <button
               onClick={() => navigate('/')}
               className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
@@ -982,7 +995,7 @@ const LandingPage = () => {
             </button>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center flex-wrap gap-2 sm:gap-3">
             {authLoading ? (
               <span className="text-gray-500">Loading...</span>
             ) : user ? (
@@ -992,7 +1005,7 @@ const LandingPage = () => {
                 <Button
                   variant="primary"
                   size="md"
-                  className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200/50 rounded-lg"
+                  className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200/50 rounded-lg text-xs sm:text-sm md:text-base px-3 py-2 sm:px-4 sm:py-2"
                   onClick={() => openModal(0)}
                 >
                   SIGN IN
@@ -1000,7 +1013,7 @@ const LandingPage = () => {
                 <Button
                   variant="primary"
                   size="md"
-                  className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200/50 rounded-lg"
+                  className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200/50 rounded-lg text-xs sm:text-sm md:text-base px-3 py-2 sm:px-4 sm:py-2"
                   onClick={handleGuestChat}
                 >
                   TRY AS GUEST
@@ -1011,9 +1024,9 @@ const LandingPage = () => {
         </nav>
 
         {/* Hero Section - FIXED */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-20 overflow-y-auto">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-10 sm:pb-20 overflow-y-auto">
           <div className="text-center mb-12">
-            <h1 className="text-5xl md:text-6xl font-extrabold text-center mb-6 max-w-4xl">
+            <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-center mb-4 sm:mb-6 max-w-4xl break-words leading-tight">
               <GradientText>{greeting}</GradientText>
             </h1>
           </div>

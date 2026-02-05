@@ -42,3 +42,16 @@ body {
   font-family: 'Inter', sans-serif;
   line-height: 1.7;
 }
+
+/* Mobile-only responsive utilities */
+@media screen and (max-width: 767px) {
+  .mobile-safe-area {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+  
+  /* Prevent horizontal overflow on mobile */
+  .overflow-x-hidden-mobile {
+    overflow-x: hidden;
+  }
+}
