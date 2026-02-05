@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import aiService from '../../api/aiService'; 
-import { Zap, AlertCircle, RefreshCw, Sparkles, User, Shield, Info } from 'lucide-react'; 
+import aiService from '../../api/aiService';
+import { Zap, AlertCircle, RefreshCw, Sparkles, User, Shield, Info } from 'lucide-react';
 
 // ✅ CONFIG: Konstanta Global
-const DEFAULT_LIMIT = 7000; 
-const DEFAULT_RESET_MS = 12 * 60 * 60 * 1000; 
+const DEFAULT_LIMIT = 7000;
+const DEFAULT_RESET_MS = 12 * 60 * 60 * 1000;
 
 /**
  * ✅ HELPER: Parser Data (Di luar komponen agar useEffect bersih)
@@ -17,24 +17,24 @@ const processStatusData = (incomingData) => {
   if (incomingData.window_limits) {
     remaining = incomingData.window_limits.remaining;
     limit = incomingData.window_limits.limit;
-    resetTime = incomingData.window_limits.reset_time; 
-    userType = incomingData.user_type; 
+    resetTime = incomingData.window_limits.reset_time;
+    userType = incomingData.user_type;
   } else {
     remaining = incomingData.remaining;
     limit = incomingData.limit;
-    resetTime = incomingData.resetTime; 
+    resetTime = incomingData.resetTime;
     userType = incomingData.userType;
   }
 
   let safeLimit = DEFAULT_LIMIT;
   if (limit !== undefined && limit !== null && limit > 100) {
-      safeLimit = limit;
+    safeLimit = limit;
   }
 
   // Fallback Reset Time: Jika null/0, gunakan 12 jam dari sekarang
-  const safeResetTime = (resetTime && resetTime > Date.now()) 
-      ? resetTime 
-      : Date.now() + DEFAULT_RESET_MS;
+  const safeResetTime = (resetTime && resetTime > Date.now())
+    ? resetTime
+    : Date.now() + DEFAULT_RESET_MS;
 
   return {
     remaining: remaining !== undefined ? remaining : safeLimit,
@@ -67,11 +67,11 @@ const RateLimitStatus = ({ className = '', userName = 'Mahasiswa', isGuestMode =
           setStatus(processStatusData(response.data));
         }
       } catch (error) {
-        setStatus({ 
-            remaining: DEFAULT_LIMIT, 
-            limit: DEFAULT_LIMIT, 
-            userType: 'guest', 
-            resetTime: Date.now() + DEFAULT_RESET_MS 
+        setStatus({
+          remaining: DEFAULT_LIMIT,
+          limit: DEFAULT_LIMIT,
+          userType: 'guest',
+          resetTime: Date.now() + DEFAULT_RESET_MS
         });
       } finally {
         if (isMounted) setLoading(false);
@@ -87,13 +87,17 @@ const RateLimitStatus = ({ className = '', userName = 'Mahasiswa', isGuestMode =
     };
   }, []);
 
-  if (loading && !status) return null; 
-  
-  const currentStatus = status || { 
-      remaining: DEFAULT_LIMIT, 
-      limit: DEFAULT_LIMIT, 
-      userType: 'guest',
-      resetTime: Date.now() + DEFAULT_RESET_MS 
+  if (loading && !status) return null;
+
+  // ✅ CONFIG: Toggle Display via Env Var
+  const showRateLimit = process.env.REACT_APP_SHOW_RATE_LIMIT_STATUS === 'true';
+  if (!showRateLimit) return null;
+
+  const currentStatus = status || {
+    remaining: DEFAULT_LIMIT,
+    limit: DEFAULT_LIMIT,
+    userType: 'guest',
+    resetTime: Date.now() + DEFAULT_RESET_MS
   };
 
   const percentage = Math.min(100, Math.max(0, (currentStatus.remaining / currentStatus.limit) * 100));
@@ -135,7 +139,7 @@ const RateLimitStatus = ({ className = '', userName = 'Mahasiswa', isGuestMode =
   };
 
   return (
-    <div 
+    <div
       className={`fixed top-20 right-4 z-40 font-sans ${className}`}
       onMouseEnter={() => { setShowTooltip(true); setIsHovered(true); }}
       onMouseLeave={() => { setShowTooltip(false); setIsHovered(false); }}
@@ -151,7 +155,7 @@ const RateLimitStatus = ({ className = '', userName = 'Mahasiswa', isGuestMode =
         ${isHovered ? 'scale-[1.02] shadow-[0_12px_40px_rgba(0,0,0,0.12)] bg-white/80' : ''}
         cursor-help
       `}>
-        
+
         {/* Decorative Glow Orb */}
         <div className={`
           absolute -top-12 -right-12 w-32 h-32 
@@ -193,13 +197,13 @@ const RateLimitStatus = ({ className = '', userName = 'Mahasiswa', isGuestMode =
         {/* Progress Bar */}
         <div className="relative mb-3.5">
           <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden shadow-inner">
-            <div 
+            <div
               className={`h-full rounded-full bg-gradient-to-r ${theme.accent} transition-all duration-1000 ease-out shadow-sm`}
               style={{ width: `${percentage}%` }}
             />
           </div>
           {/* Glow Line on Bar */}
-          <div 
+          <div
             className={`absolute top-0 h-2 rounded-full bg-gradient-to-r ${theme.accent} blur-[2px] opacity-40 transition-all duration-1000 ease-out pointer-events-none`}
             style={{ width: `${percentage}%` }}
           />
@@ -213,13 +217,13 @@ const RateLimitStatus = ({ className = '', userName = 'Mahasiswa', isGuestMode =
 
           {!isActuallyGuest ? (
             <span className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 bg-white/60 backdrop-blur-sm px-2 py-1 rounded-full border border-white/50 shadow-sm">
-              <RefreshCw size={10} className={`${theme.icon}`} /> 
+              <RefreshCw size={10} className={`${theme.icon}`} />
               Reset: {getResetTimeDisplay()}
             </span>
           ) : (
-             <span className="flex items-center gap-1.5 text-[10px] text-gray-400 bg-white/60 backdrop-blur-sm px-2 py-1 rounded-full border border-white/50">
-                <Info size={10} /> Info
-             </span>
+            <span className="flex items-center gap-1.5 text-[10px] text-gray-400 bg-white/60 backdrop-blur-sm px-2 py-1 rounded-full border border-white/50">
+              <Info size={10} /> Info
+            </span>
           )}
         </div>
       </div>
@@ -237,8 +241,8 @@ const RateLimitStatus = ({ className = '', userName = 'Mahasiswa', isGuestMode =
           <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
             <div className={`
               p-2.5 rounded-2xl backdrop-blur-sm
-              ${isActuallyGuest 
-                ? 'bg-gray-100 text-gray-500' 
+              ${isActuallyGuest
+                ? 'bg-gray-100 text-gray-500'
                 : 'bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-600 border border-blue-100'
               }
             `}>
