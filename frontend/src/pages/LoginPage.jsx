@@ -15,7 +15,7 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // ✅ BARU: State untuk email registration
   const [showEmailRegistration, setShowEmailRegistration] = useState(false);
   const [email, setEmail] = useState('');
@@ -31,21 +31,21 @@ const LoginPage = () => {
 
   // ✅ FIXED: Redirect jika sudah login - dengan pengecekan yang lebih baik
   useEffect(() => {
-    console.log('🔍 [LOGIN PAGE] Auth status:', { 
-      isAuthenticated, 
+    console.log('🔍 [LOGIN PAGE] Auth status:', {
+      isAuthenticated,
       authLoading,
-      path: location.pathname 
+      path: location.pathname
     });
-    
+
     if (isAuthenticated && !authLoading) {
       console.log('✅ [LOGIN PAGE] User already authenticated, redirecting to chat');
-      
+
       // ✅ FIXED: Gunakan replace: true dan state yang jelas
-      navigate('/chat', { 
+      navigate('/chat', {
         replace: true,
-        state: { 
+        state: {
           from: 'login',
-          isGuest: false 
+          isGuest: false
         }
       });
     }
@@ -56,11 +56,11 @@ const LoginPage = () => {
     if (location.state?.error) {
       setError(location.state.error);
       console.log('⚠️ [LOGIN PAGE] Error from location state:', location.state.error);
-      
+
       // Clear location state setelah menampilkan error
       window.history.replaceState({}, document.title);
     }
-    
+
     // ✅ FIXED: Check untuk success message (misalnya dari register)
     if (location.state?.success) {
       console.log('✅ [LOGIN PAGE] Success message from location:', location.state.success);
@@ -73,7 +73,7 @@ const LoginPage = () => {
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validasi input
     if (!nim.trim() || !password.trim()) {
       setError('NIM dan Password harus diisi');
@@ -91,21 +91,21 @@ const LoginPage = () => {
 
     try {
       console.log('🔍 [LOGIN PAGE] Attempting login with NIM:', nim);
-      
+
       // ✅ FIXED: Gunakan fungsi login yang benar dari context
       await loginWithCredentials(nim, password);
-      
+
       console.log('✅ [LOGIN PAGE] Login successful, redirect should happen automatically');
-      
+
       // ✅ FIXED: Redirect sudah ditangani oleh useEffect di atas
       // Tidak perlu navigate manual di sini
-      
+
     } catch (err) {
       console.error('❌ [LOGIN PAGE] Login failed:', err);
-      
+
       // ✅ FIXED: Error handling yang lebih detail
       let errorMessage = 'Login gagal. Periksa kembali NIM dan Password Anda.';
-      
+
       if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
       } else if (err.message) {
@@ -113,7 +113,7 @@ const LoginPage = () => {
       } else if (err.code === 'NETWORK_ERROR') {
         errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
       }
-      
+
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -125,7 +125,7 @@ const LoginPage = () => {
    */
   const handleEmailRegistration = async (e) => {
     e.preventDefault();
-    
+
     if (!email.trim()) {
       setError('Email harus diisi');
       return;
@@ -143,29 +143,29 @@ const LoginPage = () => {
 
     try {
       console.log('🔍 [LOGIN PAGE] Attempting email registration:', email);
-      
+
       const result = await registerWithEmail(email);
-      
+
       console.log('✅ [LOGIN PAGE] Email registration successful:', result);
-      
+
       // Tampilkan pesan sukses dan arahkan ke halaman verifikasi
       setRegistrationSuccess(true);
       setRegisteredEmail(email);
-      
+
       // Reset form
       setEmail('');
-      
+
     } catch (err) {
       console.error('❌ [LOGIN PAGE] Email registration failed:', err);
-      
+
       let errorMessage = 'Registrasi gagal. Silakan coba lagi.';
-      
+
       if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
+
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -176,8 +176,8 @@ const LoginPage = () => {
    * ✅ BARU: Navigasi ke halaman verifikasi
    */
   const handleGoToVerification = () => {
-    navigate('/verify-email', { 
-      state: { 
+    navigate('/verify-email', {
+      state: {
         email: registeredEmail,
         from: 'email-registration'
       }
@@ -200,17 +200,17 @@ const LoginPage = () => {
   const handleGoogleLogin = () => {
     setError('');
     setIsLoading(true);
-    
+
     console.log('🔍 [LOGIN PAGE] Redirecting to Google OAuth...');
-    
+
     try {
       // Redirect ke backend Google OAuth endpoint
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      const redirectUrl = `${apiUrl}/api/auth/google`;
-      
+      const redirectUrl = `${apiUrl}/auth/google`;
+
       console.log('📍 [LOGIN PAGE] Redirect URL:', redirectUrl);
       window.location.href = redirectUrl;
-      
+
     } catch (err) {
       console.error('❌ [LOGIN PAGE] Google login redirect failed:', err);
       setError('Gagal mengarahkan ke Google Login. Silakan coba lagi.');
@@ -223,10 +223,10 @@ const LoginPage = () => {
    */
   const handleGuestMode = () => {
     console.log('👤 [LOGIN PAGE] Redirecting to guest mode');
-    navigate('/chat', { 
-      state: { 
+    navigate('/chat', {
+      state: {
         isGuest: true,
-        from: 'login-page' 
+        from: 'login-page'
       }
     });
   };
@@ -260,7 +260,7 @@ const LoginPage = () => {
               </svg>
               Kembali ke Login
             </button>
-            
+
             <h1 className="text-2xl font-bold text-gray-800">Daftar dengan Email</h1>
             <p className="text-gray-600 mt-2">Masukkan email Anda untuk memulai</p>
           </div>
@@ -310,7 +310,7 @@ const LoginPage = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Sudah punya akun?{' '}
-              <button 
+              <button
                 onClick={handleBackToLogin}
                 className="text-orange-500 hover:underline font-medium"
                 disabled={isLoading}
@@ -334,12 +334,12 @@ const LoginPage = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          
+
           <h1 className="text-2xl font-bold text-gray-800 mb-2">Registrasi Berhasil!</h1>
           <p className="text-gray-600 mb-4">
             Kode verifikasi telah dikirim ke <strong>{registeredEmail}</strong>
           </p>
-          
+
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
             <p className="text-sm text-blue-800">
               <strong>Langkah selanjutnya:</strong>
@@ -358,7 +358,7 @@ const LoginPage = () => {
           >
             Verifikasi Email Sekarang
           </button>
-          
+
           <button
             onClick={handleBackToLogin}
             className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-lg font-medium transition-colors"

@@ -39,11 +39,11 @@ const api = {
     // Menambahkan token dari Google Callback agar 'me' berhasil
     const googleToken = 'ini-adalah-mock-token-dari-google';
     if (url === '/auth/me' && (token === 'Bearer mock-token-123' || token === 'Bearer mock-token-register' || token === `Bearer ${googleToken}`)) {
-    // --- AKHIR PERBAIKAN ---
+      // --- AKHIR PERBAIKAN ---
       console.log("Mock API: /me sukses");
       return { data: { user: { nim: '241572010024', name: 'Muhammad Ichsan Junaedi' } } };
     }
-    
+
     console.error("Mock API: Invalid token");
     throw new Error("Invalid token");
   }
@@ -56,7 +56,7 @@ const AuthContext = createContext(null);
 
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); 
+  const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false); // ✅ BARU: State untuk status autentikasi
 
   useEffect(() => {
@@ -65,18 +65,18 @@ const AuthProvider = ({ children }) => {
       if (token) {
         try {
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          const response = await api.get('/auth/me'); 
+          const response = await api.get('/auth/me');
           setUser(response.data.user);
           setIsAuthenticated(true); // ✅ BARU: Set authenticated true
         } catch (error) {
           console.error("Token invalid, logging out");
-          logout(); 
+          logout();
         }
       }
       setLoading(false);
     };
     checkLoggedInUser();
-  }, []); 
+  }, []);
 
   // --- FUNGSI LOGIN (DARI ANDA - SUDAH BENAR) ---
   const login = async (nimOrToken, passwordOrUser) => {
@@ -94,13 +94,13 @@ const AuthProvider = ({ children }) => {
         // --- Skenario 2: Login Google/Callback (Token & User Object) ---
         token = nimOrToken;
         userData = passwordOrUser; // Ini adalah objek user dari URL
-        
+
         // Jika backend HANYA kirim token, kita perlu panggil /me
         if (!userData) {
-           // Set token dulu agar 'me' berhasil
-           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-           const response = await api.get('/auth/me');
-           userData = response.data.user;
+          // Set token dulu agar 'me' berhasil
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          const response = await api.get('/auth/me');
+          userData = response.data.user;
         }
       }
 
@@ -114,8 +114,8 @@ const AuthProvider = ({ children }) => {
 
     } catch (error) {
       console.error("Login failed:", error.response?.data?.message || error.message);
-      logout(); 
-      throw error; 
+      logout();
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -127,12 +127,12 @@ const AuthProvider = ({ children }) => {
       const response = await api.post('/auth/register', userData);
       const token = response.data.token;
       const userDataFromResponse = response.data.user;
-      
+
       localStorage.setItem('token', token);
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(userDataFromResponse);
       setIsAuthenticated(true);
-      
+
       return true;
     } catch (error) {
       console.error("Register failed:", error);
@@ -145,7 +145,7 @@ const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false); // ✅ BARU: Set authenticated false
     delete api.defaults.headers.common['Authorization'];
-    window.location.href = '/'; 
+    window.location.href = '/';
   };
 
   const value = {
@@ -161,7 +161,7 @@ const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={value}>
       {loading ? (
         <div className="min-h-screen flex items-center justify-center">
-            <p>Loading user...</p>
+          <p>Loading user...</p>
         </div>
       ) : children}
     </AuthContext.Provider>
@@ -241,11 +241,11 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { login, user, logout } = useAuth();
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); 
+    e.preventDefault();
     setIsLoading(true);
     setError(null);
     try {
@@ -263,30 +263,30 @@ const LoginPage = () => {
     setIsLoading(true);
     setError(null);
     console.log("Mengarahkan ke Google Login...");
-    window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/auth/google`;
+    window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/auth/google`;
   };
 
   // Tampilan "Sudah Login" (DIPERBAIKI)
   if (user) {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6 font-sans">
-             <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
-                <h1 className="text-2xl font-bold mb-4">Anda Sudah Login</h1>
-                <p className="text-gray-700 mb-6">Selamat datang, {user.name || user.nim}!</p>
-                <button
-                    onClick={() => window.location.href = '/chat'} // ✅ PERBAIKAN: Tombol ke Chat
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors mb-3"
-                >
-                    Lanjut ke Chat
-                </button>
-                <button
-                    onClick={() => logout()} 
-                    className="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-medium transition-colors"
-                >
-                    Logout
-                </button>
-             </div>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6 font-sans">
+        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-4">Anda Sudah Login</h1>
+          <p className="text-gray-700 mb-6">Selamat datang, {user.name || user.nim}!</p>
+          <button
+            onClick={() => window.location.href = '/chat'} // ✅ PERBAIKAN: Tombol ke Chat
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors mb-3"
+          >
+            Lanjut ke Chat
+          </button>
+          <button
+            onClick={() => logout()}
+            className="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-medium transition-colors"
+          >
+            Logout
+          </button>
         </div>
+      </div>
     )
   }
 
@@ -353,7 +353,7 @@ const LoginPage = () => {
           <GoogleIcon />
           <span className="ml-3 font-medium">Lanjutkan dengan Google</span>
         </button>
-        
+
         {/* ✅ PERBAIKAN: Tombol Guest Mode */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
@@ -371,7 +371,7 @@ const LoginPage = () => {
         >
           <span className="font-medium">Coba sebagai Tamu</span>
         </button>
-        
+
         <p className="text-center text-sm text-gray-600 mt-6">
           Belum punya akun?
           <a href="#register" className="text-orange-500 hover:underline ml-1" onClick={(e) => { e.preventDefault(); alert('Mengarahkan ke halaman Daftar...'); }}>

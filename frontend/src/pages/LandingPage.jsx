@@ -378,7 +378,7 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
 
     setIsLoading(true);
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-    window.location.href = `${API_URL}/api/auth/google`;
+    window.location.href = `${API_URL}/auth/google`;
   };
 
   const handleKeyPress = (e) => {
