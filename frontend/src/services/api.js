@@ -42,22 +42,22 @@ api.interceptors.response.use(
 
 export const authAPI = {
   login: async (nim, password) => {
-    const response = await api.post('/api/auth/login', { nim, password });
+    const response = await api.post('/auth/login', { nim, password });
     return response.data;
   },
 
   logout: async () => {
-    const response = await api.post('/api/auth/logout');
+    const response = await api.post('/auth/logout');
     return response.data;
   },
 
   verify: async () => {
-    const response = await api.get('/api/auth/verify');
+    const response = await api.get('/auth/verify');
     return response.data;
   },
 
   getMe: async () => {
-    const response = await api.get('/api/auth/me');
+    const response = await api.get('/auth/me');
     return response.data;
   }
 };
@@ -66,23 +66,23 @@ export const authAPI = {
 
 export const academicAPI = {
   getSummary: async () => {
-    const response = await api.get('/api/academic/summary');
+    const response = await api.get('/academic/summary');
     return response.data;
   },
 
   getGrades: async (semester = null) => {
-    const url = semester ? `/api/academic/grades?semester=${semester}` : '/api/academic/grades';
+    const url = semester ? `/academic/grades?semester=${semester}` : '/academic/grades';
     const response = await api.get(url);
     return response.data;
   },
 
   getTranscript: async () => {
-    const response = await api.get('/api/academic/transcript');
+    const response = await api.get('/academic/transcript');
     return response.data;
   },
 
   downloadTranscriptPDF: async () => {
-    const response = await api.get('/api/academic/transcript/pdf', {
+    const response = await api.get('/academic/transcript/pdf', {
       responseType: 'blob'
     });
     return response.data;
@@ -93,7 +93,7 @@ export const academicAPI = {
 
 export const chatAPI = {
   sendMessage: async (message, conversationId = null) => {
-    const response = await api.post('/api/chat', {
+    const response = await api.post('/chat', {
       message,
       conversationId
     });
@@ -101,17 +101,17 @@ export const chatAPI = {
   },
 
   getHistory: async (conversationId) => {
-    const response = await api.get(`/api/chat/history/${conversationId}`);
+    const response = await api.get(`/chat/history/${conversationId}`);
     return response.data;
   },
 
   getConversations: async (userId) => {
-    const response = await api.get(`/api/chat/conversations/${userId}`);
+    const response = await api.get(`/chat/conversations/${userId}`);
     return response.data;
   },
 
   deleteConversation: async (conversationId) => {
-    const response = await api.delete(`/api/chat/conversation/${conversationId}`);
+    const response = await api.delete(`/chat/conversation/${conversationId}`);
     return response.data;
   }
 };

@@ -263,7 +263,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔍 [AUTH CONTEXT] loginWithCredentials called with NIM:', nim);
 
-      const response = await api.post('/api/auth/login', { nim, password });
+      const response = await api.post('/auth/login', { nim, password });
 
       console.log('🔍 [AUTH CONTEXT] Login API Response:', {
         status: response.status,
@@ -335,7 +335,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔍 [AUTH CONTEXT] registerWithEmail called with email:', email);
 
-      const response = await api.post('/api/auth/register-email', { email });
+      const response = await api.post('/auth/register-email', { email });
 
       console.log('🔍 [AUTH CONTEXT] Register with email response:', {
         status: response.status,
@@ -401,7 +401,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔍 [AUTH CONTEXT] verifyEmailCode called:', { email, code });
 
-      const response = await api.post('/api/auth/verify-email', {
+      const response = await api.post('/auth/verify-email', {
         email,
         code
       });
@@ -472,7 +472,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔍 [AUTH CONTEXT] resendVerificationCode called for:', email);
 
-      const response = await api.post('/api/auth/resend-verification', { email });
+      const response = await api.post('/auth/resend-verification', { email });
 
       console.log('🔍 [AUTH CONTEXT] Resend verification response:', {
         status: response.status,
@@ -513,7 +513,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔍 [AUTH CONTEXT] checkEmailVerificationStatus called for:', email);
 
-      const response = await api.get(`/api/auth/check-verification/${email}`);
+      const response = await api.get(`/auth/check-verification/${email}`);
 
       console.log('🔍 [AUTH CONTEXT] Check verification status response:', {
         status: response.status,
@@ -566,7 +566,7 @@ export const AuthProvider = ({ children }) => {
         email: userData.email
       });
 
-      const response = await api.post('/api/auth/register', userData);
+      const response = await api.post('/auth/register', userData);
       console.log('🔍 [AUTH CONTEXT] Register response:', response.data);
 
       const { token, user } = response.data;
@@ -674,7 +674,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('needsProfileCompletion');
 
       try {
-        await api.patch('/api/auth/update-profile', {
+        await api.patch('/auth/update-profile', {
           fullName: profileData.fullName,
           dateOfBirth: profileData.dateOfBirth
         });

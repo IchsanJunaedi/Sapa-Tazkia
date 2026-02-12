@@ -576,7 +576,7 @@ const LandingPage = () => {
 
     try {
       console.log('🔍 [LANDING PAGE] Loading chat history for user:', user.id);
-      const response = await api.get('/api/ai/conversations');
+      const response = await api.get('/ai/conversations');
       console.log('✅ [LANDING PAGE] Chat history loaded:', response.data.conversations);
       setChatHistory(response.data.conversations || []);
     } catch (error) {
@@ -851,7 +851,7 @@ const LandingPage = () => {
 
     try {
       console.log('🗑️ [LANDING PAGE] Deleting chat:', chatToDelete);
-      await api.delete(`/api/ai/conversations/${chatToDelete}`);
+      await api.delete(`/ai/conversations/${chatToDelete}`);
       console.log('✅ [LANDING PAGE] Chat deleted successfully');
 
     } catch (error) {
