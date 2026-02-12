@@ -11,7 +11,7 @@ const VerifyEmailPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  
+
   const navigate = useNavigate();
   const location = useLocation();
   const inputRefs = useRef([]);
@@ -28,10 +28,10 @@ const VerifyEmailPage = () => {
     const storedEmail = localStorage.getItem('userEmail');
     const pendingEmail = localStorage.getItem('pendingVerificationEmail');
     const oauthUserData = location.state?.userData;
-    
+
     let finalEmail = '';
     let finalUserData = null;
-    
+
     console.log('🔍 [VERIFY EMAIL] Checking email sources:', {
       locationEmail,
       storedEmail,
@@ -55,14 +55,14 @@ const VerifyEmailPage = () => {
       console.log('🔍 [VERIFY EMAIL] Email from OAuth user data:', oauthUserData.email);
     } else {
       console.log('❌ [VERIFY EMAIL] No email found, redirecting to login');
-      navigate('/login', { 
+      navigate('/login', {
         state: { error: 'Sesi verifikasi telah berakhir. Silakan daftar ulang.' }
       });
       return;
     }
-    
+
     setEmail(finalEmail);
-    
+
     // ✅ PERBAIKAN: Simpan user data jika dari OAuth untuk digunakan setelah verifikasi
     if (finalUserData) {
       localStorage.setItem('verificationUserData', JSON.stringify(finalUserData));
@@ -125,7 +125,7 @@ const VerifyEmailPage = () => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text');
     const numbers = pastedData.replace(/\D/g, '').slice(0, 6).split('');
-    
+
     if (numbers.length === 6) {
       const newCode = [...verificationCode];
       numbers.forEach((num, index) => {
@@ -133,7 +133,7 @@ const VerifyEmailPage = () => {
       });
       setVerificationCode(newCode);
       setError('');
-      
+
       // Focus last input
       inputRefs.current[5]?.focus();
     }
@@ -144,7 +144,7 @@ const VerifyEmailPage = () => {
    */
   const handleVerification = async () => {
     const code = verificationCode.join('');
-    
+
     if (code.length !== 6) {
       setError('Kode verifikasi harus 6 digit');
       return;
@@ -160,8 +160,8 @@ const VerifyEmailPage = () => {
 
     try {
       console.log('🔍 [VERIFY EMAIL] Verifying code for email:', email);
-      
-      const response = await api.post('/api/auth/verify-email', {
+
+      const response = await api.post('/auth/verify-email', {
         email,
         code
       });
@@ -170,17 +170,17 @@ const VerifyEmailPage = () => {
 
       if (response.data.success) {
         setSuccess('Email berhasil diverifikasi!');
-        
+
         // ✅ PERBAIKAN: Handle both API response data AND Google OAuth stored data
         const { token, user, requiresProfileCompletion } = response.data;
-        
+
         // ✅ PERBAIKAN: Cek jika ada OAuth data yang tersimpan
         const oauthToken = localStorage.getItem('verificationToken');
         const oauthUserData = localStorage.getItem('verificationUserData');
-        
+
         const finalToken = token || oauthToken;
         let finalUser = user;
-        
+
         // ✅ Jika dari Google OAuth, gunakan data yang disimpan
         if (!finalUser && oauthUserData) {
           try {
@@ -197,7 +197,7 @@ const VerifyEmailPage = () => {
           // ✅ PERBAIKAN: Simpan token dan user data
           localStorage.setItem('token', finalToken);
           localStorage.setItem('user', JSON.stringify(finalUser));
-          
+
           // ✅ PERBAIKAN: Login ke AuthContext untuk konsistensi state
           try {
             await login(finalToken, finalUser);
@@ -206,14 +206,14 @@ const VerifyEmailPage = () => {
             console.error('❌ [VERIFY EMAIL] AuthContext login failed:', loginError);
             // Continue anyway since we have localStorage
           }
-          
+
           // ✅ PERBAIKAN: Clear semua temporary storage
           localStorage.removeItem('userEmail');
           localStorage.removeItem('isNewUser');
           localStorage.removeItem('pendingVerificationEmail');
           localStorage.removeItem('verificationUserData');
           localStorage.removeItem('verificationToken');
-          
+
           console.log('🔍 [VERIFY EMAIL] User data after verification:', {
             user: finalUser,
             requiresProfileCompletion,
@@ -224,11 +224,11 @@ const VerifyEmailPage = () => {
           // ✅ PERBAIKAN: Redirect logic yang lebih baik
           setTimeout(() => {
             // Prioritaskan profile completion jika diperlukan
-            const needsProfileCompletion = requiresProfileCompletion || 
-                                         !finalUser.isProfileComplete || 
-                                         !finalUser.fullName ||
-                                         finalUser.fullName.trim().length === 0;
-            
+            const needsProfileCompletion = requiresProfileCompletion ||
+              !finalUser.isProfileComplete ||
+              !finalUser.fullName ||
+              finalUser.fullName.trim().length === 0;
+
             console.log('🔍 [VERIFY EMAIL] Redirect decision:', {
               needsProfileCompletion,
               requiresProfileCompletion,
@@ -238,16 +238,16 @@ const VerifyEmailPage = () => {
 
             if (needsProfileCompletion) {
               console.log('🔍 [VERIFY EMAIL] Profile incomplete - Redirecting to AboutYouPage');
-              navigate('/about-you', { 
-                state: { 
+              navigate('/about-you', {
+                state: {
                   from: 'email-verification',
                   userData: finalUser
                 }
               });
             } else {
               console.log('🔍 [VERIFY EMAIL] All complete - Redirecting to landing page');
-              navigate('/', { 
-                state: { 
+              navigate('/', {
+                state: {
                   from: 'email-verification',
                   welcome: true
                 }
@@ -262,12 +262,12 @@ const VerifyEmailPage = () => {
       }
     } catch (error) {
       console.error('❌ [VERIFY EMAIL] Verification failed:', error);
-      
+
       let errorMessage = 'Verifikasi gagal. Silakan coba lagi.';
-      
+
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
-        
+
         // Clear code on invalid verification
         if (errorMessage.includes('tidak valid') || errorMessage.includes('kadaluarsa')) {
           setVerificationCode(['', '', '', '', '', '']);
@@ -276,7 +276,7 @@ const VerifyEmailPage = () => {
       } else if (error.request) {
         errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
       }
-      
+
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -302,8 +302,8 @@ const VerifyEmailPage = () => {
 
     try {
       console.log('🔍 [VERIFY EMAIL] Resending code to:', email);
-      
-      const response = await api.post('/api/auth/resend-verification', { email });
+
+      const response = await api.post('/auth/resend-verification', { email });
 
       if (response.data.success) {
         setSuccess('Kode verifikasi baru telah dikirim ke email Anda');
@@ -315,15 +315,15 @@ const VerifyEmailPage = () => {
       }
     } catch (error) {
       console.error('❌ [VERIFY EMAIL] Resend failed:', error);
-      
+
       let errorMessage = 'Gagal mengirim ulang kode. Silakan coba lagi.';
-      
+
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.request) {
         errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
       }
-      
+
       setError(errorMessage);
     } finally {
       setIsResending(false);
@@ -340,16 +340,16 @@ const VerifyEmailPage = () => {
     localStorage.removeItem('pendingVerificationEmail');
     localStorage.removeItem('verificationUserData');
     localStorage.removeItem('verificationToken');
-    
+
     // Redirect berdasarkan source
     if (location.state?.from === 'oauth-callback') {
-      navigate('/login', { 
-        state: { 
-          message: 'Verifikasi dibatalkan. Silakan coba login kembali.' 
+      navigate('/login', {
+        state: {
+          message: 'Verifikasi dibatalkan. Silakan coba login kembali.'
         }
       });
     } else {
-      navigate('/login', { 
+      navigate('/login', {
         state: { showEmailRegistration: true }
       });
     }
@@ -375,13 +375,13 @@ const VerifyEmailPage = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           </div>
-          
+
           <h1 className="text-2xl font-bold text-gray-800 mb-2">Verifikasi Email</h1>
           <p className="text-gray-600 mb-2">
             Masukkan kode verifikasi 6 digit yang dikirim ke
           </p>
           <p className="text-blue-600 font-medium">{email}</p>
-          
+
           {/* ✅ PERBAIKAN: Tampilkan source verification */}
           {location.state?.from === 'oauth-callback' && (
             <p className="text-xs text-green-600 mt-2">
@@ -427,7 +427,7 @@ const VerifyEmailPage = () => {
               />
             ))}
           </div>
-          
+
           <p className="text-xs text-gray-500 text-center">
             Kode akan otomatis terverifikasi ketika semua digit terisi
           </p>

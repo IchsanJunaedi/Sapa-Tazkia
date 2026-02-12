@@ -269,7 +269,7 @@ const ChatPage = () => {
 
         try {
             console.log('🔍 [CHAT PAGE] Loading conversation list...');
-            const response = await api.get('/api/ai/conversations');
+            const response = await api.get('/ai/conversations');
             setChatHistory(response.data.conversations || []);
         } catch (error) {
             console.error('❌ [CHAT PAGE] Error loading chat history:', error);
@@ -302,7 +302,7 @@ const ChatPage = () => {
             isFetchingHistoryRef.current = true;
 
             console.log("🔍 [CHAT PAGE] Fetching history for:", chatId);
-            api.get(`/api/ai/history/${chatId}`)
+            api.get(`/ai/history/${chatId}`)
                 .then(response => {
                     if (response.data && Array.isArray(response.data.messages)) {
                         const processedMessages = response.data.messages.map(msg => processMessageContent(msg));
@@ -349,7 +349,7 @@ const ChatPage = () => {
         }
 
         try {
-            await api.delete(`/api/ai/conversations/${chatToDelete}`);
+            await api.delete(`/ai/conversations/${chatToDelete}`);
             setTimeout(() => {
                 loadChatHistory(true);
             }, 300);
@@ -391,7 +391,7 @@ const ChatPage = () => {
     const handleDownloadPDF = async () => {
         try {
             // Kita fetch data terbaru biar valid
-            const response = await api.get('/api/academic/transcript');
+            const response = await api.get('/academic/transcript');
             if (response.data.success) {
                 generateTranscriptPDF(response.data.data);
             } else {
@@ -727,7 +727,7 @@ const ChatPage = () => {
         navigate(`/chat/${chatId}`, { replace: false });
 
         try {
-            const response = await api.get(`/api/ai/history/${chatId}`);
+            const response = await api.get(`/ai/history/${chatId}`);
             if (response.data && Array.isArray(response.data.messages)) {
                 // ✅ PROCESS HISTORY FOR PDF TAG
                 const processedMessages = response.data.messages.map(msg => processMessageContent(msg));
