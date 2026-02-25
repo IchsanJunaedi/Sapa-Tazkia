@@ -683,11 +683,55 @@ async function handleDbSave(userId, conversationId, userMsg, botMsg, tokens, res
   }
 }
 
+// ============================================================================
+// 6. REFRESH TOKEN — Rotate access token using refresh token
+// ============================================================================
+
+/**
+ * POST /api/auth/refresh
+ * Body: { refreshToken: string }
+ * Returns: { success, token } — new short-lived access token
+ */
+const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken: incomingRefresh } = req.body;
+
+    if (!incomingRefresh) {
+      return res.status(400).json({ success: false, message: 'Refresh token wajib diisi' });
+    }
+
+    // Verify refresh token signature + expiry
+    const decoded = authService.verifyRefreshToken(incomingRefresh);
+    if (!decoded || decoded.type !== 'refresh') {
+      return res.status(401).json({ success: false, message: 'Refresh token tidak valid atau sudah kadaluarsa' });
+    }
+
+    // Ensure user still exists and session is alive
+    const user = await authService.getUserById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User tidak ditemukan' });
+    }
+
+    // Issue new short-lived access token
+    const newAccessToken = authService.generateToken(user.id);
+
+    return res.json({
+      success: true,
+      message: 'Token berhasil diperbarui',
+      token: newAccessToken,
+      expiresIn: process.env.JWT_EXPIRES_IN || '1d'
+    });
+
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat refresh token' });
+  }
+};
+
 module.exports = {
   googleAuth, googleCallback, googleCallbackSuccess,
   login, register, registerWithEmail,
   verifyEmailCode, resendVerificationCode, checkEmailVerification,
   verifyStudent, updateVerification, updateProfile, checkNIM,
   logout, verify, getProfile, checkAuth, healthCheck,
-  chat // ✅ Export chat
+  chat, refreshToken
 };
