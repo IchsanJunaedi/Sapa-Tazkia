@@ -1,11 +1,13 @@
 const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
-const helmet = require('helmet'); // ✅ NEW: Security headers middleware
+const helmet = require('helmet'); // Security headers middleware
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpecs = require('./config/swagger');
 const { PrismaClient } = require('@prisma/client');
 require('dotenv').config();
 
-// ✅ NEW: Environment-based logger
+// Environment-based logger
 const logger = require('./utils/logger');
 
 // Import routes
@@ -185,28 +187,36 @@ app.use((req, res, next) => {
   next();
 });
 
-// Session configuration - Fixed for development
+// Session configuration - Secure: no fallback secret
+// ✅ SECURITY: SESSION_SECRET must be set explicitly
+if (!process.env.SESSION_SECRET) {
+  if (isProduction) {
+    throw new Error('FATAL: SESSION_SECRET environment variable must be set in production!');
+  } else {
+    logger.warn('SESSION_SECRET not set. Using JWT_SECRET as fallback for development only.');
+  }
+}
+
 app.use(session({
   name: 'sapa-tazkia.sid',
-  secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || 'fallback-session-secret-12345-change-in-production',
+  secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-only-fallback-secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: isProduction,
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: isProduction ? 'none' : 'lax',
   },
-  store: new session.MemoryStore() // Simplified for both environments
+  store: new session.MemoryStore()
 }));
 
 // Passport middleware
 app.use(authService.passport.initialize());
 app.use(authService.passport.session());
 
-// Request logging middleware - Uses environment-based logger
+// Request logging middleware - structured via logger
 app.use((req, res, next) => {
-  // ✅ FIX: Use logger (hidden in production, visible in development)
   logger.request(req.method, req.url, '-');
   next();
 });
@@ -455,12 +465,21 @@ app.use('/api/academic', academicRoutes);
 // ERROR HANDLING MIDDLEWARE - ENHANCED WITH RATE LIMIT ERRORS
 // ========================================================
 
-// ✅ NEW: Rate limit error handler (must be before general error handler)
+// ✅ Swagger/OpenAPI Documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true
+  },
+  customSiteTitle: 'Sapa-Tazkia API Docs'
+}));
+
+// Rate limit error handler (must be before general error handler)
 app.use(rateLimitErrorHandler);
 
-// 404 Handler - UPDATED dengan rate limit endpoints
+// 404 Handler
 app.use('*', (req, res) => {
-  console.log('❌ [404] Route not found:', req.method, req.originalUrl);
+  logger.warn(`[404] Route not found: ${req.method} ${req.originalUrl}`);
 
   res.status(404).json({
     success: false,
@@ -530,16 +549,13 @@ app.use('*', (req, res) => {
   });
 });
 
-// Global error handler - Enhanced with rate limit error handling
+// Global error handler
 app.use((err, req, res, next) => {
-  console.error('🔴 [GLOBAL ERROR]', {
-    message: err.message,
-    stack: err.stack,
+  logger.error(`[GLOBAL ERROR] ${err.message}`, {
     url: req.url,
     method: req.method,
     ip: req.ip,
-    timestamp: new Date().toISOString(),
-    rateLimitError: err.code === 'RATE_LIMIT_EXCEEDED' // ✅ NEW: Rate limit error flag
+    rateLimitError: err.code === 'RATE_LIMIT_EXCEEDED'
   });
 
   // Rate limit error (already handled by rateLimitErrorHandler, but as backup)
@@ -715,9 +731,9 @@ const server = app.listen(PORT, async () => {
   }
 
   console.log('');
-  console.log('📋 AVAILABLE ENDPOINTS:');
-  console.log('   GET  / .......................... API Root (+Rate Limit Info)');
-  console.log('   GET  /health ................... Health check (+Rate Limit Status)');
+  console.log('   GET  /api/docs .............................. Swagger API Documentation');
+  console.log('   GET  / .......................... API Root');
+  console.log('   GET  /health ................... Health check');
   console.log('   GET  /status ................... System status (+Rate Limit Config)');
   console.log('   GET  /session-debug ............ Session debug (+Rate Limit Context)');
   console.log('   GET  /test .................... Test route (+Rate Limit Headers)');
