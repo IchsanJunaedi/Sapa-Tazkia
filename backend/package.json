@@ -9,7 +9,9 @@
     "db:push": "npx prisma db push",
     "db:generate": "npx prisma generate",
     "db:studio": "npx prisma studio",
-    "reset:redis": "node reset-redis.js"
+    "reset:redis": "node reset-redis.js",
+    "lint": "eslint src/ --ext .js",
+    "lint:fix": "eslint src/ --ext .js --fix"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +30,7 @@
     "express-session": "^1.18.2",
     "express-validator": "^7.3.0",
     "faiss-node": "^0.5.1",
+    "helmet": "^8.1.0",
     "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^3.0.3",
@@ -38,7 +41,9 @@
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.14.0",
     "rate-limiter-flexible": "^2.4.2",
-    "request-ip": "^3.3.0"
+    "request-ip": "^3.3.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.10",
