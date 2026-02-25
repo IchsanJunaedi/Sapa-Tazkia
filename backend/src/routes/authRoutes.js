@@ -1,14 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const rateLimit = require('express-rate-limit'); // ✅ Library standar keamanan (Install dulu: npm install express-rate-limit)
+const rateLimit = require('express-rate-limit');
 
 // Import Controller & Middleware Auth
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
-
-// ❌ KITA HAPUS IMPORT INI
-// const { ipRateLimit, userRateLimit } = require('../middleware/rateLimitMiddleware');
-// Alasannya: Kita tidak mau Auth bergantung pada kuota Token AI.
+const {
+  validateRegister,
+  validateRegisterEmail,
+  validateLogin,
+  validateVerifyEmail,
+  validateRefreshToken,
+  validateNimParam
+} = require('../middleware/validationMiddleware');
 
 // ========================================================
 // 🛡️ SECURITY RATE LIMITERS (Pos Satpam Khusus Auth)
@@ -19,10 +23,10 @@ const authMiddleware = require('../middleware/authMiddleware');
 // Jika dilanggar, blokir IP tersebut sementara.
 const strictLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 menit
-  max: 5, 
+  max: 5,
   message: { success: false, message: "Terlalu banyak percobaan. Silakan coba lagi dalam 1 menit." },
-  standardHeaders: true, 
-  legacyHeaders: false, 
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // 2. Auth Provider Limiter (Google)
@@ -38,7 +42,7 @@ const providerLimiter = rateLimit({
 // Cukup longgar (30x/menit) agar user experience tetap nyaman.
 const generalLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  max: 30, 
+  max: 30,
   message: { success: false, message: "Terlalu banyak request. Santai sedikit." }
 });
 
@@ -47,10 +51,10 @@ const generalLimiter = rateLimit({
 // ========================================================
 
 router.get('/test', generalLimiter, (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Auth routes working!', 
-    timestamp: new Date().toISOString() 
+  res.json({
+    success: true,
+    message: 'Auth routes working!',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -66,38 +70,156 @@ router.get('/google', providerLimiter, authController.googleAuth);
 /**
  * @route   GET /api/auth/google/callback
  */
-router.get('/google/callback', 
+router.get('/google/callback',
   authController.googleCallback,
   authController.googleCallbackSuccess
 );
 
 /**
- * @route   POST /api/auth/login
- * @limit   STRICT (Anti Brute-Force)
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Login dengan NIM + password
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       200:
+ *         description: Login berhasil
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       401:
+ *         description: Kredensial tidak valid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/login', strictLimiter, authController.login);
+router.post('/login', strictLimiter, validateLogin, authController.login);
 
 /**
- * @route   POST /api/auth/register
- * @limit   STRICT (Anti Spam Account)
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Registrasi akun baru (NIM + email + password)
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [fullName, nim, email, password]
+ *             properties:
+ *               fullName: { type: string, example: 'Budi Santoso' }
+ *               nim: { type: string, example: '20230001' }
+ *               email: { type: string, format: email }
+ *               password: { type: string, minLength: 8 }
+ *     responses:
+ *       201:
+ *         description: Registrasi berhasil, kode OTP dikirim ke email
+ *       422:
+ *         description: Validasi gagal
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/register', strictLimiter, authController.register);
+router.post('/register', strictLimiter, validateRegister, authController.register);
 
 /**
- * @route   POST /api/auth/register-email
- * @limit   STRICT
+ * @swagger
+ * /api/auth/register-email:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Registrasi via email (untuk Google OAuth flow)
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email }
+ *     responses:
+ *       200:
+ *         description: Kode OTP dikirim ke email
  */
-router.post('/register-email', strictLimiter, authController.registerWithEmail);
+router.post('/register-email', strictLimiter, validateRegisterEmail, authController.registerWithEmail);
+
+/**
+ * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Refresh access token menggunakan refresh token
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken: { type: string, description: 'Refresh token dari login' }
+ *     responses:
+ *       200:
+ *         description: Access token baru berhasil dibuat
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 token: { type: string, description: 'JWT access token baru (valid 1 day)' }
+ *       401:
+ *         description: Refresh token tidak valid atau expired
+ */
+router.post('/refresh', strictLimiter, validateRefreshToken, authController.refreshToken);
 
 // ========================================================
 // ✅ EMAIL VERIFICATION ROUTES (HIGH RISK)
 // ========================================================
 
 /**
- * @route   POST /api/auth/verify-email
- * @limit   STRICT (Mencegah tebak paksa kode OTP)
+ * @swagger
+ * /api/auth/verify-email:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Verifikasi email dengan kode OTP 6 digit
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, code]
+ *             properties:
+ *               email: { type: string, format: email }
+ *               code: { type: string, minLength: 6, maxLength: 6, example: '123456' }
+ *     responses:
+ *       200:
+ *         description: Email berhasil diverifikasi
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       400:
+ *         description: Kode tidak valid atau expired
  */
-router.post('/verify-email', strictLimiter, authController.verifyEmailCode);
+router.post('/verify-email', strictLimiter, validateVerifyEmail, authController.verifyEmailCode);
 
 /**
  * @route   POST /api/auth/resend-verification

@@ -12,7 +12,19 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 // Import email service
 const emailService = require('./emailService');
 
+// Import logger
+const logger = require('../utils/logger');
+
 const prisma = new PrismaClient();
+
+// ✅ SECURITY: Fail fast if JWT_SECRET is not set in production
+if (!process.env.JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: JWT_SECRET environment variable must be set in production!');
+  } else {
+    logger.warn('[AUTH SERVICE] JWT_SECRET not set. Using insecure default for development only.');
+  }
+}
 
 // ========================================================
 // ✅ BARU: FUNGSI VERIFIKASI EMAIL
@@ -572,19 +584,53 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 }
 
 // ========================================================
-// FUNGSI TOKEN
+// FUNGSI TOKEN - SECURE
 // ========================================================
+
+/**
+ * Generate short-lived access token (default: 1d via JWT_EXPIRES_IN env)
+ */
 const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET || 'fallback-secret', {
-    expiresIn: '30d',
-  });
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET is not configured');
+  return jwt.sign(
+    { id: userId, type: 'access' },
+    secret,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+  );
+};
+
+/**
+ * Generate long-lived refresh token (default: 30d via JWT_REFRESH_EXPIRES_IN env)
+ */
+const generateRefreshToken = (userId) => {
+  const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_REFRESH_SECRET is not configured');
+  return jwt.sign(
+    { id: userId, type: 'refresh' },
+    secret,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' }
+  );
 };
 
 const verifyToken = (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET is not configured');
+    return jwt.verify(token, secret);
   } catch (error) {
-    console.error('[ERROR] Token verification failed:', error);
+    logger.debug('[AUTH SERVICE] Token verification failed: ' + error.message);
+    return null;
+  }
+};
+
+const verifyRefreshToken = (token) => {
+  try {
+    const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_REFRESH_SECRET is not configured');
+    return jwt.verify(token, secret);
+  } catch (error) {
+    logger.debug('[AUTH SERVICE] Refresh token verification failed: ' + error.message);
     return null;
   }
 };
@@ -602,20 +648,22 @@ const createSession = async (userId, token, ipAddress, userAgent) => {
       }
     });
 
+    // Session expiry matches JWT refresh token expiry (30d by default)
+    const sessionExpiryMs = 30 * 24 * 60 * 60 * 1000;
     const session = await prisma.session.create({
       data: {
         userId: userId,
         token,
         ipAddress: ipAddress || 'unknown',
         userAgent: userAgent || 'unknown',
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 hari
+        expiresAt: new Date(Date.now() + sessionExpiryMs),
       },
     });
 
-    console.log(`[DEBUG] Session created for user: ${userId}`);
+    logger.debug(`[AUTH SERVICE] Session created for user: ${userId}`);
     return session;
   } catch (error) {
-    console.error('[ERROR] Error creating session:', error);
+    logger.error('[AUTH SERVICE] Error creating session: ' + error.message);
     throw error;
   }
 };
@@ -1087,7 +1135,7 @@ const getUserById = async (userId) => {
 };
 
 // ========================================================
-// EXPORTS - TAMBAH FUNGSI BARU VERIFIKASI
+// EXPORTS
 // ========================================================
 module.exports = {
   register,
@@ -1095,7 +1143,9 @@ module.exports = {
   logout,
   verifySession,
   generateToken,
+  generateRefreshToken,
   verifyToken,
+  verifyRefreshToken,
   getUserById,
   createSession,
   logoutAllUserSessions,
