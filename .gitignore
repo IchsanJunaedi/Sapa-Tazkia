@@ -1,12 +1,11 @@
 **/node_modules/
 
 .gitignore
-docker-compose.yml
 qdrant_storage/
 mysql_data
 geminiService.js  
 .env
 build
-public
 topicExtractor.js
 redis_data
+.env.production
