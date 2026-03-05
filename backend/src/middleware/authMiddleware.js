@@ -11,11 +11,11 @@ const requireAuth = async (req, res, next) => {
   try {
     // Ambil token dari header Authorization
     const authHeader = req.headers['authorization'];
-    
+
     if (!authHeader) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: 'Akses ditolak. Token otentikasi tidak ditemukan.' 
+        message: 'Akses ditolak. Token otentikasi tidak ditemukan.'
       });
     }
 
@@ -29,7 +29,7 @@ const requireAuth = async (req, res, next) => {
     }
 
     const token = parts[1].trim();
-    
+
     // Validasi token dasar
     if (!token || token === 'null' || token === 'undefined') {
       return res.status(401).json({
@@ -41,7 +41,7 @@ const requireAuth = async (req, res, next) => {
     // 1. Verifikasi JWT
     // authService.verifyToken biasanya throw error jika expired
     const decoded = authService.verifyToken(token);
-    
+
     if (!decoded) {
       return res.status(401).json({
         success: false,
@@ -66,15 +66,15 @@ const requireAuth = async (req, res, next) => {
   } catch (error) {
     // ✅ FIX PENTING: Tangani TokenExpiredError agar responsenya rapi (401) bukan crash
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Sesi telah berakhir (Token Expired). Silakan login kembali.' 
+      return res.status(401).json({
+        success: false,
+        message: 'Sesi telah berakhir (Token Expired). Silakan login kembali.'
       });
     }
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Token tidak valid.' 
+      return res.status(401).json({
+        success: false,
+        message: 'Token tidak valid.'
       });
     }
 
@@ -97,7 +97,7 @@ const requireAuth = async (req, res, next) => {
 const guestFriendlyAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    
+
     // KASUS 1: Tidak ada header auth -> GUEST
     if (!authHeader) {
       req.user = null;
@@ -111,7 +111,7 @@ const guestFriendlyAuth = async (req, res, next) => {
     }
 
     const token = parts[1].trim();
-    
+
     if (!token || token.length < 10 || token === 'null' || token === 'undefined') {
       req.user = null;
       return next();
@@ -120,11 +120,11 @@ const guestFriendlyAuth = async (req, res, next) => {
     // KASUS 2: Ada token, coba verifikasi dengan Try-Catch
     try {
       const decoded = authService.verifyToken(token);
-      
+
       if (decoded) {
         // Token format valid, cek session database
         const verification = await authService.verifySession(token);
-        
+
         if (verification.valid && verification.user) {
           // SUKSES: User terautentikasi
           req.user = verification.user;
@@ -176,7 +176,7 @@ const simpleAuthMiddleware = async (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
     const decoded = authService.verifyToken(token);
-    
+
     if (decoded) {
       req.user = { id: decoded.id };
       next();
@@ -195,7 +195,10 @@ const simpleAuthMiddleware = async (req, res, next) => {
  */
 const requireAdmin = async (req, res, next) => {
   await requireAuth(req, res, async () => {
-    if (req.user && (req.user.role === 'admin' || req.user.isAdmin)) {
+    // ✅ BUG-03 FIX: Sebelumnya cek `req.user.role === 'admin' || req.user.isAdmin` yang
+    // tidak pernah true karena field tersebut tidak ada di schema Prisma.
+    // Field yang benar adalah `userType` dengan nilai 'admin'.
+    if (req.user && req.user.userType === 'admin') {
       next();
     } else {
       return res.status(403).json({
@@ -208,8 +211,8 @@ const requireAdmin = async (req, res, next) => {
 
 module.exports = {
   requireAuth,
-  guestFriendlyAuth, 
-  optionalAuth, 
+  guestFriendlyAuth,
+  optionalAuth,
   simpleAuthMiddleware,
   requireAdmin
 };
