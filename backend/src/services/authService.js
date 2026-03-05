@@ -1,5 +1,7 @@
 // --- BAGIAN IMPORT ---
-const { PrismaClient } = require('@prisma/client');
+// ✅ BUG-02 FIX: Gunakan singleton Prisma agar tidak ada banyak koneksi DB pool terbuka sekaligus.
+// Sebelumnya setiap service file buat `new PrismaClient()` sendiri yang menyebabkan koneksi exhausted.
+const prisma = require('../config/prismaClient');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -14,8 +16,6 @@ const emailService = require('./emailService');
 
 // Import logger
 const logger = require('../utils/logger');
-
-const prisma = new PrismaClient();
 
 // ✅ SECURITY: Fail fast if JWT_SECRET is not set in production
 if (!process.env.JWT_SECRET) {
@@ -425,10 +425,12 @@ const registerWithEmail = async (email) => {
       }
     }
 
-    // If not student email, generate random NIM
+    // If not student email, generate unique NIM (dengan cek duplikasi ke DB)
+    // ✅ BUG-04 FIX: Sebelumnya pakai Math.random() tanpa cek uniqueness sehingga bisa
+    // bentrok dan menyebabkan Prisma error P2002 di production.
     if (!nim) {
-      nim = 'E' + Math.floor(10000000 + Math.random() * 90000000).toString();
-      console.log('👤 [AUTH SERVICE] Regular user, generated NIM:', nim);
+      nim = await generateUniqueNIM('E');
+      console.log('👤 [AUTH SERVICE] Regular user, generated unique NIM:', nim);
     }
 
     // Generate verification code
