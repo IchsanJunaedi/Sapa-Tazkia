@@ -1,10 +1,12 @@
 const express = require('express');
 const session = require('express-session');
+const RedisStore = require('connect-redis').RedisStore;
 const cors = require('cors');
 const helmet = require('helmet'); // Security headers middleware
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpecs = require('./config/swagger');
-const { PrismaClient } = require('@prisma/client');
+// ✅ BUG-02 FIX: Gunakan Prisma singleton agar koneksi DB tidak exhausted
+const prisma = require('./config/prismaClient');
 require('dotenv').config();
 
 // Environment-based logger
@@ -27,7 +29,7 @@ const app = express();
 // ✅ REQUIRED: Trust proxy for Nginx & Rate Limiting
 app.set('trust proxy', 1);
 
-const prisma = new PrismaClient();
+// ✅ BUG-02: prisma sudah di-import sebagai singleton di atas (bukan new PrismaClient())
 
 // ========================================================
 // RATE LIMIT SYSTEM INITIALIZATION - NEW SECTION
@@ -197,6 +199,10 @@ if (!process.env.SESSION_SECRET) {
   }
 }
 
+// ✅ BUG-01 FIX: Gunakan Redis sebagai session store agar session tidak hilang saat server restart.
+// Sebelumnya memakai MemoryStore yang data-nya hilang setiap kali proses Node mati/restart.
+const redisServiceInstance = require('./services/redisService');
+const redisClientForSession = redisServiceInstance.client;
 app.use(session({
   name: 'sapa-tazkia.sid',
   secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-only-fallback-secret',
@@ -208,7 +214,7 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: isProduction ? 'none' : 'lax',
   },
-  store: new session.MemoryStore()
+  store: new RedisStore({ client: redisClientForSession, prefix: 'sess:' })
 }));
 
 // Passport middleware
