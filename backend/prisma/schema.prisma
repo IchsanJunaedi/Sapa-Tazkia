@@ -138,6 +138,9 @@ model Conversation {
   id        Int       @id @default(autoincrement())
   userId    Int
   title     String    @db.VarChar(200)
+  // ✅ Field ini diperlukan agar konsisten dengan Prisma client yang sudah di-generate.
+  // Kolom optional (default false) — tidak mempengaruhi logika auth chat yang ada.
+  isGuest   Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -153,6 +156,7 @@ model Message {
   role           String   @db.VarChar(10)
   content        String   @db.Text
   responseTime   Float?
+  tokenUsage     Int?
   createdAt      DateTime @default(now())
 
   // ✅ PERBAIKAN DI SINI: Menambahkan onDelete: Cascade
@@ -217,4 +221,23 @@ enum RateLimitType {
   USER
   PREMIUM
   IP
+}
+
+//
+// ==================== ANALYTICS ====================
+//
+
+model AnalyticsSnapshot {
+  id          Int      @id @default(autoincrement())
+  date        DateTime @unique @db.Date
+  totalChats  Int      @default(0)
+  userChats   Int      @default(0)
+  guestChats  Int      @default(0)
+  totalTokens Int      @default(0)
+  uniqueUsers Int      @default(0)
+  hourlyData  Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("analytics_snapshots")
 }
