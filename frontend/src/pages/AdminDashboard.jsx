@@ -27,7 +27,8 @@ import {
     Area
 } from 'recharts';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// REACT_APP_API_URL already includes /api (e.g. http://localhost:5000/api) — do NOT add /api in paths below
+const API = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 // ─── Shared sub-components ───────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ const AnalyticsView = () => {
     const fetchRealtime = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`${API}/api/admin/analytics/realtime`, {
+            const res = await axios.get(`${API}/admin/analytics/realtime`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setRealtime(res.data.realtime);
@@ -88,7 +89,7 @@ const AnalyticsView = () => {
         try {
             setHistoryLoading(true);
             const token = localStorage.getItem('token');
-            const res = await axios.get(`${API}/api/admin/analytics/history?range=${range}`, {
+            const res = await axios.get(`${API}/admin/analytics/history?range=${range}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setHistory(res.data);
@@ -431,7 +432,7 @@ const AdminDashboard = () => {
         try {
             if (showLoading) setLoading(true);
             const token = localStorage.getItem('token');
-            const res = await axios.get(`${API}/api/admin/chat-logs`, {
+            const res = await axios.get(`${API}/admin/chat-logs`, {
                 withCredentials: true,
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -449,7 +450,7 @@ const AdminDashboard = () => {
 
     const handleLogout = async () => {
         try {
-            await axios.post(`${API}/api/auth/logout`, {}, { withCredentials: true });
+            await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             window.location.href = '/admin/login';
