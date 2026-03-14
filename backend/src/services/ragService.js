@@ -158,6 +158,8 @@ class RagService {
         try {
           const primaryQuery = queries[0]; // Gunakan query pertama (sudah normalized)
           const vector = await openaiService.createEmbedding(primaryQuery);
+          // Intentionally unconstrained (no category filter): if primary category-scoped search
+          // returned 0 docs, we relax both threshold AND category as a last resort.
           const fallbackResults = await client.search(COLLECTION_NAME, {
             vector,
             limit: 2,
@@ -168,6 +170,8 @@ class RagService {
           if (fallbackResults.length > 0) {
             console.log(`📄 [RAG] Fallback retrieved ${fallbackResults.length} docs`);
             return fallbackResults;
+          } else {
+            console.log(`📭 [RAG] Fallback also returned zero docs for: "${primaryQuery}"`);
           }
         } catch (e) {
           console.warn('⚠️ [RAG] Fallback search failed:', e.message);
