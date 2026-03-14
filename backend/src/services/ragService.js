@@ -4,6 +4,7 @@ const redisService = require('./redisService'); // ✅ Added Redis for Caching
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { normalizeQuery, wasNormalized } = require('../utils/queryNormalizer');
 
 /**
  * ⚙️ KONFIGURASI RAG SERVICE - PRODUCTION GRADE (HYBRID EDITION)
@@ -15,10 +16,12 @@ const COLLECTION_NAME = 'sapa_tazkia_knowledge';
 const VECTOR_SIZE = 1536;
 
 const MAX_CONTEXT_TOKENS = 800;
-const SCORE_THRESHOLD = 0.35; // Sedikit lebih ketat agar hasil lebih relevan
+// ✅ UPGRADE: Threshold dinaikkan 0.35 → 0.45 agar hanya dokumen SANGAT relevan yang masuk.
+// Ini mengurangi noise di context sehingga LLM bisa jawab akurat dengan token lebih sedikit.
+const SCORE_THRESHOLD = 0.45;
 const CACHE_TTL_SECONDS = 3600 * 6; // 6 Jam Cache
 
-const client = new QdrantClient({ host: QDRANT_HOST, port: QDRANT_PORT });
+const client = new QdrantClient({ host: QDRANT_HOST, port: QDRANT_PORT, checkCompatibility: false });
 
 class RagService {
   constructor() {
@@ -34,34 +37,36 @@ class RagService {
       const finalQueries = new Set();
       const cleanQuery = userQuery.toLowerCase().trim();
 
-      // --- LOGIC: CONTEXT INJECTION (FAST & STABLE) ⚡ ---
+      // --- LAYER 0: Normalized (Typo-Corrected) Query ---
+      const normalizedQuery = normalizeQuery(userQuery);
+      finalQueries.add(normalizedQuery); // selalu masuk sebagai base (sudah lowercase + corrected)
 
-      // 1. Base Query
-      finalQueries.add(userQuery);
+      // Jika ada koreksi, tambahkan original juga (jaga coverage edge case)
+      if (wasNormalized(userQuery, normalizedQuery)) {
+        finalQueries.add(userQuery); // original tetap masuk
+        console.log(`🔧 [NORMALIZER] "${userQuery}" → "${normalizedQuery}"`);
+      }
 
-      // 2. Context from History (Optional)
+      // --- LAYER 1: Context Injection ---
       if (history.length > 0) {
         const lastUserMessage = [...history].reverse().find(m => m.role === 'user')?.content || "";
-
-        // Cek jika pertanyaan ambigu (pendek/kata ganti)
         const isShort = cleanQuery.split(' ').length < 4;
         const triggers = ['nya', 'itu', 'tersebut', 'tadi', 'ini', 'dia', 'beliau', 'dimana', 'berapa', 'kapan', 'dalil', 'hukum', 'biaya'];
         const hasTrigger = triggers.some(w => cleanQuery.includes(w));
 
-        // Jika ambigu dan ada history, gabungkan
         if ((isShort || hasTrigger) && lastUserMessage.length > 2) {
-          const combinedQuery = `${userQuery} (Konteks: ${lastUserMessage})`;
-          // console.log(`🔗 [CONTEXT FIX] Combined Query: "${combinedQuery}"`); // Debug log reduced
+          const combinedQuery = `${normalizedQuery} (Konteks: ${lastUserMessage})`;
           finalQueries.add(combinedQuery);
         }
       }
 
-      // 3. Keyword Extraction (Simple fallback)
-      // Jika query panjang, ambil keywords penting saja untuk pencarian backup
+      // --- LAYER 2: Keyword Extraction ---
       if (cleanQuery.length > 50) {
-        // Hapus kata sambung umum (naive stopword removal)
-        const keywords = cleanQuery.replace(/\b(dan|yang|di|ke|dari|untuk|pada|adalah|itu|ini|saya|ingin|mau|tanya|apakah|bagaimana)\b/g, '').replace(/\s+/g, ' ').trim();
-        if (keywords.length > 5 && keywords !== cleanQuery) {
+        const keywords = normalizedQuery
+          .replace(/\b(dan|yang|di|ke|dari|untuk|pada|adalah|itu|ini|saya|ingin|mau|tanya|apakah|bagaimana)\b/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (keywords.length > 5 && keywords !== normalizedQuery) {
           finalQueries.add(keywords);
         }
       }
@@ -95,7 +100,10 @@ class RagService {
 
           const searchOptions = {
             vector: vector,
-            limit: 5,
+            // ✅ UPGRADE: Limit 5 → 3 per sub-query.
+            // 3 dokumen berkualitas tinggi (threshold 0.45) lebih berguna daripada
+            // 5 dokumen campuran. Hasilnya: context lebih bersih, token LLM lebih hemat.
+            limit: 3,
             with_payload: true,
             score_threshold: SCORE_THRESHOLD,
           };
@@ -137,10 +145,10 @@ class RagService {
         }
       });
 
-      // Sort by Score
+      // Sort by Score — ambil top 3 saja (cukup untuk jawaban akurat + token efisien)
       const finalDocs = Array.from(uniqueDocs.values())
         .sort((a, b) => b.score - a.score)
-        .slice(0, 5);
+        .slice(0, 3);
 
       if (finalDocs.length > 0) {
         console.log(`📄 [RAG] Retrieved ${finalDocs.length} docs in ${(Date.now() - startSearchTotal)}ms`);
