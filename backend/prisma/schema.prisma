@@ -157,6 +157,7 @@ model Message {
   content        String   @db.Text
   responseTime   Float?
   tokenUsage     Int?
+  isError        Boolean  @default(false)
   createdAt      DateTime @default(now())
 
   // ✅ PERBAIKAN DI SINI: Menambahkan onDelete: Cascade
@@ -228,16 +229,18 @@ enum RateLimitType {
 //
 
 model AnalyticsSnapshot {
-  id          Int      @id @default(autoincrement())
-  date        DateTime @unique @db.Date
-  totalChats  Int      @default(0)
-  userChats   Int      @default(0)
-  guestChats  Int      @default(0)
-  totalTokens Int      @default(0)
-  uniqueUsers Int      @default(0)
-  hourlyData  Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  date            DateTime @unique @db.Date
+  totalChats      Int      @default(0)
+  userChats       Int      @default(0)
+  guestChats      Int      @default(0)
+  totalTokens     Int      @default(0)
+  uniqueUsers     Int      @default(0)
+  avgResponseTime Float?
+  topQuestions    Json?
+  hourlyData      Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([date])
   @@map("analytics_snapshots")
