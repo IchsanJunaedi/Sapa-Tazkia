@@ -6,6 +6,8 @@
 
 // Domain-specific correction map (tambahkan sesuai kebutuhan)
 const CORRECTION_MAP = {
+  // Note: identity entries (e.g., 'biaya': 'biaya') are intentionally excluded —
+  // the fallback `CORRECTION_MAP[lower] || word` already preserves the original.
   // Biaya & Keuangan
   'beiyaa': 'biaya', 'biyaa': 'biaya', 'biay': 'biaya', 'byaya': 'biaya',
   'biyaya': 'biaya', 'bayia': 'biaya',
@@ -39,8 +41,12 @@ const CORRECTION_MAP = {
  * Normalisasi single word menggunakan correction map
  */
 function correctWord(word) {
-  const lower = word.toLowerCase();
-  return CORRECTION_MAP[lower] || word;
+  // Strip leading/trailing punctuation before map lookup, then restore it
+  const match = word.match(/^([^a-zA-Z0-9]*)([a-zA-Z0-9]+)([^a-zA-Z0-9]*)$/);
+  if (!match) return word;
+  const [, prefix, core, suffix] = match;
+  const corrected = CORRECTION_MAP[core.toLowerCase()] || core;
+  return prefix + corrected + suffix;
 }
 
 /**
