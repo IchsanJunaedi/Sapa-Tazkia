@@ -1,5 +1,6 @@
 const prisma = require('../config/prismaClient');
 const guestController = require('./guestController');
+const ragService = require('../services/ragService');
 
 /**
  * Get unified chat logs (Users + Guests)
@@ -287,8 +288,62 @@ const getHistoryAnalytics = async (req, res) => {
     }
 };
 
+/**
+ * GET /api/admin/knowledge-base
+ * List all documents in the knowledge base
+ */
+const listKnowledgeBase = async (req, res) => {
+  try {
+    const documents = await ragService.listDocuments();
+    res.json({ success: true, documents, total: documents.length });
+  } catch (error) {
+    console.error('❌ [ADMIN] List KB Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch knowledge base' });
+  }
+};
+
+/**
+ * POST /api/admin/knowledge-base
+ * Add a new document to the knowledge base
+ */
+const addKnowledgeDoc = async (req, res) => {
+  try {
+    const { content, source, category } = req.body;
+    if (!content || content.trim().length < 10) {
+      return res.status(400).json({ success: false, message: 'Content must be at least 10 characters' });
+    }
+    const doc = await ragService.addDocument(content.trim(), {
+      source: source || 'admin-manual',
+      category: category || 'manual'
+    });
+    res.status(201).json({ success: true, document: doc });
+  } catch (error) {
+    console.error('❌ [ADMIN] Add KB Doc Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to add document' });
+  }
+};
+
+/**
+ * DELETE /api/admin/knowledge-base/:id
+ * Delete a document from the knowledge base
+ */
+const deleteKnowledgeDoc = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Document ID required' });
+    const result = await ragService.deleteDocument(id);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('❌ [ADMIN] Delete KB Doc Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete document' });
+  }
+};
+
 module.exports = {
     getChatLogs,
     getRealtimeAnalytics,
-    getHistoryAnalytics
+    getHistoryAnalytics,
+    listKnowledgeBase,
+    addKnowledgeDoc,
+    deleteKnowledgeDoc
 };
