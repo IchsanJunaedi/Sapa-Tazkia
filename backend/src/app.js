@@ -18,6 +18,7 @@ const aiRoutes = require('./routes/aiRoutes');
 const guestRoutes = require('./routes/guestRoutes');
 const rateLimitRoutes = require('./routes/rateLimitRoutes'); // ✅ NEW: Rate limit routes
 const academicRoutes = require('./routes/academicRoutes');   // ✅ NEW: Academic Routes (Ditambahkan)
+const adminRoutes = require('./routes/adminRoutes');         // ✅ NEW: Admin Routes
 
 // Import services
 const authService = require('./services/authService');
@@ -73,6 +74,18 @@ const initializeRateLimitSystem = async () => {
   } catch (error) {
     console.error('❌ [RATE LIMIT] Failed to initialize rate limit system:', error.message);
     console.log('⚠️ [RATE LIMIT] Continuing without rate limiting features');
+  }
+};
+
+// ✅ NEW: Initialize analytics system
+const initializeAnalyticsSystem = async () => {
+  try {
+    const analyticsJob = require('./jobs/analyticsJob');
+    analyticsJob.init();
+    console.log('✅ [ANALYTICS] Analytics snapshot job initialized');
+  } catch (error) {
+    console.error('❌ [ANALYTICS] Failed to initialize analytics job:', error.message);
+    console.log('⚠️ [ANALYTICS] Continuing without analytics snapshot job');
   }
 };
 
@@ -199,10 +212,27 @@ if (!process.env.SESSION_SECRET) {
   }
 }
 
-// ✅ BUG-01 FIX: Gunakan Redis sebagai session store agar session tidak hilang saat server restart.
-// Sebelumnya memakai MemoryStore yang data-nya hilang setiap kali proses Node mati/restart.
+// ✅ BUG FIX: connect-redis v7 menggunakan API node-redis v4 (set dengan options object {EX: ttl}),
+// sedangkan ioredis menggunakan convention berbeda (set key value 'EX' ttl).
+// Solusi: buat thin wrapper yang menjembatani keduanya tanpa ganti library.
 const redisServiceInstance = require('./services/redisService');
-const redisClientForSession = redisServiceInstance.client;
+const ioRedisClient = redisServiceInstance.client;
+const redisClientForSession = {
+  get: (key) => ioRedisClient.get(key),
+  set: (key, value, options) => {
+    // connect-redis v7 memanggil: client.set(key, val, { EX: seconds })
+    // ioredis mengharapkan: client.set(key, val, 'EX', seconds)
+    if (options && typeof options === 'object' && options.EX) {
+      return ioRedisClient.set(key, value, 'EX', options.EX);
+    }
+    return ioRedisClient.set(key, value);
+  },
+  // connect-redis butuh fungsi ini untuk touch/reset TTL
+  expire: (key, seconds) => ioRedisClient.expire(key, seconds),
+  del: (...keys) => ioRedisClient.del(...keys),
+  mget: (...keys) => ioRedisClient.mget(...keys),
+};
+
 app.use(session({
   name: 'sapa-tazkia.sid',
   secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-only-fallback-secret',
@@ -463,6 +493,9 @@ app.use('/api/guest', guestRoutes);
 
 // ✅ NEW: Rate limit routes - For monitoring and management
 app.use('/api/rate-limit', rateLimitRoutes);
+
+// Admin Endpoints
+app.use('/api/admin', adminRoutes);
 
 // ✅ NEW: Academic Routes (Ditambahkan sesuai request)
 app.use('/api/academic', academicRoutes);
@@ -728,12 +761,20 @@ const server = app.listen(PORT, async () => {
   console.log(`🧠 RAG: ✅ Knowledge Base System Enabled`);
   console.log(`🗄️ Database: ${process.env.DATABASE_URL ? '✅ Connected' : '❌ No DB Config'}`);
   console.log(`🛡️ Rate Limiting: ${process.env.RATE_LIMIT_ENABLED !== 'false' ? '✅ Enabled' : '❌ Disabled'}`);
+  console.log(`📊 Analytics: ✅ Snapshot job enabled`);
 
   // ✅ NEW: Rate limit system status
   try {
     await initializeRateLimitSystem();
   } catch (error) {
     console.log(`⚠️ Rate Limit: ❌ Initialization Failed - ${error.message}`);
+  }
+
+  // ✅ NEW: Analytics system status
+  try {
+    await initializeAnalyticsSystem();
+  } catch (error) {
+    console.log(`⚠️ Analytics: ❌ Initialization Failed - ${error.message}`);
   }
 
   console.log('');
