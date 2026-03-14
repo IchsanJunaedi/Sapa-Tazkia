@@ -27,7 +27,39 @@ import {
     Area
 } from 'recharts';
 
-const API = 'http://localhost:5000';
+const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+// ─── Shared sub-components ───────────────────────────────────────────────────
+
+const DeltaBadge = ({ delta }) => {
+    if (delta === null || delta === undefined) return <span className="text-xs text-[#71717a]">-</span>;
+    const positive = delta >= 0;
+    return (
+        <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${positive ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+            {positive ? '↑' : '↓'} {Math.abs(delta)}%
+        </span>
+    );
+};
+
+// Heatmap cell — extracted to module scope so it has a stable reference across renders
+const HeatCell = ({ hour, count, opacity }) => {
+    const [hovered, setHovered] = useState(false);
+    return (
+        <div className="relative group">
+            <div
+                className="w-7 h-7 rounded cursor-default transition-opacity"
+                style={{ background: `rgba(168, 85, 247, ${opacity})` }}
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
+            />
+            {hovered && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[#18181b] border border-[#27272a] text-[10px] text-[#e4e4e7] whitespace-nowrap z-10 pointer-events-none">
+                    {String(hour).padStart(2, '0')}:00 — {count}
+                </div>
+            )}
+        </div>
+    );
+};
 
 // ─── Analytics View ──────────────────────────────────────────────────────────
 
@@ -146,17 +178,6 @@ const AnalyticsView = () => {
         cursor: { fill: 'rgba(168,85,247,0.08)' },
     };
 
-    // ── Delta badge ─────────────────────────────────────────────────────
-    const DeltaBadge = ({ delta }) => {
-        if (delta === null || delta === undefined) return <span className="text-xs text-[#71717a]">-</span>;
-        const positive = delta >= 0;
-        return (
-            <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${positive ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
-                {positive ? '↑' : '↓'} {Math.abs(delta)}%
-            </span>
-        );
-    };
-
     return (
         <div className="space-y-6">
 
@@ -256,7 +277,7 @@ const AnalyticsView = () => {
                                             <Cell key={i} fill={entry.fill} />
                                         ))}
                                     </Pie>
-                                    <Tooltip contentStyle={tooltipStyle.contentStyle} />
+                                    <Tooltip {...tooltipStyle} />
                                 </PieChart>
                             </ResponsiveContainer>
                             <div className="flex justify-center gap-4 mt-2">
@@ -314,6 +335,8 @@ const AnalyticsView = () => {
                         <div className="h-20 flex items-center justify-center">
                             <div className="animate-spin w-6 h-6 rounded-full border-2 border-[#a855f7] border-t-transparent" />
                         </div>
+                    ) : historyError ? (
+                        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">{historyError}</div>
                     ) : (
                         <>
                             <div className="flex gap-1 flex-wrap">
@@ -381,26 +404,6 @@ const AnalyticsView = () => {
                     )}
                 </div>
             </div>
-        </div>
-    );
-};
-
-// Heatmap cell extracted to avoid inline style linting issues
-const HeatCell = ({ hour, count, opacity }) => {
-    const [hovered, setHovered] = useState(false);
-    return (
-        <div className="relative group">
-            <div
-                className="w-7 h-7 rounded cursor-default transition-opacity"
-                style={{ background: `rgba(168, 85, 247, ${opacity})` }}
-                onMouseEnter={() => setHovered(true)}
-                onMouseLeave={() => setHovered(false)}
-            />
-            {hovered && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[#18181b] border border-[#27272a] text-[10px] text-[#e4e4e7] whitespace-nowrap z-10 pointer-events-none">
-                    {String(hour).padStart(2, '0')}:00 — {count}
-                </div>
-            )}
         </div>
     );
 };
