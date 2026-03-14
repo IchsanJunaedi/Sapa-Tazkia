@@ -187,10 +187,11 @@ const getHistoryAnalytics = async (req, res) => {
         const rangeStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - days));
 
         const [snapshots, messageGroups] = await Promise.all([
-            // Fetch snapshots in range ordered by date asc
+            // Fetch snapshots in range ordered by date asc — project only fields needed by frontend
             prisma.analyticsSnapshot.findMany({
                 where: { date: { gte: rangeStart } },
-                orderBy: { date: 'asc' }
+                orderBy: { date: 'asc' },
+                select: { date: true, totalChats: true, userChats: true, guestChats: true, totalTokens: true, uniqueUsers: true, hourlyData: true }
             }),
 
             // Group messages by conversationId to get per-user counts
@@ -232,11 +233,11 @@ const getHistoryAnalytics = async (req, res) => {
             userStatsMap[userId].tokens += group._sum.tokenUsage ?? 0;
         }
 
-        // Sort by chats desc and take top 10
-        const topUserIds = Object.keys(userStatsMap)
+        // Sort by chats desc, take top 10 — keep string keys consistent throughout, convert to Number only for Prisma query
+        const topUserIdStrings = Object.keys(userStatsMap)
             .sort((a, b) => userStatsMap[b].chats - userStatsMap[a].chats)
-            .slice(0, 10)
-            .map(Number);
+            .slice(0, 10);
+        const topUserIds = topUserIdStrings.map(Number);
 
         // Fetch User records for top users
         const topUserRecords = topUserIds.length > 0
@@ -251,9 +252,9 @@ const getHistoryAnalytics = async (req, res) => {
             userRecordMap[u.id] = u;
         }
 
-        const topUsers = topUserIds.map((userId, index) => {
-            const user = userRecordMap[userId];
-            const stats = userStatsMap[userId];
+        const topUsers = topUserIdStrings.map((userIdStr, index) => {
+            const user = userRecordMap[Number(userIdStr)];
+            const stats = userStatsMap[userIdStr];
             return {
                 rank: index + 1,
                 name: user?.fullName || 'Unknown',
