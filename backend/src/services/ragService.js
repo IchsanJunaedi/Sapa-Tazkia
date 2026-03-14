@@ -19,6 +19,8 @@ const MAX_CONTEXT_TOKENS = 800;
 // ✅ UPGRADE: Threshold dinaikkan 0.35 → 0.45 agar hanya dokumen SANGAT relevan yang masuk.
 // Ini mengurangi noise di context sehingga LLM bisa jawab akurat dengan token lebih sedikit.
 const SCORE_THRESHOLD = 0.45;
+// Fallback threshold jika primary search return 0 docs (misal: typo yang belum di-map)
+const SCORE_THRESHOLD_FALLBACK = 0.30;
 const CACHE_TTL_SECONDS = 3600 * 6; // 6 Jam Cache
 
 const client = new QdrantClient({ host: QDRANT_HOST, port: QDRANT_PORT, checkCompatibility: false });
@@ -149,6 +151,28 @@ class RagService {
       const finalDocs = Array.from(uniqueDocs.values())
         .sort((a, b) => b.score - a.score)
         .slice(0, 3);
+
+      // --- FALLBACK: Retry dengan threshold lebih rendah jika 0 hasil ---
+      if (finalDocs.length === 0) {
+        console.log(`🔁 [RAG] Zero docs at threshold ${SCORE_THRESHOLD}, retrying with ${SCORE_THRESHOLD_FALLBACK}...`);
+        try {
+          const primaryQuery = queries[0]; // Gunakan query pertama (sudah normalized)
+          const vector = await openaiService.createEmbedding(primaryQuery);
+          const fallbackResults = await client.search(COLLECTION_NAME, {
+            vector,
+            limit: 2,
+            with_payload: true,
+            score_threshold: SCORE_THRESHOLD_FALLBACK,
+          });
+
+          if (fallbackResults.length > 0) {
+            console.log(`📄 [RAG] Fallback retrieved ${fallbackResults.length} docs`);
+            return fallbackResults;
+          }
+        } catch (e) {
+          console.warn('⚠️ [RAG] Fallback search failed:', e.message);
+        }
+      }
 
       if (finalDocs.length > 0) {
         console.log(`📄 [RAG] Retrieved ${finalDocs.length} docs in ${(Date.now() - startSearchTotal)}ms`);
