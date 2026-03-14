@@ -314,6 +314,65 @@ class RagService {
   async deleteCollection() { try { await client.deleteCollection(COLLECTION_NAME); } catch { } }
 
   // =============================================================================
+  // 4. DOCUMENT MANAGEMENT (CRUD)
+  // =============================================================================
+
+  async listDocuments() {
+    try {
+      const result = await client.scroll(COLLECTION_NAME, {
+        limit: 100,
+        with_payload: true,
+        with_vector: false
+      });
+      return result.points.map(p => ({
+        id: p.id,
+        content: p.payload?.content || p.payload?.text || '',
+        source: p.payload?.source || p.payload?.filename || 'unknown',
+        category: p.payload?.category || '',
+        createdAt: p.payload?.createdAt || null
+      }));
+    } catch (error) {
+      console.error('❌ [RAG] listDocuments Error:', error.message);
+      throw error;
+    }
+  }
+
+  async addDocument(content, metadata = {}) {
+    try {
+      const vector = await openaiService.createEmbedding(content);
+      const id = this.generateDeterministicId(content + Date.now());
+      const createdAt = new Date().toISOString();
+      const payload = {
+        content,
+        source: metadata.source || 'manual',
+        category: metadata.category || 'manual',
+        createdAt,
+        ...metadata
+      };
+
+      await client.upsert(COLLECTION_NAME, {
+        points: [{ id, vector, payload }]
+      });
+
+      return { id, content, source: payload.source, createdAt };
+    } catch (error) {
+      console.error('❌ [RAG] addDocument Error:', error.message);
+      throw error;
+    }
+  }
+
+  async deleteDocument(id) {
+    try {
+      const parsedId = isNaN(id) ? id : Number(id);
+      await client.delete(COLLECTION_NAME, { points: [parsedId] });
+      return { success: true, id: parsedId };
+    } catch (error) {
+      console.error('❌ [RAG] deleteDocument Error:', error.message);
+      throw error;
+    }
+  }
+
+  // =============================================================================
   // 5. INGESTION (DATA LOADING)
   // =============================================================================
 
