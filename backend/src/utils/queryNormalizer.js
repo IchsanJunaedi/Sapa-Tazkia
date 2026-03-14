@@ -66,7 +66,7 @@ function normalizeQuery(query) {
  * Cek apakah query berubah setelah normalisasi (ada koreksi)
  */
 function wasNormalized(original, normalized) {
-  return original.toLowerCase().trim() !== normalized;
+  return original.toLowerCase().trim().replace(/\s+/g, ' ') !== normalized;
 }
 
 module.exports = { normalizeQuery, wasNormalized, CORRECTION_MAP };
