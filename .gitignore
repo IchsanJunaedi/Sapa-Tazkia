@@ -1,4 +1,5 @@
 **/node_modules/
+.superpowers/
 
 .gitignore
 qdrant_storage/
@@ -9,3 +10,10 @@ build
 topicExtractor.js
 redis_data
 .env.production
+qdrant_storage_backup
+mysql_init
+backend/setup_admin.js
+backend/test_conn.js
+backend/add_token_usage_col.js
+docs/
+.claude/

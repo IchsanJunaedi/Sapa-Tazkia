@@ -568,14 +568,19 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       });
 
       if (!user) {
-        console.error(`[ERROR] User not found during deserialization:`, id);
-        return done(new Error('User not found'), null);
+        // ✅ BUG FIX: Jika user tidak ada di DB (misal habis dihapus tapi session di Redis masih ada),
+        // jangan lempar Error karena akan bikin route crash 500.
+        // Lempar `done(null, false)` agar Passport.js tahu session ini invalid dan melanjutkan proses 
+        // dengan req.user = undefined (sehingga auth layer bisa minta login ulang).
+        console.warn(`[AUTH] User not found during deserialization (Session Invalid): ID ${id}`);
+        return done(null, false);
       }
 
       console.log(`[DEBUG] User deserialized:`, user.email);
       done(null, user);
     } catch (error) {
       console.error('[ERROR] Deserialize user error:', error);
+      // Jika terjadi error DB system, baru lempar error
       done(error, null);
     }
   });
@@ -951,12 +956,12 @@ const register = async (userData) => {
 };
 
 // PERBAIKAN: Login function dengan validasi yang lebih ketat
-const login = async (identifier, password, ipAddress, userAgent) => {
+const login = async (identifier, password, ipAddress, userAgent, skipPassword = false) => {
   try {
     console.log(`[DEBUG] Login attempt for identifier: ${identifier}`);
 
-    // Validasi input
-    if (!identifier || !password) {
+    // Validasi input — skip if 2FA bypass
+    if (!skipPassword && (!identifier || !password)) {
       return {
         success: false,
         message: 'Email/NIM dan password harus diisi',
@@ -1016,6 +1021,19 @@ const login = async (identifier, password, ipAddress, userAgent) => {
       return {
         success: false,
         message: 'Akun tidak aktif. Silakan hubungi administrator.',
+      };
+    }
+
+    // Skip password check when called from 2FA verify flow
+    if (skipPassword) {
+      const token = generateToken(user.id);
+      await logoutAllUserSessions(user.id);
+      await createSession(user.id, token, ipAddress, userAgent);
+      return {
+        success: true,
+        message: 'Login berhasil',
+        token,
+        user: { id: user.id, fullName: user.fullName, email: user.email, nim: user.nim, status: user.status, authMethod: user.authMethod, userType: user.userType, isProfileComplete: user.isProfileComplete, isEmailVerified: user.isEmailVerified }
       };
     }
 

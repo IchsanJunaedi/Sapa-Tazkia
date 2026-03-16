@@ -237,6 +237,7 @@ model AnalyticsSnapshot {
   totalTokens     Int      @default(0)
   uniqueUsers     Int      @default(0)
   avgResponseTime Float?
+  errorCount      Int      @default(0)
   topQuestions    Json?
   hourlyData      Json?
   createdAt       DateTime @default(now())

@@ -35,7 +35,9 @@ const getChatLogs = async (req, res) => {
                         identifier: conv.user?.fullName || conv.user?.email || 'Unknown User',
                         message: userMsg.content,
                         response: botMsg ? botMsg.content : 'No response',
-                        tokens: botMsg ? botMsg.tokenUsage : null
+                        tokens: botMsg ? botMsg.tokenUsage : null,
+                        responseTime: botMsg ? botMsg.responseTime : null,
+                        isError: botMsg ? botMsg.isError : false
                     });
                 }
             }
@@ -62,7 +64,9 @@ const getChatLogs = async (req, res) => {
                             identifier: sessionId,
                             message: userMsg.content,
                             response: botMsg ? botMsg.content : 'No response',
-                            tokens: botMsg ? botMsg.tokenUsage : null
+                            tokens: botMsg ? botMsg.tokenUsage : null,
+                            responseTime: botMsg ? botMsg.responseTime : null,
+                            isError: botMsg ? botMsg.isError : false
                         });
                     }
                 }
@@ -79,8 +83,13 @@ const getChatLogs = async (req, res) => {
             logs: unifiedLogs
         });
     } catch (error) {
-        console.error('❌ [ADMIN] Fetch Chat Logs Error:', error);
-        res.status(500).json({ success: false, message: 'Internal Server Error' });
+        console.error('❌ [ADMIN] Fetch Chat Logs Error:', error.message);
+        console.error(error.stack);
+        res.status(500).json({
+            success: false,
+            message: 'Internal Server Error',
+            ...(process.env.NODE_ENV !== 'production' && { detail: error.message })
+        });
     }
 };
 
@@ -100,7 +109,9 @@ const getRealtimeAnalytics = async (req, res) => {
             tokenAgg,
             activeUserGroups,
             guestChatsCount,
-            yesterdaySnapshot
+            yesterdaySnapshot,
+            errorCount,
+            responseTimeAgg
         ] = await Promise.all([
             // 1. Count user messages today
             prisma.message.count({
@@ -142,6 +153,17 @@ const getRealtimeAnalytics = async (req, res) => {
             // 5. Yesterday's snapshot for delta calculation
             prisma.analyticsSnapshot.findFirst({
                 where: { date: yesterdayDate }
+            }),
+
+            // 6. errorCount today
+            prisma.message.count({
+                where: { role: 'bot', isError: true, createdAt: { gte: todayStart } }
+            }),
+
+            // 7. avgResponseTime today
+            prisma.message.aggregate({
+                _avg: { responseTime: true },
+                where: { role: 'bot', responseTime: { not: null }, createdAt: { gte: todayStart } }
             })
         ]);
 
@@ -157,7 +179,8 @@ const getRealtimeAnalytics = async (req, res) => {
         const delta = {
             chatToday: calcDelta(chatToday, yesterdaySnapshot?.totalChats),
             activeUsers: calcDelta(activeUsers, yesterdaySnapshot?.uniqueUsers),
-            tokensUsed: calcDelta(totalTokens, yesterdaySnapshot?.totalTokens)
+            tokensUsed: calcDelta(totalTokens, yesterdaySnapshot?.totalTokens),
+            errorCount: calcDelta(errorCount, yesterdaySnapshot?.errorCount)
         };
 
         res.json({
@@ -168,12 +191,19 @@ const getRealtimeAnalytics = async (req, res) => {
                 tokensUsed: totalTokens,
                 guestChats: guestChatsCount,
                 userChats: userChatsCount,
+                errorCount: errorCount,
+                avgResponseTime: responseTimeAgg._avg.responseTime ?? null, // in ms, null if no data
                 delta
             }
         });
     } catch (error) {
-        console.error('❌ [ADMIN] getRealtimeAnalytics Error:', error);
-        res.status(500).json({ success: false, message: 'Internal Server Error' });
+        console.error('❌ [ADMIN] getRealtimeAnalytics Error:', error.message);
+        console.error(error.stack);
+        res.status(500).json({
+            success: false,
+            message: 'Internal Server Error',
+            ...(process.env.NODE_ENV !== 'production' && { detail: error.message })
+        });
     }
 };
 
@@ -192,7 +222,7 @@ const getHistoryAnalytics = async (req, res) => {
             prisma.analyticsSnapshot.findMany({
                 where: { date: { gte: rangeStart } },
                 orderBy: { date: 'asc' },
-                select: { date: true, totalChats: true, userChats: true, guestChats: true, totalTokens: true, uniqueUsers: true, hourlyData: true }
+                select: { date: true, totalChats: true, userChats: true, guestChats: true, totalTokens: true, uniqueUsers: true, hourlyData: true, topQuestions: true }
             }),
 
             // Group messages by conversationId to get per-user counts
@@ -275,16 +305,27 @@ const getHistoryAnalytics = async (req, res) => {
             }
         }
 
+        // topQuestions from most recent snapshot (last 7d rolling window stored by analyticsJob)
+        const latestTopQuestions = snapshots.length > 0
+            ? (snapshots[snapshots.length - 1]?.topQuestions ?? [])
+            : [];
+
         res.json({
             success: true,
             range: req.query.range === '30d' ? '30d' : '7d',
             snapshots,
             hourlyData,
-            topUsers
+            topUsers,
+            topQuestions: latestTopQuestions
         });
     } catch (error) {
-        console.error('❌ [ADMIN] getHistoryAnalytics Error:', error);
-        res.status(500).json({ success: false, message: 'Internal Server Error' });
+        console.error('❌ [ADMIN] getHistoryAnalytics Error:', error.message);
+        console.error(error.stack);
+        res.status(500).json({
+            success: false,
+            message: 'Internal Server Error',
+            ...(process.env.NODE_ENV !== 'production' && { detail: error.message })
+        });
     }
 };
 
@@ -311,6 +352,9 @@ const addKnowledgeDoc = async (req, res) => {
     const { content, source, category } = req.body;
     if (!content || content.trim().length < 10) {
       return res.status(400).json({ success: false, message: 'Content must be at least 10 characters' });
+    }
+    if (content.trim().length > 50000) {
+      return res.status(400).json({ success: false, message: 'Content too large. Maximum 50,000 characters.' });
     }
     const doc = await ragService.addDocument(content.trim(), {
       source: source || 'admin-manual',

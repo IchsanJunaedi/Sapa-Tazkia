@@ -27,9 +27,9 @@ const LoginPage = () => {
   const location = useLocation();
 
   // ✅ FIXED: Ambil fungsi login yang benar dari AuthContext
-  const { loginWithCredentials, isAuthenticated, loading: authLoading, registerWithEmail } = useAuth();
+  const { loginWithCredentials, isAuthenticated, loading: authLoading, registerWithEmail, user } = useAuth();
 
-  // ✅ FIXED: Redirect jika sudah login - dengan pengecekan yang lebih baik
+  // ✅ FIXED: Redirect jika sudah login - dengan pengecekan role
   useEffect(() => {
     console.log('🔍 [LOGIN PAGE] Auth status:', {
       isAuthenticated,
@@ -38,18 +38,23 @@ const LoginPage = () => {
     });
 
     if (isAuthenticated && !authLoading) {
-      console.log('✅ [LOGIN PAGE] User already authenticated, redirecting to chat');
+      console.log('✅ [LOGIN PAGE] User already authenticated, redirecting...', user);
 
-      // ✅ FIXED: Gunakan replace: true dan state yang jelas
-      navigate('/chat', {
-        replace: true,
-        state: {
-          from: 'login',
-          isGuest: false
-        }
-      });
+      // ✅ JIKA ADMIN, lempar ke dashboard
+      if (user && user.userType === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        // ✅ JIKA MAHASISWA/UMUM, lempar ke chat
+        navigate('/chat', {
+          replace: true,
+          state: {
+            from: 'login',
+            isGuest: false
+          }
+        });
+      }
     }
-  }, [isAuthenticated, authLoading, navigate, location]);
+  }, [isAuthenticated, authLoading, navigate, location, user]);
 
   // ✅ FIXED: Check untuk error message dari location state
   useEffect(() => {
@@ -93,12 +98,11 @@ const LoginPage = () => {
       console.log('🔍 [LOGIN PAGE] Attempting login with NIM:', nim);
 
       // ✅ FIXED: Gunakan fungsi login yang benar dari context
+      // Anggap fungsi ini melempar objek user jika berhasil atau return user (butuh adaptasi jika AuthContext tidak return user).
+      // Namun useEffect di atas sudah menangani redirect ketika isAuthenticated berubah menjadi true.
       await loginWithCredentials(nim, password);
 
-      console.log('✅ [LOGIN PAGE] Login successful, redirect should happen automatically');
-
-      // ✅ FIXED: Redirect sudah ditangani oleh useEffect di atas
-      // Tidak perlu navigate manual di sini
+      console.log('✅ [LOGIN PAGE] Login successful, redirect should happen automatically via useEffect');
 
     } catch (err) {
       console.error('❌ [LOGIN PAGE] Login failed:', err);

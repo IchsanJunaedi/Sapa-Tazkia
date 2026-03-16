@@ -1045,7 +1045,10 @@ const LandingPage = () => {
                 className="flex-1 px-2 py-2 text-lg text-gray-700 placeholder-gray-500 focus:outline-none bg-white"
               />
               <button
-                className="p-3 bg-blue-500 text-white hover:bg-blue-600 rounded-full transition-colors shadow-md ml-2"
+                className={`p-3 rounded-full transition-colors shadow-md ml-2 flex items-center justify-center ${message.trim()
+                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
                 aria-label="Send Message"
                 onClick={handleSendMessage}
                 disabled={!message.trim()}

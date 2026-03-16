@@ -22,6 +22,7 @@ const adminRoutes = require('./routes/adminRoutes');         // ✅ NEW: Admin R
 
 // Import services
 const authService = require('./services/authService');
+const { requireAuth } = require('./middleware/authMiddleware');
 
 // ✅ NEW: Import rate limit error handler
 const { rateLimitErrorHandler } = require('./utils/errorHandlers');
@@ -174,14 +175,14 @@ app.options('*', cors({
 
 // Body parser middleware
 app.use(express.json({
-  limit: '10mb',
+  limit: '1mb',
   verify: (req, res, buf) => {
     req.rawBody = buf;
   }
 }));
 app.use(express.urlencoded({
   extended: true,
-  limit: '10mb',
+  limit: '1mb',
   parameterLimit: 100
 }));
 
@@ -431,8 +432,9 @@ app.get('/status', async (req, res) => {
   res.json(statusData);
 });
 
-// Session debug endpoint
-app.get('/session-debug', (req, res) => {
+// Session debug endpoint — dev only, requires auth
+app.get('/session-debug', requireAuth, (req, res) => {
+  if (isProduction) return res.status(404).json({ success: false, message: 'Not found' });
   res.json({
     sessionID: req.sessionID,
     sessionExists: !!req.session,
@@ -450,8 +452,9 @@ app.get('/session-debug', (req, res) => {
   });
 });
 
-// Simple test route with rate limit headers
+// Simple test route with rate limit headers — dev only
 app.get('/test', (req, res) => {
+  if (isProduction) return res.status(404).json({ success: false, message: 'Not found' });
   // ✅ NEW: Add sample rate limit headers for testing
   res.set({
     'X-RateLimit-Limit': '10',
@@ -519,72 +522,10 @@ app.use(rateLimitErrorHandler);
 // 404 Handler
 app.use('*', (req, res) => {
   logger.warn(`[404] Route not found: ${req.method} ${req.originalUrl}`);
-
   res.status(404).json({
     success: false,
-    message: `Route not found: ${req.method} ${req.originalUrl}`,
-    timestamp: new Date().toISOString(),
-    availableEndpoints: {
-      auth: [
-        'POST /api/auth/login',
-        'POST /api/auth/register',
-        'POST /api/auth/register-email',
-        'POST /api/auth/verify-email',
-        'POST /api/auth/resend-verification',
-        'GET  /api/auth/check-verification/:email',
-        'GET  /api/auth/google',
-        'GET  /api/auth/google/callback',
-        'POST /api/auth/logout',
-        'GET  /api/auth/me',
-        'PATCH /api/auth/update-profile',
-        'POST /api/auth/verify-student',
-        'PATCH /api/auth/update-verification',
-        'GET  /api/auth/check-nim/:nim'
-      ],
-      guest: [
-        'POST /api/guest/chat',
-        'GET  /api/guest/conversation/:sessionId',
-        'GET  /api/guest/rate-limit-status', // ✅ NEW
-        'GET  /api/guest/usage-stats/:sessionId', // ✅ NEW
-        'GET  /api/guest/session-info/:sessionId' // ✅ NEW
-      ],
-      ai: [
-        'POST /api/ai/chat',
-        'GET  /api/ai/conversations',
-        'GET  /api/ai/history/:chatId',
-        'POST /api/ai/test-ai',
-        'GET  /api/ai/test-openai',
-        'GET  /api/ai/test-embedding',
-        'POST /api/ai/analyze-academic',
-        'POST /api/ai/study-recommendations',
-        'GET  /api/ai/knowledge-status',
-        'POST /api/ai/ingest-now',
-        'POST /api/ai/ingest',
-        'GET  /api/ai/health',
-        'GET  /api/ai/public-test',
-        'POST /api/ai/reset-knowledge',
-        'GET  /api/ai/rate-limit-status' // ✅ NEW
-      ],
-      academic: [ // ✅ NEW: Academic Routes Info
-        'GET /api/academic/summary',
-        'GET /api/academic/grades',
-        'GET /api/academic/transcript',
-        'POST /api/academic/analyze'
-      ],
-      rateLimit: [ // ✅ NEW: Rate limit endpoints
-        'GET  /api/rate-limit/status',
-        'GET  /api/rate-limit/analytics',
-        'POST /api/rate-limit/reset'
-      ],
-      system: [
-        'GET  /',
-        'GET  /health',
-        'GET  /status',
-        'GET  /test',
-        'GET  /session-debug'
-      ]
-    },
-    suggestion: 'Check the available endpoints above or refer to the API documentation'
+    message: 'Route not found',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -615,9 +556,7 @@ app.use((err, req, res, next) => {
   if (err.message.includes('CORS')) {
     return res.status(403).json({
       success: false,
-      message: 'CORS Error: Origin not allowed',
-      allowedOrigins: allowedOrigins,
-      yourOrigin: req.headers.origin
+      message: 'CORS Error: Origin not allowed'
     });
   }
 

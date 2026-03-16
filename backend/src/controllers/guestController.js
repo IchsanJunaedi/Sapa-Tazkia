@@ -142,7 +142,7 @@ async function handlePostChat(sessionId, userMsg, botMsg, ip, usage, cacheKey = 
     }
     const session = guestSessions.get(sessionId);
     session.messages.push({ role: 'user', content: userMsg });
-    session.messages.push({ role: 'bot', content: botMsg });
+    session.messages.push({ role: 'bot', content: botMsg, tokenUsage: usage });
     session.lastActivity = new Date();
 
     // 2. Track Usage
@@ -220,9 +220,12 @@ const cleanupOldSessions = () => {
 
 setInterval(cleanupOldSessions, 30 * 60 * 1000);
 
+const getAllActiveSessions = () => guestSessions;
+
 module.exports = {
   guestChat,
   getGuestConversation,
   getGuestSessionInfo,
-  clearGuestSession
+  clearGuestSession,
+  getAllActiveSessions
 };

@@ -3,7 +3,9 @@ const ragService = require('../services/ragService');
 const { generateAIResponse, testOpenAIConnection, generateTitle, isGreeting } = require('../services/openaiService');
 const academicService = require('../services/academicService');
 const rateLimitService = require('../services/rateLimitService');
-const prisma = require('../../config/prisma');
+// ✅ BUG FIX: Sebelumnya `../../config/prisma` — path salah, module tidak ada!
+// Ganti ke singleton yang benar agar tidak crash MODULE_NOT_FOUND
+const prisma = require('../config/prismaClient');
 
 /**
  * ============================================================================
@@ -170,7 +172,7 @@ const sendChat = async (req, res) => {
                     remaining = Math.max(0, limits.tokenLimitDaily - track.totalUsage);
                 }
 
-                const savedId = await handleSaveAndTrack(userId, currentConversationId, conversationId, isNewChat, cleanMessage, streamedText, 0, req.ip, true);
+                const savedId = await handleSaveAndTrack(userId, currentConversationId, conversationId, isNewChat, cleanMessage, streamedText, streamUsage, req.ip, true);
 
                 res.write(`data: ${JSON.stringify({ type: 'done', usage: streamUsage, remaining, conversationId: savedId })}\n\n`);
                 res.end();
@@ -191,15 +193,18 @@ const sendChat = async (req, res) => {
             }
         }
 
-        const savedId = await handleSaveAndTrack(userId, currentConversationId, conversationId, isNewChat, cleanMessage, finalAnswer, 0, req.ip, true);
+        const savedId = await handleSaveAndTrack(userId, currentConversationId, conversationId, isNewChat, cleanMessage, finalAnswer, realTokenUsage, req.ip, true);
+
+        // ✅ BUG FIX: `shouldCreateNewConversation` tidak pernah dideklarasikan → ReferenceError.
+        // Ganti dengan logika yang jelas: ini percakapan baru jika tidak ada conversationId dari request
+        const isCreatedNew = isNewChat || !conversationId;
 
         res.json({
             success: true,
             reply: finalAnswer,
             conversationId: savedId,
             timestamp: new Date().toISOString(),
-            isNewConversation: shouldCreateNewConversation,
-            title: shouldCreateNewConversation ? (await prisma.conversation.findUnique({ where: { id: savedId } }))?.title : null,
+            isNewConversation: isCreatedNew,
             usage: {
                 tokensUsed: realTokenUsage,
                 remaining: currentRemaining
@@ -229,14 +234,22 @@ async function handleSaveAndTrack(userId, currentId, reqConvId, isNewChat, userM
                 data: {
                     userId,
                     title,
-                    messages: { create: [{ role: 'user', content: userMsg }, { role: 'bot', content: botMsg }] }
+                    messages: {
+                        create: [
+                            { role: 'user', content: userMsg },
+                            { role: 'bot', content: botMsg, tokenUsage: usageToTrack }
+                        ]
+                    }
                 }
             });
             return newConv.id;
         } else {
             // Existing chat: Add messages
             await prisma.message.createMany({
-                data: [{ conversationId: convId, role: 'user', content: userMsg }, { conversationId: convId, role: 'bot', content: botMsg }]
+                data: [
+                    { conversationId: convId, role: 'user', content: userMsg },
+                    { conversationId: convId, role: 'bot', content: botMsg, tokenUsage: usageToTrack }
+                ]
             });
 
             // ✅ Defer Title Generation Logic

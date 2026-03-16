@@ -12,6 +12,26 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 // ✅ NEW: Import Halaman Akademik
 import AcademicPage from './pages/AcademicPage';
 
+// ✅ NEW: Import Halaman Admin
+import AdminDashboard from './pages/AdminDashboard';
+import AdminLogin from './pages/AdminLogin';
+
+// ✅ NEW: Custom Wrapper for Admin Login Redirect
+const AdminLoginRoute = ({ children }) => {
+  const storedUser = localStorage.getItem('user');
+  const storedToken = localStorage.getItem('token');
+
+  if (storedUser && storedToken) {
+    try {
+      const userData = JSON.parse(storedUser);
+      if (userData.userType === 'admin') {
+        return <Navigate to="/admin/dashboard" replace />;
+      }
+    } catch (e) { }
+  }
+  return children;
+};
+
 function App() {
   return (
     <Router>
@@ -22,50 +42,71 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
-          
+
+          {/* Public Admin Routes */}
+          <Route path="/admin/login" element={
+            <AdminLoginRoute>
+              <AdminLogin />
+            </AdminLoginRoute>
+          } />
+          <Route path="/admin" element={
+            <AdminLoginRoute>
+              <Navigate to="/admin/login" replace />
+            </AdminLoginRoute>
+          } />
+
           {/* Protected Routes */}
-          <Route 
-            path="/about-you" 
+          <Route
+            path="/about-you"
             element={
               <ProtectedRoute>
                 <AboutYouPage />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* ✅ NEW: Route untuk Halaman Akademik (Nilai & PDF) */}
-          <Route 
-            path="/academic" 
+          <Route
+            path="/academic"
             element={
               <ProtectedRoute>
                 <AcademicPage />
               </ProtectedRoute>
-            } 
+            }
           />
-          
+
+          {/* ✅ NEW: Route untuk Admin Dashboard */}
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute adminOnly={true}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Route untuk ChatPage */}
-          
+
           {/* 1. Route untuk New Chat (Chat Baru) */}
-          <Route 
-            path="/chat" 
+          <Route
+            path="/chat"
             element={
               <ProtectedRoute>
                 <ChatPage />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* 2. Route untuk History Chat (Agar bisa refresh) */}
-          {/* :chatId harus sama dengan nama di useParams() ChatPage.jsx */}
-          <Route 
-            path="/chat/:chatId" 
+          <Route
+            path="/chat/:chatId"
             element={
               <ProtectedRoute>
                 <ChatPage />
               </ProtectedRoute>
-            } 
+            }
           />
-          
+
           {/* Fallback route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

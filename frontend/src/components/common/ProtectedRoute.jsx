@@ -2,23 +2,25 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+const ProtectedRoute = ({ children, adminOnly = false }) => {
+  const { isAuthenticated, loading, user } = useAuth();
   const location = useLocation();
 
-  console.log('🔐 [PROTECTED ROUTE] Auth check:', {
-    isAuthenticated,
-    loading,
-    currentPath: location.pathname,
-    locationState: location.state,
-    locationSearch: location.search
-  });
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔐 [PROTECTED ROUTE] Auth check:', {
+      isAuthenticated,
+      loading,
+      currentPath: location.pathname,
+      locationState: location.state,
+      locationSearch: location.search
+    });
+  }
 
   // ✅ CEK URL PARAMETERS untuk guest mode
   const guestFromUrl = new URLSearchParams(location.search).get('guest') === 'true';
   const isGuestMode = location.state?.isGuest || guestFromUrl;
-  
-  // ✅ CEK PERSISTENT GUEST SESSION (SOLUSI BARU)
+
+  // ✅ CEK PERSISTENT GUEST SESSION
   const hasGuestSession = localStorage.getItem('guestSessionId') || sessionStorage.getItem('guestSessionId');
 
   if (loading) {
@@ -40,16 +42,21 @@ const ProtectedRoute = ({ children }) => {
 
   // ✅ IZINKAN AKSES JIKA: Authenticated ATAU Guest Mode ATAU Ada Guest Session
   if (!isAuthenticated && !isGuestMode && !hasGuestSession) {
-    console.log('🛑 [PROTECTED ROUTE] User not authenticated and not guest, redirecting to home');
     return <Navigate to="/" replace />;
   }
 
-  console.log('✅ [PROTECTED ROUTE] Access granted:', {
-    isAuthenticated,
-    isGuestMode,
-    hasGuestSession,
-    user: isAuthenticated ? 'Authenticated User' : 'Guest User'
-  });
+  // ✅ JIKA ROUTE INI KHUSUS ADMIN
+  if (adminOnly) {
+    if (!isAuthenticated || !user || user.userType !== 'admin') {
+      return <Navigate to="/" replace />;
+    }
+  } else {
+    // ✅ JIKA ROUTE BUKAN KHUSUS ADMIN MELAINKAN HALAMAN CHAT USER
+    // Tolak Admin masuk ke halaman mahasiswa/user biasa
+    if (isAuthenticated && user && user.userType === 'admin') {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+  }
 
   return children;
 };

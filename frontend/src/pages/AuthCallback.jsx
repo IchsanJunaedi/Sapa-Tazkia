@@ -5,10 +5,10 @@ import { useAuth } from '../context/AuthContext';
 const AuthCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login, isAuthenticated, loading } = useAuth();
+  const { login, isAuthenticated, loading, user } = useAuth();
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('Processing authentication...');
-  
+
   // ✅ SOLUSI RADIKAL: Gunakan useRef untuk track processed state
   const hasProcessedRef = useRef(false);
   const processingRef = useRef(false);
@@ -26,20 +26,24 @@ const AuthCallback = () => {
       return;
     }
 
-    // ✅ PERBAIKAN 3: Jika sudah authenticated, langsung redirect
+    // ✅ PERBAIKAN 3: Jika sudah authenticated, langsung redirect ke path yang benar
     if (isAuthenticated) {
-      console.log('🔍 [AUTH CALLBACK] Already authenticated, redirecting to LANDING PAGE');
-      navigate('/', { replace: true });
+      console.log('🔍 [AUTH CALLBACK] Already authenticated, redirecting...', user);
+      if (user && user.userType === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/chat', { replace: true });
+      }
       return;
     }
 
     const handleAuthCallback = async () => {
       // ✅ Tandai sedang processing untuk cegah multiple execution
       processingRef.current = true;
-      
+
       try {
         setStatus('Validating authentication data...');
-        
+
         // Ambil semua parameter dari URL
         const token = searchParams.get('token');
         const userParam = searchParams.get('user');
@@ -48,7 +52,7 @@ const AuthCallback = () => {
 
         console.log('🔍 [AUTH CALLBACK] URL Parameters:', {
           token: token ? `✓ Available (${token.length} chars)` : '✗ Missing',
-          userParam: userParam ? '✓ Available' : '✗ Missing', 
+          userParam: userParam ? '✓ Available' : '✗ Missing',
           success,
           requiresVerification,
           fullURL: window.location.href
@@ -60,9 +64,9 @@ const AuthCallback = () => {
           setError('Authentication failed. Please try again.');
           setStatus('Authentication failed');
           setTimeout(() => {
-            navigate('/', { 
+            navigate('/', {
               state: { error: 'Authentication failed. Please try again.' },
-              replace: true 
+              replace: true
             });
           }, 2000);
           return;
@@ -73,9 +77,9 @@ const AuthCallback = () => {
           setError('Missing authentication data.');
           setStatus('Missing authentication data');
           setTimeout(() => {
-            navigate('/', { 
+            navigate('/', {
               state: { error: 'Missing authentication data.' },
-              replace: true 
+              replace: true
             });
           }, 2000);
           return;
@@ -83,10 +87,10 @@ const AuthCallback = () => {
 
         try {
           setStatus('Parsing user data...');
-          
+
           // Parse user data
           const userData = JSON.parse(decodeURIComponent(userParam));
-          
+
           console.log('✅ [AUTH CALLBACK] Parsed user data:', {
             id: userData.id,
             fullName: userData.fullName,
@@ -98,8 +102,8 @@ const AuthCallback = () => {
           });
 
           // ✅ ✅ ✅ PERBAIKAN KRITIS: Cek apakah perlu verifikasi email
-          const needsEmailVerification = requiresVerification || 
-                                       (userData && !userData.isEmailVerified);
+          const needsEmailVerification = requiresVerification ||
+            (userData && !userData.isEmailVerified);
 
           console.log('🔍 [AUTH CALLBACK] Verification check:', {
             needsEmailVerification,
@@ -111,21 +115,21 @@ const AuthCallback = () => {
           // ✅ PERBAIKAN: Prioritaskan verifikasi email untuk new user
           if (needsEmailVerification) {
             console.log('🔐 [AUTH CALLBACK] Email verification required - Redirecting to VERIFICATION PAGE');
-            
+
             // Simpan data sementara untuk verifikasi
             localStorage.setItem('pendingVerificationEmail', userData.email);
             localStorage.setItem('verificationUserData', JSON.stringify(userData));
             localStorage.setItem('verificationToken', token);
-            
+
             // ✅ PERBAIKAN: Clear URL parameters SEBELUM redirect
             const cleanUrl = window.location.origin + window.location.pathname;
             window.history.replaceState({}, document.title, cleanUrl);
-            
+
             setStatus('Redirecting to verification...');
-            
-            navigate('/verify-email', { 
+
+            navigate('/verify-email', {
               replace: true,
-              state: { 
+              state: {
                 from: 'oauth-callback',
                 userData: userData,
                 token: token,
@@ -136,13 +140,13 @@ const AuthCallback = () => {
           }
 
           setStatus('Logging in...');
-          
+
           // ✅ PERBAIKAN: Tandai sebagai processed SEBELUM login
           hasProcessedRef.current = true;
 
           // Simpan data ke AuthContext
           const result = await login(token, userData);
-          
+
           console.log('✅ [AUTH CALLBACK] Login successful!');
           console.log('🔍 [AUTH CALLBACK] Login result:', {
             success: result.success,
@@ -152,47 +156,50 @@ const AuthCallback = () => {
           // ✅ PERBAIKAN: Clear URL parameters SEBELUM redirect
           const cleanUrl = window.location.origin + window.location.pathname;
           window.history.replaceState({}, document.title, cleanUrl);
-          
+
           setStatus('Redirecting...');
-          
+
           // ✅ PERBAIKAN: Gunakan HANYA data dari loginResult
           const needsCompletion = result.needsProfileCompletion;
-          
-          console.log('🔍 [AUTH CALLBACK] Final decision:', { 
+
+          console.log('🔍 [AUTH CALLBACK] Final decision:', {
             needsCompletion,
             userProfileComplete: userData.isProfileComplete,
             isEmailVerified: userData.isEmailVerified
           });
 
-          // ✅ PERBAIKAN: Redirect langsung tanpa setTimeout
+          // ✅ PERBAIKAN: Redirect langsung tanpa setTimeout berdasarkan role dan profil
           if (needsCompletion) {
             console.log('🔍 [AUTH CALLBACK] FIRST TIME USER - Redirecting to AboutYouPage');
-            navigate('/about-you', { 
+            navigate('/about-you', {
               replace: true,
-              state: { 
+              state: {
                 from: 'first-login',
                 userData: userData
               }
             });
+          } else if (userData.userType === 'admin') {
+            console.log('🔍 [AUTH CALLBACK] ADMIN USER - Redirecting to Dashboard');
+            navigate('/admin/dashboard', { replace: true });
           } else {
-            console.log('🔍 [AUTH CALLBACK] RETURNING USER - Redirecting to LANDING PAGE');
-            navigate('/', { 
+            console.log('🔍 [AUTH CALLBACK] RETURNING NORMAL USER - Redirecting to Chat');
+            navigate('/chat', {
               replace: true,
-              state: { 
+              state: {
                 from: 'auth-callback',
                 welcomeBack: true
               }
             });
           }
-          
+
         } catch (parseError) {
           console.error('❌ [AUTH CALLBACK] Error parsing user data:', parseError);
           setError('Invalid user data format.');
           setStatus('Data parsing failed');
           setTimeout(() => {
-            navigate('/', { 
+            navigate('/', {
               state: { error: 'Invalid user data format.' },
-              replace: true 
+              replace: true
             });
           }, 2000);
         }
@@ -202,9 +209,9 @@ const AuthCallback = () => {
         setError('An unexpected error occurred.');
         setStatus('Unexpected error');
         setTimeout(() => {
-          navigate('/', { 
+          navigate('/', {
             state: { error: 'An unexpected error occurred.' },
-            replace: true 
+            replace: true
           });
         }, 2000);
       } finally {
@@ -283,8 +290,8 @@ const AuthCallback = () => {
           <div style={{ fontSize: '16px', color: '#6b7280', marginBottom: '8px' }}>
             {status}
           </div>
-          <div style={{ 
-            fontSize: '14px', 
+          <div style={{
+            fontSize: '14px',
             color: '#9ca3af',
             backgroundColor: '#f1f5f9',
             padding: '8px 16px',
@@ -299,7 +306,7 @@ const AuthCallback = () => {
           </div>
         </>
       )}
-      
+
       <style>
         {`
           @keyframes spin {

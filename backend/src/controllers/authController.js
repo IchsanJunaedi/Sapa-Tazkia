@@ -5,6 +5,9 @@ const ragService = require('../services/ragService'); // ✅ IMPORT RAG SERVICE
 const openaiService = require('../services/openaiService'); // ✅ BARU: Import OpenAI Service untuk Title
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const jwt = require('jsonwebtoken');
+const { authenticator } = require('otplib');
+const QRCode = require('qrcode');
 
 // ============================================================================
 // 1. AUTHENTICATION (Google, Callback, Login, Register)
@@ -264,11 +267,23 @@ const login = async (req, res) => {
     const result = await authService.login(identifier, password, ipAddress, userAgent);
 
     if (result.success) {
+      // If admin and 2FA is configured, return temp token instead of full JWT
+      if (result.user.userType === 'admin' && process.env.ADMIN_2FA_SECRET) {
+        const tempToken = jwt.sign(
+          { adminPre2FA: true, userId: result.user.id },
+          process.env.JWT_SECRET,
+          { expiresIn: '5m' }
+        );
+        return res.status(200).json({
+          success: true,
+          requiresTwoFactor: true,
+          tempToken
+        });
+      }
+
       req.login({ id: result.user.id, email: result.user.email }, (err) => {
         if (err) console.log('[DEBUG] Passport login in regular login failed:', err);
       });
-
-      console.log(`[DEBUG] Login successful for user: ${result.user.email}`);
 
       res.status(200).json({
         success: true,
@@ -663,7 +678,7 @@ async function handleDbSave(userId, conversationId, userMsg, botMsg, tokens, res
         data: { conversationId: finalConvId, role: 'user', content: userMsg }
       }),
       prisma.message.create({
-        data: { conversationId: finalConvId, role: 'bot', content: botMsg, responseTime: parseFloat(responseTime || 0) }
+        data: { conversationId: finalConvId, role: 'bot', content: botMsg, responseTime: parseFloat(responseTime || 0), tokenUsage: tokens }
       })
     ]);
 
@@ -727,11 +742,98 @@ const refreshToken = async (req, res) => {
   }
 };
 
+// ============================================================================
+// 2FA — Verify TOTP after admin password login
+// POST /api/auth/admin/2fa/verify  { tempToken, totpCode }
+// ============================================================================
+const adminVerify2FA = async (req, res) => {
+  try {
+    const { tempToken, totpCode } = req.body;
+    if (!tempToken || !totpCode) {
+      return res.status(400).json({ success: false, message: 'tempToken dan totpCode harus diisi' });
+    }
+
+    // Decode temp token
+    let decoded;
+    try {
+      decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ success: false, message: 'Token sementara tidak valid atau sudah expired' });
+    }
+
+    if (!decoded.adminPre2FA) {
+      return res.status(401).json({ success: false, message: 'Token tidak valid' });
+    }
+
+    // Verify TOTP
+    const secret = process.env.ADMIN_2FA_SECRET;
+    if (!secret) {
+      return res.status(503).json({ success: false, message: '2FA belum dikonfigurasi di server' });
+    }
+
+    const isValid = authenticator.verify({ token: totpCode, secret });
+    if (!isValid) {
+      return res.status(401).json({ success: false, message: 'Kode 2FA tidak valid' });
+    }
+
+    // Issue full JWT
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+    if (!user || user.userType !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Akses ditolak' });
+    }
+
+    const fullResult = await authService.login(user.email, null, req.ip, req.get('User-Agent'), true);
+    if (!fullResult.success) {
+      return res.status(500).json({ success: false, message: 'Gagal menerbitkan token' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Login 2FA berhasil',
+      token: fullResult.token,
+      user: {
+        id: user.id,
+        nim: user.nim,
+        email: user.email,
+        fullName: user.fullName,
+        status: user.status,
+        authMethod: user.authMethod,
+        userType: user.userType,
+        isProfileComplete: user.isProfileComplete,
+        isEmailVerified: user.isEmailVerified
+      }
+    });
+  } catch (error) {
+    console.error('[ERROR] adminVerify2FA:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ============================================================================
+// 2FA — Get QR code for first-time setup (admin only, requireAdmin middleware)
+// GET /api/auth/admin/2fa/setup
+// ============================================================================
+const adminSetup2FA = async (req, res) => {
+  try {
+    const secret = process.env.ADMIN_2FA_SECRET;
+    if (!secret) {
+      return res.status(503).json({ success: false, message: 'ADMIN_2FA_SECRET belum diset di .env' });
+    }
+    const otpauth = authenticator.keyuri(req.user.email, 'Sapa Tazkia Admin', secret);
+    const qrDataUrl = await QRCode.toDataURL(otpauth);
+    return res.json({ success: true, qrCode: qrDataUrl, secret });
+  } catch (error) {
+    console.error('[ERROR] adminSetup2FA:', error);
+    res.status(500).json({ success: false, message: 'Gagal membuat QR code' });
+  }
+};
+
 module.exports = {
   googleAuth, googleCallback, googleCallbackSuccess,
   login, register, registerWithEmail,
   verifyEmailCode, resendVerificationCode, checkEmailVerification,
   verifyStudent, updateVerification, updateProfile, checkNIM,
   logout, verify, getProfile, checkAuth, healthCheck,
-  chat, refreshToken
+  chat, refreshToken,
+  adminVerify2FA, adminSetup2FA
 };

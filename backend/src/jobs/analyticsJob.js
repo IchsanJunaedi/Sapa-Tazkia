@@ -112,18 +112,63 @@ async function runSnapshot() {
     const totalChats = userChats + guestChats;
 
     // ------------------------------------------------------------------
-    // 7. Upsert AnalyticsSnapshot for today
+    // 7. avgResponseTime — average responseTime of bot messages today
+    // ------------------------------------------------------------------
+    const responseTimeAgg = await prisma.message.aggregate({
+      _avg: { responseTime: true },
+      where: {
+        role: 'bot',
+        responseTime: { not: null },
+        createdAt: { gte: todayStart }
+      }
+    });
+    const avgResponseTime = responseTimeAgg._avg.responseTime ?? null;
+
+    // ------------------------------------------------------------------
+    // 8. errorCount — count of bot messages with isError=true today
+    // ------------------------------------------------------------------
+    const errorCount = await prisma.message.count({
+      where: {
+        role: 'bot',
+        isError: true,
+        createdAt: { gte: todayStart }
+      }
+    });
+
+    // ------------------------------------------------------------------
+    // 9. topQuestions — top 5 most frequent user messages from last 7 days
+    // ------------------------------------------------------------------
+    const sevenDaysAgo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 7));
+    const recentUserMessages = await prisma.message.findMany({
+      where: { role: 'user', createdAt: { gte: sevenDaysAgo } },
+      select: { content: true }
+    });
+    // Count frequency of trimmed+lowercased questions (truncate to 120 chars as key)
+    const freq = {};
+    for (const m of recentUserMessages) {
+      const key = m.content.trim().toLowerCase().slice(0, 120);
+      if (key.length < 5) continue; // skip very short messages
+      freq[key] = (freq[key] || 0) + 1;
+    }
+    const topQuestions = Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([question, count]) => ({ question, count }));
+
+    // ------------------------------------------------------------------
+    // 10. Upsert AnalyticsSnapshot for today
     // ------------------------------------------------------------------
     await prisma.analyticsSnapshot.upsert({
       where: { date: todayDate },
-      update: { totalChats, userChats, guestChats, totalTokens, uniqueUsers, hourlyData },
-      create: { date: todayDate, totalChats, userChats, guestChats, totalTokens, uniqueUsers, hourlyData },
+      update: { totalChats, userChats, guestChats, totalTokens, uniqueUsers, hourlyData, avgResponseTime, errorCount, topQuestions },
+      create: { date: todayDate, totalChats, userChats, guestChats, totalTokens, uniqueUsers, hourlyData, avgResponseTime, errorCount, topQuestions },
     });
 
     console.log(
       `[analyticsJob] Snapshot saved for ${todayDate.toISOString().slice(0, 10)}: ` +
         `totalChats=${totalChats} userChats=${userChats} guestChats=${guestChats} ` +
-        `tokens=${totalTokens} uniqueUsers=${uniqueUsers}`
+        `tokens=${totalTokens} uniqueUsers=${uniqueUsers} ` +
+        `avgResponseTime=${avgResponseTime} errorCount=${errorCount} topQuestions=${topQuestions.length}`
     );
   } catch (err) {
     console.error('[analyticsJob] runSnapshot failed:', err);

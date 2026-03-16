@@ -165,31 +165,6 @@ const optionalAuth = guestFriendlyAuth;
 
 /**
  * ============================================================================
- * 4. SIMPLE AUTH MIDDLEWARE (FOR TESTING)
- * Hanya validasi JWT dasar tanpa cek database
- * ============================================================================
- */
-const simpleAuthMiddleware = async (req, res, next) => {
-  try {
-    const authHeader = req.headers['authorization'];
-    if (!authHeader) return res.status(401).json({ success: false, message: 'No token provided' });
-
-    const token = authHeader.split(' ')[1];
-    const decoded = authService.verifyToken(token);
-
-    if (decoded) {
-      req.user = { id: decoded.id };
-      next();
-    } else {
-      res.status(401).json({ success: false, message: 'Invalid token' });
-    }
-  } catch (error) {
-    res.status(401).json({ success: false, message: 'Authentication failed' });
-  }
-};
-
-/**
- * ============================================================================
  * 5. REQUIRE ADMIN
  * ============================================================================
  */
@@ -213,7 +188,6 @@ module.exports = {
   requireAuth,
   guestFriendlyAuth,
   optionalAuth,
-  simpleAuthMiddleware,
   requireAdmin
 };
 

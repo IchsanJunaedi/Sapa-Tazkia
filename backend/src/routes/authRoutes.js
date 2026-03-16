@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 // Import Controller & Middleware Auth
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
+const { requireAdmin } = require('../middleware/authMiddleware');
 const {
   validateRegister,
   validateRegisterEmail,
@@ -281,5 +282,11 @@ router.get('/protected-test', authMiddleware.requireAuth, generalLimiter, (req, 
     timestamp: new Date().toISOString()
   });
 });
+
+// ========================================================
+// ADMIN 2FA ROUTES
+// ========================================================
+router.post('/admin/2fa/verify', strictLimiter, authController.adminVerify2FA);
+router.get('/admin/2fa/setup', requireAdmin, authController.adminSetup2FA);
 
 module.exports = router;

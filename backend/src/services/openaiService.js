@@ -28,6 +28,13 @@ Tugas Anda adalah melayani Mahasiswa/Calon Mahasiswa dengan informasi yang **Aku
 1. **Scope:** HANYA jawab pertanyaan seputar Akademik, Kampus Tazkia, dan Islam/Ekonomi Syariah.
 2. **Context-Driven:** Jawab HANYA berdasarkan [CONTEXT]. Jika data tidak ada, katakan jujur "Mohon maaf, data spesifik belum tersedia", jangan mengarang (halusinasi).
 
+📏 **ATURAN PANJANG JAWABAN (TOKEN EFFICIENCY):**
+- Jawaban maksimal **4 poin list** ATAU **2 paragraf pendek**.
+- Jika pertanyaan membutuhkan daftar (lokasi, biaya, prodi), gunakan format list bernomor yang ringkas — satu baris per item.
+- **DILARANG** menambah kalimat basa-basi panjang di tengah jawaban.
+- Penutup cukup satu kalimat singkat (misal: *"Ada pertanyaan lain, Kak?"*).
+- **Target:** Jawaban lengkap dan akurat dalam 150–300 token output.
+
 🎨 **ATURAN FORMATTING (VISUAL GUIDE):**
 Agar jawaban mudah dibaca, ikuti aturan ini:
 1. **BOLD (PENEKANAN):** Wajib gunakan **Bold** (\`**Teks**\`) untuk entitas penting:
@@ -49,9 +56,7 @@ Agar jawaban mudah dibaca, ikuti aturan ini:
 
 ✍️ **GAYA MENJAWAB:**
 1. **Direct Answer:** Jawab inti pertanyaan di kalimat pertama.
-2. **Struktur:** - Paragraf 1: Jawaban Inti.
-   - List/Poin: Detail & Link Resmi (Jika perlu).
-   - Penutup: Tawarkan bantuan lain ("Ada lagi yang bisa Kia bantu, Kak?").
+2. **Struktur:** Jawaban Inti → Detail/List (jika perlu) → Penutup singkat 1 kalimat.
 
 ☪️ **ADAB:**
 - Mulai dengan "Assalamualaikum" jika user memulai percakapan dengan salam.
@@ -59,17 +64,14 @@ Agar jawaban mudah dibaca, ikuti aturan ini:
 `;
 
 
-/**
- * Template Context dengan Instruksi Ringkas (Hemat Token)
- */
+// ✅ UPGRADE: Template lebih ringkas — hemat input token, enforce jawaban padat
 const CONTEXT_INSTRUCTION_TEMPLATE = `
 [CONTEXT]
 {context}
 
-[USER QUERY]
-{query}
+[PERTANYAAN]: {query}
 
-Instruksi: Jawab berdasarkan context di atas. Ikuti persona Kia. Gunakan format yang efisien.
+Instruksi: Gunakan HANYA data dari [CONTEXT] di atas. Jawab akurat, terstruktur, dan ringkas (maks 4 poin atau 2 paragraf). Ikuti persona Kia.
 `;
 
 /**
@@ -117,7 +119,10 @@ async function* createMockStream(content) {
  */
 async function generateAIResponse(userMessage, conversationHistory = [], customContext = null, options = {}) {
   try {
-    const { maxTokens = 600, temperature = 0.3 } = options;
+    // ✅ UPGRADE: maxTokens default diturunkan 600 → 450.
+    // Target: jawaban lengkap + akurat dalam 150-300 token output (seperti contoh user).
+    // 450 memberi cukup ruang untuk jawaban detail (lokasi, biaya, daftar prodi) tanpa membengkak.
+    const { maxTokens = 450, temperature = 0.3 } = options;
 
     // --- Safety Checks ---
     const handleStaticResponse = (reply) => {
@@ -263,6 +268,12 @@ async function generateTitle(userMessage, aiResponse = null) {
 // --- Utils (Safety Filters) ---
 function isGreeting(text) {
   const t = text.toLowerCase().trim();
+
+  // ✅ FIX: Threshold 12 karakter — cukup untuk memisahkan salam murni ("halo", "hai kak")
+  // dari compound query ("halo, dimana tazkia" = 19 char → RAG).
+  // "halo" = 4 ✓ salam | "halo kak" = 8 ✓ salam | "halo, dimana tazkia" = 19 → RAG
+  if (t.length > 12) return false;
+
   const greetings = [
     'halo', 'hai', 'hi', 'hello', 'hey',
     'assalamualaikum', 'assalamu alaikum', 'assalamualaikum wr wb',

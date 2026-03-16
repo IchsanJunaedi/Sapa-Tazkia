@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
     LayoutDashboard,
@@ -8,10 +8,17 @@ import {
     User,
     ShieldCheck,
     Search,
-    TrendingUp,
     Users,
     Zap,
-    DollarSign
+    DollarSign,
+    Clock,
+    AlertTriangle,
+    BookOpen,
+    Plus,
+    Trash2,
+    HelpCircle,
+    RefreshCw,
+    X
 } from 'lucide-react';
 import {
     BarChart,
@@ -113,8 +120,15 @@ const AnalyticsView = () => {
 
     // ── Derived data ────────────────────────────────────────────────────────
     const tokensUsed = realtime?.tokensUsed ?? 0;
-    const estCostUSD = (tokensUsed * 0.00000015).toFixed(4);
-    const estCostIDR = Math.round(tokensUsed * 0.00000015 * 16000).toLocaleString('id-ID');
+    // GPT-4o-mini input-only pricing: $0.15 per 1M tokens = $0.00000015 per token
+    // NOTE: tokenUsage includes both input+output tokens. Output costs $0.60/M (4x higher).
+    // This formula gives a LOWER BOUND — real cost will be higher. UI label: "Est. Min. Cost"
+    const COST_PER_TOKEN = 0.00000015;
+    const estCostUSD = (tokensUsed * COST_PER_TOKEN).toFixed(4);
+    const estCostIDR = Math.round(tokensUsed * COST_PER_TOKEN * 16000).toLocaleString('id-ID');
+
+    const avgMs = realtime?.avgResponseTime;
+    const avgMsDisplay = avgMs != null ? `${Math.round(avgMs)}ms` : null;
 
     const kpiCards = [
         {
@@ -147,6 +161,20 @@ const AnalyticsView = () => {
             icon: <DollarSign size={18} />,
             gradient: 'from-green-400 to-cyan-500',
         },
+        {
+            label: 'Avg Response Time',
+            value: realtime ? (avgMsDisplay ?? '—') : null,
+            delta: null,
+            icon: <Clock size={18} />,
+            gradient: 'from-sky-400 to-indigo-500',
+        },
+        {
+            label: 'Error Count',
+            value: realtime ? (realtime.errorCount ?? 0) : null,
+            delta: realtime?.delta?.errorCount ?? null,
+            icon: <AlertTriangle size={18} />,
+            gradient: 'from-rose-500 to-red-600',
+        },
     ];
 
     const barData = history?.snapshots?.map((s) => ({
@@ -171,6 +199,7 @@ const AnalyticsView = () => {
     const hourlyMax = Math.max(...Object.values(hourlyData).map(Number), 1);
 
     const topUsers = history?.topUsers ?? [];
+    const topQuestions = Array.isArray(history?.topQuestions) ? history.topQuestions : [];
 
     // ── Tooltip styles ────────────────────────────────────────────────────
     const tooltipStyle = {
@@ -189,8 +218,8 @@ const AnalyticsView = () => {
                 </div>
             )}
 
-            {/* ── KPI Cards ─────────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {/* ── KPI Cards (6) ─────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
                 {kpiCards.map((card) => (
                     <div key={card.label} className="bg-[#18181b] border border-[#27272a] rounded-xl overflow-hidden">
                         {/* Colored top border */}
@@ -405,6 +434,278 @@ const AnalyticsView = () => {
                     )}
                 </div>
             </div>
+
+            {/* ── Top Questions (last 7 days) ─────────────────────────────── */}
+            {!historyLoading && (
+                <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                        <HelpCircle size={16} className="text-[#a855f7]" />
+                        <h3 className="text-sm font-semibold text-[#e4e4e7]">Most Asked Questions</h3>
+                        <span className="ml-auto text-[10px] text-[#71717a] italic">last 7 days</span>
+                    </div>
+                    {topQuestions.length === 0 ? (
+                        <p className="text-[#71717a] text-sm text-center py-4">No data yet</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {topQuestions.map((q, i) => {
+                                const maxCount = topQuestions[0]?.count ?? 1;
+                                const pct = Math.round((q.count / maxCount) * 100);
+                                return (
+                                    <div key={i} className="flex items-center gap-3">
+                                        <span className="text-xs text-[#71717a] w-4 text-right shrink-0">{i + 1}</span>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between mb-0.5">
+                                                <p className="text-xs text-[#e4e4e7] truncate max-w-[85%]">{q.question}</p>
+                                                <span className="text-[10px] text-[#a1a1aa] shrink-0 ml-2">{q.count}×</span>
+                                            </div>
+                                            <div className="h-1 rounded-full bg-[#27272a] overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500"
+                                                    style={{ width: `${pct}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─── Knowledge Base View ─────────────────────────────────────────────────────
+
+const KnowledgeBaseView = () => {
+    const [docs, setDocs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [showForm, setShowForm] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [formData, setFormData] = useState({ content: '', source: '', category: '' });
+    const [formError, setFormError] = useState('');
+    const [deleteId, setDeleteId] = useState(null);
+
+    const fetchDocs = useCallback(async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${API}/admin/knowledge-base`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setDocs(res.data.documents ?? []);
+            setError('');
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to load knowledge base');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { fetchDocs(); }, [fetchDocs]);
+
+    const handleAdd = async (e) => {
+        e.preventDefault();
+        if (!formData.content.trim() || formData.content.trim().length < 10) {
+            setFormError('Content must be at least 10 characters');
+            return;
+        }
+        try {
+            setSubmitting(true);
+            setFormError('');
+            const token = localStorage.getItem('token');
+            await axios.post(`${API}/admin/knowledge-base`, formData, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setFormData({ content: '', source: '', category: '' });
+            setShowForm(false);
+            await fetchDocs();
+        } catch (err) {
+            setFormError(err.response?.data?.message || 'Failed to add document');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        try {
+            setDeleteId(id);
+            const token = localStorage.getItem('token');
+            await axios.delete(`${API}/admin/knowledge-base/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setDocs((prev) => prev.filter((d) => d.id !== id));
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to delete document');
+        } finally {
+            setDeleteId(null);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Header row */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-[#71717a] text-sm mt-0.5">{docs.length} document{docs.length !== 1 ? 's' : ''} in Qdrant</p>
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        onClick={fetchDocs}
+                        className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-[#18181b] border border-[#27272a] text-[#a1a1aa] hover:text-[#e4e4e7] hover:border-[#3f3f46] transition-all"
+                    >
+                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                        Refresh
+                    </button>
+                    <button
+                        onClick={() => { setShowForm(!showForm); setFormError(''); }}
+                        className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-all"
+                    >
+                        {showForm ? <X size={14} /> : <Plus size={14} />}
+                        {showForm ? 'Cancel' : 'Add Document'}
+                    </button>
+                </div>
+            </div>
+
+            {/* Add Document form */}
+            {showForm && (
+                <div className="bg-[#18181b] border border-purple-500/30 rounded-xl p-5">
+                    <h3 className="text-sm font-semibold text-[#e4e4e7] mb-4">New Document</h3>
+                    <form onSubmit={handleAdd} className="space-y-4">
+                        <div>
+                            <label className="block text-xs text-[#a1a1aa] mb-1.5">Content <span className="text-red-400">*</span></label>
+                            <textarea
+                                value={formData.content}
+                                onChange={(e) => setFormData((p) => ({ ...p, content: e.target.value }))}
+                                rows={5}
+                                placeholder="Enter document content to embed..."
+                                className="w-full px-3 py-2 bg-[#09090b] border border-[#27272a] rounded-lg text-sm text-[#e4e4e7] placeholder-[#71717a] focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 resize-none transition-all"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs text-[#a1a1aa] mb-1.5">Source</label>
+                                <input
+                                    type="text"
+                                    value={formData.source}
+                                    onChange={(e) => setFormData((p) => ({ ...p, source: e.target.value }))}
+                                    placeholder="e.g. admin-manual"
+                                    className="w-full px-3 py-2 bg-[#09090b] border border-[#27272a] rounded-lg text-sm text-[#e4e4e7] placeholder-[#71717a] focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-[#a1a1aa] mb-1.5">Category</label>
+                                <input
+                                    type="text"
+                                    value={formData.category}
+                                    onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
+                                    placeholder="e.g. manual"
+                                    className="w-full px-3 py-2 bg-[#09090b] border border-[#27272a] rounded-lg text-sm text-[#e4e4e7] placeholder-[#71717a] focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                                />
+                            </div>
+                        </div>
+                        {formError && (
+                            <p className="text-red-400 text-xs">{formError}</p>
+                        )}
+                        <div className="flex justify-end">
+                            <button
+                                type="submit"
+                                disabled={submitting}
+                                className="flex items-center gap-2 px-5 py-2.5 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                {submitting ? (
+                                    <div className="animate-spin w-4 h-4 rounded-full border-2 border-white border-t-transparent" />
+                                ) : (
+                                    <Plus size={14} />
+                                )}
+                                {submitting ? 'Embedding...' : 'Add & Embed'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* Error */}
+            {error && (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                    {error}
+                </div>
+            )}
+
+            {/* Documents table */}
+            <div className="bg-[#18181b] border border-[#27272a] rounded-xl overflow-hidden">
+                {loading ? (
+                    <div className="h-48 flex items-center justify-center">
+                        <div className="animate-spin w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent" />
+                    </div>
+                ) : docs.length === 0 ? (
+                    <div className="h-48 flex flex-col items-center justify-center text-[#71717a]">
+                        <BookOpen size={32} className="mb-3 opacity-40" />
+                        <p className="text-sm">No documents in knowledge base</p>
+                        <p className="text-xs mt-1 opacity-70">Add your first document above</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-[#27272a]/40 border-b border-[#27272a]">
+                                <tr className="text-[#71717a] text-xs uppercase tracking-wider">
+                                    <th className="px-5 py-3.5 text-left font-medium">Content Preview</th>
+                                    <th className="px-5 py-3.5 text-left font-medium">Source</th>
+                                    <th className="px-5 py-3.5 text-left font-medium">Category</th>
+                                    <th className="px-5 py-3.5 text-left font-medium">Added</th>
+                                    <th className="px-5 py-3.5 text-right font-medium">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#27272a]/80">
+                                {docs.map((doc) => (
+                                    <tr key={doc.id} className="hover:bg-[#27272a]/30 transition-colors">
+                                        <td className="px-5 py-4 max-w-xs">
+                                            <p className="text-[#e4e4e7] text-xs leading-relaxed line-clamp-2">
+                                                {doc.content || '(empty)'}
+                                            </p>
+                                            <p className="text-[10px] text-[#71717a] mt-1 font-mono truncate max-w-[200px]">
+                                                id: {String(doc.id).substring(0, 20)}…
+                                            </p>
+                                        </td>
+                                        <td className="px-5 py-4">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#27272a] text-[#a1a1aa] text-xs font-mono">
+                                                {doc.source || '—'}
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-4">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 text-xs">
+                                                {doc.category || '—'}
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-4 text-[#71717a] text-xs whitespace-nowrap">
+                                            {doc.createdAt
+                                                ? new Date(doc.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+                                                : '—'
+                                            }
+                                        </td>
+                                        <td className="px-5 py-4 text-right">
+                                            <button
+                                                onClick={() => handleDelete(doc.id)}
+                                                disabled={deleteId === doc.id}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                            >
+                                                {deleteId === doc.id ? (
+                                                    <div className="animate-spin w-3 h-3 rounded-full border-2 border-red-400 border-t-transparent" />
+                                                ) : (
+                                                    <Trash2 size={13} />
+                                                )}
+                                                Delete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -418,6 +719,8 @@ const AdminDashboard = () => {
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('All');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
 
     useEffect(() => {
         if (activeTab !== 'logs') return;
@@ -467,12 +770,31 @@ const AdminDashboard = () => {
             log.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             log.identifier?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesType = filterType === 'All' ? true : log.userType === filterType;
-        return matchesSearch && matchesType;
+
+        let matchesDate = true;
+        if (dateFrom) {
+            matchesDate = matchesDate && new Date(log.timestamp) >= new Date(dateFrom);
+        }
+        if (dateTo) {
+            // include the full day of dateTo
+            const endOfDay = new Date(dateTo);
+            endOfDay.setHours(23, 59, 59, 999);
+            matchesDate = matchesDate && new Date(log.timestamp) <= endOfDay;
+        }
+
+        return matchesSearch && matchesType && matchesDate;
     });
+
+    const tabTitles = {
+        analytics: 'Analytics',
+        logs: 'Live Chat Logs',
+        'knowledge-base': 'Knowledge Base',
+    };
 
     const navItems = [
         { id: 'analytics', label: 'Analytics', icon: <LayoutDashboard size={18} /> },
         { id: 'logs', label: 'Chat Logs', icon: <MessageSquare size={18} /> },
+        { id: 'knowledge-base', label: 'Knowledge Base', icon: <BookOpen size={18} /> },
     ];
 
     return (
@@ -526,7 +848,7 @@ const AdminDashboard = () => {
                 {/* Header */}
                 <header className="h-16 border-b border-[#27272a] bg-[#18181b]/50 backdrop-blur flex items-center justify-between px-8 shrink-0">
                     <h2 className="text-base font-semibold text-[#e4e4e7]">
-                        {activeTab === 'analytics' ? 'Analytics' : 'Live Chat Logs'}
+                        {tabTitles[activeTab] ?? activeTab}
                     </h2>
                     <div className="flex items-center gap-2 text-sm text-[#a1a1aa] bg-[#27272a] px-3 py-1.5 rounded-full">
                         <User size={14} />
@@ -541,11 +863,15 @@ const AdminDashboard = () => {
                         {/* ── Analytics Tab ──────────────────────────────── */}
                         {activeTab === 'analytics' && <AnalyticsView />}
 
+                        {/* ── Knowledge Base Tab ─────────────────────────── */}
+                        {activeTab === 'knowledge-base' && <KnowledgeBaseView />}
+
                         {/* ── Chat Logs Tab ──────────────────────────────── */}
                         {activeTab === 'logs' && (
                             <div className="space-y-6">
                                 {/* Filters */}
-                                <div className="flex flex-col sm:flex-row justify-between gap-4">
+                                <div className="flex flex-col sm:flex-row justify-between gap-4 flex-wrap">
+                                    {/* Search */}
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#71717a]" size={18} />
                                         <input
@@ -553,9 +879,36 @@ const AdminDashboard = () => {
                                             placeholder="Search messages or identifiers..."
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="pl-10 pr-4 py-2 bg-[#18181b] border border-[#27272a] rounded-lg text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 w-full sm:w-80 transition-all text-[#e4e4e7] placeholder-[#71717a]"
+                                            className="pl-10 pr-4 py-2 bg-[#18181b] border border-[#27272a] rounded-lg text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 w-full sm:w-72 transition-all text-[#e4e4e7] placeholder-[#71717a]"
                                         />
                                     </div>
+
+                                    {/* Date range */}
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="date"
+                                            value={dateFrom}
+                                            onChange={(e) => setDateFrom(e.target.value)}
+                                            className="px-3 py-2 bg-[#18181b] border border-[#27272a] rounded-lg text-sm text-[#a1a1aa] focus:outline-none focus:border-purple-500 transition-all [color-scheme:dark]"
+                                        />
+                                        <span className="text-[#71717a] text-xs">to</span>
+                                        <input
+                                            type="date"
+                                            value={dateTo}
+                                            onChange={(e) => setDateTo(e.target.value)}
+                                            className="px-3 py-2 bg-[#18181b] border border-[#27272a] rounded-lg text-sm text-[#a1a1aa] focus:outline-none focus:border-purple-500 transition-all [color-scheme:dark]"
+                                        />
+                                        {(dateFrom || dateTo) && (
+                                            <button
+                                                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                                                className="text-[#71717a] hover:text-[#e4e4e7] transition-colors"
+                                            >
+                                                <X size={15} />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Type filter */}
                                     <div className="flex items-center gap-2 bg-[#18181b] border border-[#27272a] rounded-lg p-1">
                                         {['All', 'User', 'Guest'].map((type) => (
                                             <button
@@ -588,13 +941,15 @@ const AdminDashboard = () => {
                                                         <th className="px-6 py-4 font-medium">Waktu</th>
                                                         <th className="px-6 py-4 font-medium w-96 leading-relaxed">Pesan User</th>
                                                         <th className="px-6 py-4 font-medium w-96">Response Bot</th>
+                                                        <th className="px-6 py-4 font-medium text-right">Resp. Time</th>
+                                                        <th className="px-6 py-4 font-medium text-center">Status</th>
                                                         <th className="px-6 py-4 font-medium text-right">Tokens</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-[#27272a]/80">
                                                     {filteredLogs.length === 0 ? (
                                                         <tr>
-                                                            <td colSpan={5} className="px-6 py-12 text-center text-[#71717a]">
+                                                            <td colSpan={7} className="px-6 py-12 text-center text-[#71717a]">
                                                                 Tidak ada log yang ditemukan.
                                                             </td>
                                                         </tr>
@@ -621,6 +976,22 @@ const AdminDashboard = () => {
                                                                 </td>
                                                                 <td className="px-6 py-4 text-[#a1a1aa] whitespace-normal break-words leading-relaxed min-w-[250px]">
                                                                     {log.response?.length > 100 ? `${log.response.substring(0, 100)}...` : log.response}
+                                                                </td>
+                                                                <td className="px-6 py-4 text-right">
+                                                                    <span className="text-xs text-[#a1a1aa] font-mono">
+                                                                        {log.responseTime != null ? `${Math.round(log.responseTime)}ms` : '—'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-6 py-4 text-center">
+                                                                    {log.isError ? (
+                                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 text-xs">
+                                                                            <AlertTriangle size={10} /> Error
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 text-xs">
+                                                                            ✓ OK
+                                                                        </span>
+                                                                    )}
                                                                 </td>
                                                                 <td className="px-6 py-4 text-right">
                                                                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#27272a] text-[#a1a1aa] text-xs font-mono">
