@@ -776,21 +776,18 @@ const adminVerify2FA = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Kode 2FA tidak valid' });
     }
 
-    // Issue full JWT
+    // Issue full JWT — fetch user once, no second DB read
     const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
     if (!user || user.userType !== 'admin') {
       return res.status(403).json({ success: false, message: 'Akses ditolak' });
     }
 
-    const fullResult = await authService.login(user.email, null, req.ip, req.get('User-Agent'), true);
-    if (!fullResult.success) {
-      return res.status(500).json({ success: false, message: 'Gagal menerbitkan token' });
-    }
+    const token = await authService.issueSessionToken(user.id, req.ip, req.get('User-Agent'));
 
     return res.status(200).json({
       success: true,
       message: 'Login 2FA berhasil',
-      token: fullResult.token,
+      token,
       user: {
         id: user.id,
         nim: user.nim,

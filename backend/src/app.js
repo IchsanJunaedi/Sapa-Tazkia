@@ -432,9 +432,14 @@ app.get('/status', async (req, res) => {
   res.json(statusData);
 });
 
-// Session debug endpoint — dev only, requires auth
-app.get('/session-debug', requireAuth, (req, res) => {
+// Middleware: block in production before hitting any real middleware
+const devOnly = (req, res, next) => {
   if (isProduction) return res.status(404).json({ success: false, message: 'Not found' });
+  next();
+};
+
+// Session debug endpoint — dev only, requires auth
+app.get('/session-debug', devOnly, requireAuth, (req, res) => {
   res.json({
     sessionID: req.sessionID,
     sessionExists: !!req.session,
@@ -453,8 +458,7 @@ app.get('/session-debug', requireAuth, (req, res) => {
 });
 
 // Simple test route with rate limit headers — dev only
-app.get('/test', (req, res) => {
-  if (isProduction) return res.status(404).json({ success: false, message: 'Not found' });
+app.get('/test', devOnly, (req, res) => {
   // ✅ NEW: Add sample rate limit headers for testing
   res.set({
     'X-RateLimit-Limit': '10',

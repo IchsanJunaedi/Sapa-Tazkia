@@ -10,14 +10,17 @@ const logger = require('../utils/logger');
 // If not set, all IPs are allowed (backward compatible).
 // Example: ADMIN_ALLOWED_IPS=192.168.1.1,10.0.0.5
 // ============================================================
+// Parse once at module load — env is static after startup
+const allowedAdminIPs = process.env.ADMIN_ALLOWED_IPS
+  ? process.env.ADMIN_ALLOWED_IPS.split(',').map(ip => ip.trim())
+  : null;
+
 const ipWhitelist = (req, res, next) => {
-  const allowedIPs = process.env.ADMIN_ALLOWED_IPS;
-  if (!allowedIPs) return next(); // not configured = allow all
+  if (!allowedAdminIPs) return next(); // not configured = allow all
 
-  const clientIP = (req.ip || req.connection.remoteAddress || '').replace('::ffff:', '');
-  const allowed = allowedIPs.split(',').map(ip => ip.trim());
+  const clientIP = (req.ip || req.socket.remoteAddress || '').replace('::ffff:', '');
 
-  if (allowed.includes(clientIP)) return next();
+  if (allowedAdminIPs.includes(clientIP)) return next();
 
   logger.warn(`[ADMIN] Blocked unauthorized IP: ${clientIP}`);
   return res.status(403).json({ success: false, message: 'Access denied' });

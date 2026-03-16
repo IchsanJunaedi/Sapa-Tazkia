@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 // Import Controller & Middleware Auth
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
-const { requireAdmin } = require('../middleware/authMiddleware');
+const { requireAdmin } = authMiddleware;
 const {
   validateRegister,
   validateRegisterEmail,

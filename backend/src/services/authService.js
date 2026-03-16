@@ -1155,6 +1155,17 @@ const getUserById = async (userId) => {
 };
 
 // ========================================================
+// Issue session token for an already-validated user (no DB re-fetch)
+// Used by 2FA verify flow to avoid double DB read
+// ========================================================
+const issueSessionToken = async (userId, ipAddress, userAgent) => {
+  const token = generateToken(userId);
+  await logoutAllUserSessions(userId);
+  await createSession(userId, token, ipAddress, userAgent);
+  return token;
+};
+
+// ========================================================
 // EXPORTS
 // ========================================================
 module.exports = {
@@ -1178,5 +1189,6 @@ module.exports = {
   sendVerificationEmail,
   verifyEmailCode,
   resendVerificationCode,
+  issueSessionToken,
   passport,
 };
