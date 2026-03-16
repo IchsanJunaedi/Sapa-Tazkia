@@ -25,11 +25,7 @@ const ChatInput = ({ onSend, disabled, isGenerating, onCancel }) => {
             textarea.style.height = 'auto';
             const currentHeight = textarea.scrollHeight;
             textarea.style.height = `${Math.min(currentHeight, 150)}px`;
-            if (currentHeight > 52) {
-                form.style.borderRadius = '1.5rem';
-            } else {
-                form.style.borderRadius = '30px';
-            }
+            form.style.borderRadius = currentHeight > 52 ? '1.5rem' : '9999px';
         }
     };
 
@@ -40,7 +36,7 @@ const ChatInput = ({ onSend, disabled, isGenerating, onCancel }) => {
             setInput('');
             if (textareaRef.current && formRef.current) {
                 textareaRef.current.style.height = 'auto';
-                formRef.current.style.borderRadius = '30px';
+                formRef.current.style.borderRadius = '9999px';
             }
         }
     };
@@ -59,17 +55,24 @@ const ChatInput = ({ onSend, disabled, isGenerating, onCancel }) => {
     const canSend = input.trim() && !isTooLong && !disabled && !isGenerating;
 
     return (
-        <div className="p-4 md:p-6 border-t border-gray-200 flex flex-col items-center justify-center bg-[#fef6e4]">
+        <div className="px-4 pb-5 pt-3 md:px-6 md:pb-6 md:pt-4 border-t border-white/10 flex flex-col items-center justify-center bg-transparent backdrop-blur-xl">
             <form
                 ref={formRef}
                 onSubmit={handleSubmit}
-                className="w-full max-w-3xl flex items-end p-2 bg-white border border-gray-300 shadow-xl transition-all duration-200 ease-out relative"
-                style={{ borderRadius: '30px' }}
+                className="w-full max-w-3xl flex items-end p-2 bg-white/10 backdrop-blur-lg border border-white/20 transition-all duration-200 ease-out relative"
+                style={{ borderRadius: '9999px' }}
             >
-                <button type="button" className="p-2 mb-1 mr-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0 h-10 w-10 flex items-center justify-center" title="Attach" disabled={disabled || isGenerating}>
+                {/* Attach button */}
+                <button
+                    type="button"
+                    className="p-2 mb-1 mr-2 flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all duration-200"
+                    title="Attach"
+                    disabled={disabled || isGenerating}
+                >
                     <Plus size={20} />
                 </button>
 
+                {/* Textarea */}
                 <textarea
                     ref={textareaRef}
                     placeholder="Message Sapa Tazkia"
@@ -78,47 +81,50 @@ const ChatInput = ({ onSend, disabled, isGenerating, onCancel }) => {
                     onKeyDown={handleKeyDown}
                     disabled={disabled || isGenerating}
                     rows={1}
-                    className="flex-1 py-3 px-2 text-base text-gray-700 placeholder-gray-500 focus:outline-none bg-white resize-none max-h-[150px]"
+                    className="flex-1 py-3 px-2 text-base text-white placeholder-white/40 focus:outline-none bg-transparent resize-none max-h-[150px]"
                     style={{ lineHeight: '1.5', minHeight: '44px' }}
                 />
 
+                {/* Send / Cancel button */}
                 <div className="relative group mb-1 ml-2 flex-shrink-0">
-                    {/* Tombol Cancel saat Generating */}
                     {isGenerating ? (
                         <button
                             type="button"
                             onClick={onCancel}
-                            className="h-10 w-10 flex items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white transition-all duration-200 shadow-md animate-pulse"
+                            className="h-10 w-10 flex items-center justify-center rounded-full text-white transition-all duration-200 animate-pulse bg-gradient-to-br from-red-500 to-rose-600 shadow-lg shadow-red-500/40 hover:from-red-400 hover:to-rose-500 hover:scale-105 active:scale-95"
                             aria-label="Cancel Generation"
                             title="Batalkan"
                         >
                             <Square size={14} fill="currentColor" />
                         </button>
                     ) : (
-                        /* Tombol Send Normal */
                         <button
                             type="submit"
                             disabled={!canSend}
-                            className={`h-10 w-10 flex items-center justify-center rounded-full transition-all duration-200 shadow-md ${canSend
-                                ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                                : 'bg-gray-300 cursor-not-allowed text-gray-500'
-                                }`}
+                            className={`h-10 w-10 flex items-center justify-center rounded-full transition-all duration-300 ${
+                                canSend
+                                    ? 'bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-lg shadow-indigo-500/50 hover:from-indigo-400 hover:to-blue-500 hover:shadow-indigo-400/70 hover:scale-105 active:scale-95'
+                                    : 'bg-white/10 cursor-not-allowed text-white/25'
+                            }`}
                             aria-label="Send Message"
                         >
                             <ArrowUp size={20} />
                         </button>
                     )}
                     {isTooLong && !isGenerating && (
-                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-max px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none shadow-lg z-50">
+                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-max px-3 py-1.5 bg-gray-900/90 backdrop-blur-sm border border-white/10 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none shadow-lg z-50">
                             Message is too long
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900/90"></div>
                         </div>
                     )}
                 </div>
             </form>
 
-            {/* ✅ AI Disclaimer */}
-            <p className="text-xs text-gray-500 mt-3 text-center font-medium opacity-80">
+            {/* AI Disclaimer */}
+            <p
+                className="text-xs text-white/50 mt-3 text-center font-medium"
+                style={{ textShadow: '0 0 16px rgba(255,255,255,0.3)' }}
+            >
                 AI can make mistakes. Cross-check academic information with official sources.
             </p>
         </div>
@@ -857,12 +863,12 @@ const ChatPage = () => {
 
     if (loading && !isGuest) {
         return (
-            <div className="flex h-screen bg-[#fbf9f6] items-center justify-center">
+            <div className="flex h-screen items-center justify-center" style={{ background: 'linear-gradient(135deg, #0A1560 0%, #1E3BCC 55%, #3D4FE0 100%)' }}>
                 <div className="text-center">
-                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4 mx-auto">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                    <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mb-4 mx-auto">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/60"></div>
                     </div>
-                    <p className="text-gray-600">Loading...</p>
+                    <p className="text-white/60">Loading...</p>
                 </div>
             </div>
         );
@@ -870,19 +876,19 @@ const ChatPage = () => {
 
     if (!isAuthenticated && !isGuest) {
         return (
-            <div className="flex h-screen bg-[#fbf9f6] items-center justify-center">
+            <div className="flex h-screen items-center justify-center" style={{ background: 'linear-gradient(135deg, #0A1560 0%, #1E3BCC 55%, #3D4FE0 100%)' }}>
                 <div className="text-center">
-                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                    <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mb-4 mx-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/60"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                     </div>
-                    <p className="text-gray-600">Redirecting...</p>
+                    <p className="text-white/60">Redirecting...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="flex h-screen bg-amber-50 font-sans overflow-hidden">
+        <div className="flex h-screen font-sans overflow-hidden" style={{ background: 'linear-gradient(135deg, #0A1560 0%, #1E3BCC 55%, #3D4FE0 100%)' }}>
 
             <RateLimitStatus
                 isGuestMode={isGuest}
@@ -919,12 +925,12 @@ const ChatPage = () => {
             />
 
             <div className="flex-1 flex flex-col overflow-hidden relative">
-                <nav className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 flex-shrink-0">
+                <nav className="flex items-center justify-between p-4 md:p-6 border-b border-white/10 flex-shrink-0">
                     <div className="flex items-center gap-2">
                         {/* Hamburger Menu - Mobile Only */}
                         <button
                             onClick={() => setIsMobileSidebarOpen(true)}
-                            className="p-2 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors md:hidden"
+                            className="p-2 rounded-lg text-white/80 hover:bg-white/10 transition-colors md:hidden"
                             title="Open Menu"
                         >
                             <Menu size={24} />
@@ -943,7 +949,7 @@ const ChatPage = () => {
 
                     <div className="flex items-center space-x-4">
                         {isGuest ? (
-                            <span className="text-blue-500 font-medium">Mode Tamu</span>
+                            <span className="text-blue-200 font-medium">Mode Tamu</span>
                         ) : null}
 
                         {!isGuest && currentChatId && (
@@ -951,7 +957,7 @@ const ChatPage = () => {
                                 <button
                                     ref={menuButtonRef}
                                     onClick={handleMenuToggle}
-                                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors opacity-80 hover:opacity-100"
+                                    className="p-1 text-white/40 hover:text-white/80 transition-colors opacity-80 hover:opacity-100"
                                 >
                                     <MoreHorizontal size={18} />
                                 </button>

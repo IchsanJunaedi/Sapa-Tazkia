@@ -11,7 +11,7 @@ import Swal from 'sweetalert2'; // ✅ TAMBAHAN: Import SweetAlert2
 const GradientText = ({ children, className = '' }) => {
   return (
     <span
-      className={`bg-clip-text text-transparent bg-gradient-to-r from-gray-500 to-gray-600  ${className}`}
+      className={`bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-200 ${className}`}
       style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
     >
       {children}
@@ -100,71 +100,89 @@ const VerificationForm = ({ email, onVerify, onResend, onBack, isLoading, error 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-2xl font-bold text-gray-800 mb-2">Verifikasi Email</h2>
-      <p className="text-sm text-gray-600 mb-6">
-        Kami telah mengirim kode verifikasi ke: <strong>{email}</strong>
-      </p>
+    <form onSubmit={handleSubmit}>
+      {/* Header */}
+      <div className="mb-6">
+        <p className="text-xs font-semibold tracking-[0.15em] text-indigo-400 uppercase mb-2">Verifikasi</p>
+        <h2 className="text-[26px] font-black text-white leading-tight" style={{ letterSpacing: '-0.02em' }}>
+          Cek email kamu
+        </h2>
+        <p className="text-sm text-white/40 mt-2 leading-relaxed">
+          Kode dikirim ke{' '}
+          <span className="text-white/70 font-medium">{email}</span>
+        </p>
+      </div>
 
       {resendSuccess && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
-          <span className="block sm:inline">✅ Kode verifikasi telah dikirim ulang!</span>
+        <div className="px-4 py-3 rounded-xl mb-4 text-sm text-green-300 flex items-center gap-2"
+          style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)' }}>
+          <span>✓</span> Kode verifikasi telah dikirim ulang!
         </div>
       )}
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
-          <span className="block sm:inline">{error}</span>
+        <div className="px-4 py-3 rounded-xl mb-4 text-sm text-red-300 relative"
+          style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
+          {error}
           <button
             type="button"
             onClick={() => error && typeof error === 'object' && error.onClose ? error.onClose() : null}
-            className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+            className="absolute top-2.5 right-2.5 text-red-400/60 hover:text-red-300 transition-colors"
           >
-            <X size={16} />
+            <X size={14} />
           </button>
         </div>
       )}
 
-      <div className="mb-4">
+      {/* OTP input */}
+      <div className="mb-5">
         <input
           type="text"
-          placeholder="Masukkan kode verifikasi"
+          placeholder="Masukkan kode 6 digit"
           value={code}
           onChange={(e) => setCode(e.target.value)}
           onKeyPress={handleKeyPress}
-          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+          className="auth-input w-full px-4 py-[14px] text-white rounded-xl text-[15px] transition-all duration-200 focus:outline-none text-center tracking-[0.3em] font-semibold"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
           disabled={isLoading}
           maxLength={6}
         />
-        <p className="text-xs text-gray-500 mt-2">
-          Masukkan kode 6 digit yang dikirim ke email Anda
+        <p className="text-[11px] text-white/25 mt-2 text-center">
+          Berlaku selama 10 menit
         </p>
       </div>
 
+      {/* Verify button */}
       <button
         type="submit"
-        className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-3 ${code.trim().length >= 4 && !isLoading ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
-          }`}
         disabled={code.trim().length < 4 || isLoading}
+        className={`w-full py-[14px] rounded-xl font-semibold text-white text-[15px] transition-all duration-300 ${
+          code.trim().length >= 4 && !isLoading
+            ? 'bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/30 hover:from-indigo-400 hover:to-blue-500 hover:scale-[1.02] active:scale-[0.99]'
+            : 'cursor-not-allowed'
+        }`}
+        style={code.trim().length < 4 || isLoading ? { background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.25)' } : {}}
       >
         {isLoading ? 'Memverifikasi...' : 'Verifikasi'}
       </button>
 
-      <div className="flex space-x-3">
+      {/* Secondary actions */}
+      <div className="flex gap-3 mt-4">
         <button
           type="button"
           onClick={handleResend}
           disabled={resendLoading}
-          className="flex-1 py-2 text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+          className="flex-1 py-2.5 text-sm rounded-xl font-medium transition-all duration-200 text-indigo-400 hover:text-indigo-300 disabled:text-white/20"
+          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}
         >
-          {resendLoading ? 'Mengirim...' : 'Kirim Ulang Kode'}
+          {resendLoading ? 'Mengirim...' : 'Kirim Ulang'}
         </button>
-
         <button
           type="button"
           onClick={onBack}
           disabled={isLoading}
-          className="flex-1 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:text-gray-400"
+          className="flex-1 py-2.5 text-sm rounded-xl font-medium transition-all duration-200 text-white/35 hover:text-white/60 disabled:text-white/15"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
         >
           Kembali
         </button>
@@ -393,92 +411,104 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
     switch (step) {
       case 0:
         return (
-          <form onSubmit={handleContinue} className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Log in or sign up</h2>
-            <p className="text-sm text-gray-600 mb-6">
-              Dapatkan panduan akademik yang lebih cerdas dari Sapa Tazkia.
-            </p>
+          <form onSubmit={handleContinue}>
+            {/* Header */}
+            <div className="mb-7">
+              <p className="text-xs font-semibold tracking-[0.15em] text-indigo-400 uppercase mb-2">Selamat datang</p>
+              <h2 className="text-[26px] font-black text-white leading-tight" style={{ letterSpacing: '-0.02em' }}>
+                Log in or sign up
+              </h2>
+              <p className="text-[13px] text-white/40 mt-2 leading-relaxed">
+                Panduan akademik lebih cerdas dengan Sapa Tazkia.
+              </p>
+            </div>
 
             {showSuccess && (
-              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
-                <span className="block sm:inline">✅ Autentikasi berhasil! Mengarahkan...</span>
+              <div className="px-4 py-3 rounded-xl mb-5 text-sm text-green-300 flex items-center gap-2"
+                style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                <span>✓</span> Autentikasi berhasil! Mengarahkan...
               </div>
             )}
 
             {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mb-4" role="alert">
-                <span className="block sm:inline">{error}</span>
+              <div className="px-4 py-3 rounded-xl mb-5 text-sm text-red-300 relative"
+                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                {error}
                 {error.includes('sudah terdaftar') && (
-                  <div style={{ marginTop: '10px', fontSize: '14px' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEmail('');
-                        setError('');
-                      }}
-                      style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                      Klik di sini untuk masuk dengan NIM
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setEmail(''); setError(''); }}
+                    className="block mt-2 text-indigo-400 hover:text-indigo-300 underline text-xs transition-colors"
+                  >
+                    Masuk dengan NIM
+                  </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setError(null)}
-                  className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+                  className="absolute top-2.5 right-2.5 text-red-400/60 hover:text-red-300 transition-colors"
                 >
-                  <X size={16} />
+                  <X size={14} />
                 </button>
               </div>
             )}
 
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                className="w-full py-3 flex items-center justify-center border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                disabled={isLoading}
-              >
-                <GoogleIcon />
-                Lanjutkan dengan Google
-              </button>
+            {/* Google */}
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={isLoading}
+              className="w-full py-[13px] flex items-center justify-center rounded-xl font-medium text-white text-[14px] transition-all duration-200 hover:bg-white/10 mb-5"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+            >
+              <GoogleIcon />
+              Lanjutkan dengan Google
+            </button>
+
+            {/* Divider */}
+            <div className="flex items-center mb-5">
+              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
+              <span className="mx-4 text-[11px] font-semibold text-white/25 tracking-[0.12em]">ATAU</span>
+              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
             </div>
 
-            <div className="flex items-center my-4">
-              <div className="flex-grow border-t border-gray-300"></div>
-              <span className="flex-shrink mx-4 text-gray-500 text-sm">ATAU</span>
-              <div className="flex-grow border-t border-gray-300"></div>
-            </div>
-
-            <div className="mb-4">
+            {/* Email / NIM input */}
+            <div className="mb-1">
               <input
                 type="text"
-                placeholder="Masukkan Email atau NIM"
+                placeholder="Email atau NIM"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyPress={handleKeyPress}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                className="auth-input w-full px-4 py-[14px] text-white rounded-xl text-[15px] transition-all duration-200 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
                 disabled={isLoading}
               />
-              <p className="text-xs text-gray-500 mt-2">
-                Untuk email: gunakan email Tazkia (@student.tazkia.ac.id, @student.stmik.tazkia.ac.id, atau @tazkia.ac.id)
+              <p className="text-[11px] text-white/25 mt-2 leading-relaxed">
+                Gunakan email kampus Tazkia atau NIM Anda
               </p>
             </div>
 
+            {/* Continue button */}
             <button
               type="submit"
-              className={`w-full py-3 rounded-xl font-semibold text-white transition-colors mb-4 ${email && !isLoading ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'
-                }`}
               disabled={!email || isLoading}
+              className={`w-full py-[14px] rounded-xl font-semibold text-[15px] text-white transition-all duration-300 mt-5 ${
+                email && !isLoading
+                  ? 'bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/30 hover:from-indigo-400 hover:to-blue-500 hover:shadow-indigo-400/50 hover:scale-[1.02] active:scale-[0.99]'
+                  : 'cursor-not-allowed'
+              }`}
+              style={!email || isLoading ? { background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.25)' } : {}}
             >
               {isLoading ? 'Memproses...' : 'Lanjutkan'}
             </button>
 
+            {/* Close */}
             <button
               type="button"
               onClick={handleClose}
-              className="w-full text-sm text-gray-500 hover:text-gray-900 mt-2"
               disabled={isLoading}
+              className="w-full mt-4 text-[13px] text-white/25 hover:text-white/50 transition-colors py-1"
             >
               Tutup
             </button>
@@ -505,20 +535,69 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm relative transform transition-all duration-300 scale-100">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(2, 6, 40, 0.55)' }}
+    >
+      <div
+        className="auth-modal-card w-full relative overflow-hidden"
+        style={{
+          maxWidth: '400px',
+          background: 'rgba(10, 18, 70, 0.65)',
+          backdropFilter: 'blur(40px)',
+          WebkitBackdropFilter: 'blur(40px)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: '20px',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(255,255,255,0.06)'
+        }}
+      >
+        {/* Top accent stripe */}
+        <div className="h-[3px] w-full bg-gradient-to-r from-indigo-500 via-blue-500 to-indigo-400" />
+
+        {/* Close button */}
         <button
           type="button"
           onClick={handleClose}
-          className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-900 rounded-full hover:bg-gray-100"
           disabled={isLoading}
+          className="absolute top-5 right-5 p-1.5 rounded-full transition-all duration-200 text-white/30 hover:text-white/70"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
         >
-          <X size={24} />
+          <X size={16} />
         </button>
-        <div className="text-center mt-4">
+
+        {/* Form content */}
+        <div className="px-8 py-7">
           {renderContent()}
         </div>
+
+        {/* Footer brand line */}
+        <div className="px-8 pb-6 pt-0">
+          <p className="text-[11px] text-white/15 text-center tracking-wide">
+            STMIK TAZKIA · Sapa AI © 2025
+          </p>
+        </div>
       </div>
+
+      <style>{`
+        .auth-modal-card {
+          animation: authModalIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        @keyframes authModalIn {
+          from { opacity: 0; transform: scale(0.94) translateY(12px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0); }
+        }
+        .auth-input::placeholder {
+          color: rgba(255,255,255,0.28);
+        }
+        .auth-input:focus {
+          border-color: rgba(99,102,241,0.6) !important;
+          background: rgba(255,255,255,0.09) !important;
+          box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+        }
+        .auth-input:disabled {
+          opacity: 0.4;
+        }
+      `}</style>
     </div>
   );
 };
@@ -941,7 +1020,7 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-amber-50 font-sans overflow-hidden">
+    <div className="min-h-screen flex font-sans overflow-hidden" style={{ background: 'linear-gradient(135deg, #0A1560 0%, #1E3BCC 55%, #3D4FE0 100%)' }}>
       {/* ✅ MODAL KONFIRMASI HAPUS */}
       <ConfirmationModal
         isOpen={showDeleteModal}
@@ -978,7 +1057,7 @@ const LandingPage = () => {
             {/* Hamburger Menu - Mobile Only */}
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="p-2 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors md:hidden"
+              className="p-2 rounded-lg text-white/80 hover:bg-white/10 transition-colors md:hidden"
               title="Open Menu"
             >
               <Menu size={24} />
@@ -997,27 +1076,23 @@ const LandingPage = () => {
 
           <div className="flex items-center flex-wrap gap-2 sm:gap-3">
             {authLoading ? (
-              <span className="text-gray-500">Loading...</span>
+              <span className="text-white/50">Loading...</span>
             ) : user ? (
               null
             ) : (
               <>
-                <Button
-                  variant="primary"
-                  size="md"
-                  className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200/50 rounded-lg text-xs sm:text-sm md:text-base px-3 py-2 sm:px-4 sm:py-2"
+                <button
+                  className="text-white text-xs sm:text-sm font-semibold px-5 py-2 rounded-full transition-all duration-300 bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/40 hover:from-indigo-400 hover:to-blue-500 hover:shadow-indigo-400/60 hover:scale-105 active:scale-95"
                   onClick={() => openModal(0)}
                 >
                   SIGN IN
-                </Button>
-                <Button
-                  variant="primary"
-                  size="md"
-                  className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200/50 rounded-lg text-xs sm:text-sm md:text-base px-3 py-2 sm:px-4 sm:py-2"
+                </button>
+                <button
+                  className="text-white text-xs sm:text-sm font-semibold px-5 py-2 rounded-full transition-all duration-300 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 hover:scale-105 active:scale-95"
                   onClick={handleGuestChat}
                 >
                   TRY AS GUEST
-                </Button>
+                </button>
               </>
             )}
           </div>
@@ -1032,8 +1107,8 @@ const LandingPage = () => {
           </div>
 
           <div className="w-full max-w-2xl">
-            <div className="relative flex items-center p-2 bg-white border border-gray-300 rounded-full shadow-xl">
-              <button className="p-2 mr-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-colors">
+            <div className="relative flex items-center p-2 rounded-full backdrop-blur-lg border border-white/25 bg-white/10">
+              <button className="p-2 mr-2 bg-white/10 text-white hover:bg-white/20 rounded-full transition-colors">
                 <Plus size={20} />
               </button>
               <input
@@ -1042,13 +1117,14 @@ const LandingPage = () => {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                className="flex-1 px-2 py-2 text-lg text-gray-700 placeholder-gray-500 focus:outline-none bg-white"
+                className="flex-1 px-2 py-2 text-lg text-white placeholder-white/50 focus:outline-none bg-transparent"
               />
               <button
-                className={`p-3 rounded-full transition-colors shadow-md ml-2 flex items-center justify-center ${message.trim()
-                    ? 'bg-blue-500 text-white hover:bg-blue-600'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  }`}
+                className={`p-3 rounded-full transition-all duration-300 ml-2 flex items-center justify-center text-white ${
+                  message.trim()
+                    ? 'bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/50 hover:from-indigo-400 hover:to-blue-500 hover:shadow-indigo-400/70 hover:scale-105 active:scale-95'
+                    : 'bg-white/10 text-white/30 cursor-not-allowed'
+                }`}
                 aria-label="Send Message"
                 onClick={handleSendMessage}
                 disabled={!message.trim()}
@@ -1059,8 +1135,11 @@ const LandingPage = () => {
 
             {/* Guest mode info */}
             <div className="mt-4 text-center">
-              <p className="text-gray-500 text-sm">
-                {user ? 'AI can make mistakes. Cross-check academic information with official sources.' : 'AI can make mistakes. Cross-check academic information with official sources.'}
+              <p
+                className="text-white/60 text-sm"
+                style={{ textShadow: '0 0 18px rgba(255,255,255,0.35), 0 0 36px rgba(255,255,255,0.12)' }}
+              >
+                AI can make mistakes. Cross-check academic information with official sources.
               </p>
             </div>
           </div>

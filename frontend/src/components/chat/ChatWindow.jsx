@@ -1,31 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, AlertCircle, Clock, User, Bot, Download, Copy, CheckCheck, RotateCcw } from 'lucide-react';
+import { AlertCircle, Clock, User, Bot, Download, Copy, CheckCheck, RotateCcw } from 'lucide-react';
 
 // ==========================================
 // 🛠️ HELPER FUNCTIONS (FORMATTING)
 // ==========================================
 
-// 1. Clean content dari teks yang tidak diinginkan
 const cleanMessageContent = (text) => {
   if (typeof text !== 'string') return '';
   return text.replace(/Invalid Date\s*$/, '').trim();
 };
 
-// 2. Deteksi dan format teks Arabic
 const formatMessageWithArabic = (text) => {
   const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-
   return text.split('\n').map((line, index) => {
     const hasArabic = arabicRegex.test(line);
-
     return (
       <div
         key={index}
         className={hasArabic ? 'arabic-text' : 'regular-text'}
-        style={{
-          marginBottom: '0.5rem',
-          unicodeBidi: hasArabic ? 'plaintext' : 'normal'
-        }}
+        style={{ marginBottom: '0.5rem', unicodeBidi: hasArabic ? 'plaintext' : 'normal' }}
       >
         {line}
       </div>
@@ -33,122 +26,66 @@ const formatMessageWithArabic = (text) => {
   });
 };
 
-// 3. Format teks dengan link clickable (Support Markdown & Raw URL)
 const formatMessageWithLinks = (text) => {
   if (typeof text !== 'string') return text;
-
-  // Regex untuk Markdown [label](url)
   const markdownRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
-  // Regex untuk URL mentah (mendukung domain umum)
   const rawUrlRegex = /(https?:\/\/[^\s<]+[^.,\s<)])|(\b(?:[a-z0-9-]+\.)+(?:ac\.id|id|com|net|org|edu|gov)\b(?:[^\s,.<)]*[^\s,.<)])?)/gi;
-
   const parts = [];
   let lastIndex = 0;
   const matches = [];
-
-  // Cari semua Link Markdown
   let match;
   while ((match = markdownRegex.exec(text)) !== null) {
-    matches.push({
-      index: match.index,
-      length: match[0].length,
-      label: match[1],
-      url: match[2],
-      type: 'markdown'
-    });
+    matches.push({ index: match.index, length: match[0].length, label: match[1], url: match[2], type: 'markdown' });
   }
-
-  // Cari semua URL mentah yang tidak berada di dalam Link Markdown
   while ((match = rawUrlRegex.exec(text)) !== null) {
     const isOverlapping = matches.some(m =>
       (match.index >= m.index && match.index < m.index + m.length) ||
       (m.index >= match.index && m.index < match.index + match[0].length)
     );
-
     if (!isOverlapping) {
-      matches.push({
-        index: match.index,
-        length: match[0].length,
-        label: match[0],
-        url: match[0],
-        type: 'raw'
-      });
+      matches.push({ index: match.index, length: match[0].length, label: match[0], url: match[0], type: 'raw' });
     }
   }
-
-  // Urutkan berdasarkan posisi index
   matches.sort((a, b) => a.index - b.index);
-
-  // Susun output
   matches.forEach((m, i) => {
-    if (m.index > lastIndex) {
-      parts.push(text.substring(lastIndex, m.index));
-    }
-
+    if (m.index > lastIndex) parts.push(text.substring(lastIndex, m.index));
     const href = m.url.startsWith('http') ? m.url : `https://${m.url}`;
-
     parts.push(
-      <a
-        key={`link-${m.index}-${i}`}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-600 hover:text-blue-800 underline decoration-blue-500/30 hover:decoration-blue-700 transition-all font-medium px-0.5"
-      >
+      <a key={`link-${m.index}-${i}`} href={href} target="_blank" rel="noopener noreferrer"
+        className="text-blue-200 hover:text-blue-100 underline decoration-blue-200/40 hover:decoration-blue-100 transition-all font-medium px-0.5">
         {m.label}
       </a>
     );
-
     lastIndex = m.index + m.length;
   });
-
-  if (lastIndex < text.length) {
-    parts.push(text.substring(lastIndex));
-  }
-
+  if (lastIndex < text.length) parts.push(text.substring(lastIndex));
   return parts.length > 0 ? parts : text;
 };
 
-// 4. Format teks dengan bold untuk **teks**
 const formatMessageWithBold = (text) => {
   return text.split('\n').map((line, lineIndex) => {
     if (!line.trim()) return <div key={lineIndex} className="h-3"></div>;
-
     const parts = [];
     let currentIndex = 0;
     let boldStart = line.indexOf('**');
-
     while (boldStart !== -1) {
       if (boldStart > currentIndex) {
-        parts.push(
-          <span key={`${lineIndex}-${currentIndex}`}>
-            {formatMessageWithLinks(line.substring(currentIndex, boldStart))}
-          </span>
-        );
+        parts.push(<span key={`${lineIndex}-${currentIndex}`}>{formatMessageWithLinks(line.substring(currentIndex, boldStart))}</span>);
       }
-
       const boldEnd = line.indexOf('**', boldStart + 2);
       if (boldEnd === -1) break;
-
       const boldText = line.substring(boldStart + 2, boldEnd);
       parts.push(
-        <strong key={`${lineIndex}-bold-${boldStart}`} className="font-semibold text-gray-900">
+        <strong key={`${lineIndex}-bold-${boldStart}`} className="font-semibold text-white">
           {formatMessageWithLinks(boldText)}
         </strong>
       );
-
       currentIndex = boldEnd + 2;
       boldStart = line.indexOf('**', currentIndex);
     }
-
     if (currentIndex < line.length) {
-      parts.push(
-        <span key={`${lineIndex}-end`}>
-          {formatMessageWithLinks(line.substring(currentIndex))}
-        </span>
-      );
+      parts.push(<span key={`${lineIndex}-end`}>{formatMessageWithLinks(line.substring(currentIndex))}</span>);
     }
-
     return (
       <div key={lineIndex} className="mb-2 last:mb-0">
         {parts.length > 0 ? parts : formatMessageWithLinks(line)}
@@ -157,13 +94,10 @@ const formatMessageWithBold = (text) => {
   });
 };
 
-// 5. Gabungkan semua formatter
 const formatMessageContent = (text) => {
   if (!text || typeof text !== 'string') return null;
-
   const cleanedText = cleanMessageContent(text);
   const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-
   if (arabicRegex.test(cleanedText)) {
     return formatMessageWithArabic(cleanedText).map(element => {
       if (element.props && element.props.children) {
@@ -172,65 +106,63 @@ const formatMessageContent = (text) => {
       return element;
     });
   }
-
   return formatMessageWithBold(cleanedText);
 };
 
 // ==========================================
-// 💬 INTERNAL COMPONENT: Single Chat Message
+// 💬 TYPING INDICATOR
 // ==========================================
 
-// ✅ UPDATE: Terima prop onDownloadPDF dan onRetry
+const TypingIndicator = () => (
+  <div className="flex justify-start mb-6 w-full">
+    <div className="flex flex-row">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ai-avatar mr-3">
+        <Bot size={16} className="text-white" />
+      </div>
+      <div className="ai-bubble px-5 py-4 flex items-center space-x-1.5">
+        <div className="typing-dot"></div>
+        <div className="typing-dot"></div>
+        <div className="typing-dot"></div>
+      </div>
+    </div>
+  </div>
+);
+
+// ==========================================
+// 💬 SINGLE CHAT MESSAGE
+// ==========================================
+
 const SingleChatMessage = ({ message, onDownloadPDF, onRetry }) => {
   const isUser = message.role === 'user';
   const isCancelledOrError = message.isCancelled || message.isError;
   const [copied, setCopied] = useState(false);
-
-  // State untuk efek mengetik
   const [displayContent, setDisplayContent] = useState('');
   const [isTyping, setIsTyping] = useState(false);
 
-  // EFFECT: Logika Typing vs Instant Load
   useEffect(() => {
     const fullContent = message.content || '';
-
-    // 1. Jika User, langsung tampilkan
     if (isUser) {
       setDisplayContent(fullContent);
       setIsTyping(false);
       return;
     }
-
-    // 2. Cek apakah pesan ini "Baru"
     const msgTime = new Date(message.createdAt || message.timestamp || Date.now()).getTime();
-    const now = Date.now();
-    const isRecent = (now - msgTime) < 5000;
-
-    // 3. Jika History Lama -> Langsung tampilkan
+    const isRecent = (Date.now() - msgTime) < 5000;
     if (!isRecent) {
       setDisplayContent(fullContent);
       setIsTyping(false);
       return;
     }
-
-    // 4. Jika Streaming / Selesai Streaming -> Langsung tampilkan (bypass typewriter)
     if (message.isStreaming || message.isStreamComplete) {
       setDisplayContent(fullContent);
       setIsTyping(false);
       return;
     }
-
-    // 5. Jika Pesan Baru (Non-Stream) -> Jalankan Efek Mengetik
     setDisplayContent('');
     setIsTyping(true);
-
     let index = 0;
-    const speed = 10; // Kecepatan ketik
-    const charsPerTick = 3;
-
     const intervalId = setInterval(() => {
-      index += charsPerTick;
-
+      index += 3;
       if (index <= fullContent.length) {
         setDisplayContent(fullContent.slice(0, index));
       } else {
@@ -238,8 +170,7 @@ const SingleChatMessage = ({ message, onDownloadPDF, onRetry }) => {
         clearInterval(intervalId);
         setIsTyping(false);
       }
-    }, speed);
-
+    }, 10);
     return () => clearInterval(intervalId);
   }, [message.content, message.createdAt, message.timestamp, isUser]);
 
@@ -251,33 +182,32 @@ const SingleChatMessage = ({ message, onDownloadPDF, onRetry }) => {
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6 group w-full`}>
-      <div className={`flex max-w-[85%] md:max-w-[75%] ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+      <div className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'}`} style={{ maxWidth: isUser ? '70%' : '85%' }}>
 
         {/* Avatar */}
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isUser ? 'bg-blue-500 ml-3' : 'bg-gradient-to-br from-gray-400 to-gray-600 mr-3'
-          }`}>
-          {isUser ?
-            <User size={16} className="text-white" /> :
-            <Bot size={16} className="text-white" />
-          }
+        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+          isUser ? 'user-avatar ml-3' : 'ai-avatar mr-3'
+        }`}>
+          {isUser ? <User size={16} className="text-white" /> : <Bot size={16} className="text-white" />}
         </div>
 
         {/* Message Content */}
         <div className="flex-1 min-w-0">
-          <div className={`relative px-4 py-3 rounded-2xl shadow-sm ${isUser
-            ? 'bg-blue-500 text-white rounded-tr-sm'
-            : isCancelledOrError
-              ? 'bg-orange-50 text-gray-600 rounded-tl-sm border border-orange-200'
-              : 'glass-effect text-gray-800 rounded-tl-sm bg-white border border-gray-100'
-            }`}>
+          <div className={`relative ${
+            isUser
+              ? 'user-bubble px-[18px] py-3'
+              : isCancelledOrError
+                ? 'error-bubble px-[18px] py-3'
+                : 'ai-bubble px-[18px] py-[14px]'
+          }`}>
 
-            <div className={`
-              ${isUser
-                ? 'font-medium text-[15px] leading-relaxed'
-                : 'font-normal text-[15px] leading-[1.7] tracking-wide'
-              }
-            `}>
-              {/* Teks yang diformat */}
+            <div className={`${
+              isUser
+                ? 'font-medium text-[15px] leading-relaxed text-white'
+                : isCancelledOrError
+                  ? 'font-normal text-[15px] leading-[1.7] text-orange-200'
+                  : 'font-normal text-[15px] leading-[1.7] tracking-wide text-white'
+            }`}>
               {formatMessageContent(displayContent)}
             </div>
 
@@ -285,22 +215,23 @@ const SingleChatMessage = ({ message, onDownloadPDF, onRetry }) => {
             {!isUser && !isTyping && (
               <button
                 onClick={handleCopy}
-                className="glass-effect-copy absolute -bottom-2 -right-2 p-1.5 border border-gray-300 rounded-lg shadow-sm hover:bg-white/50 transition-all duration-300 opacity-0 group-hover:opacity-100 backdrop-blur-sm bg-white"
+                className="absolute -bottom-2 -right-2 p-1.5 rounded-lg transition-all duration-300 opacity-0 group-hover:opacity-100 backdrop-blur-sm"
+                style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)' }}
                 title="Salin teks"
               >
-                {copied ?
-                  <CheckCheck size={14} className="text-green-500" /> :
-                  <Copy size={14} className="text-gray-600" />
+                {copied
+                  ? <CheckCheck size={14} className="text-green-300" />
+                  : <Copy size={14} className="text-white/70" />
                 }
               </button>
             )}
 
-            {/* ✅ PDF Download Button (UPDATED) */}
-            {/* Cek hasPdfButton (dari ChatPage) atau hasPDF (legacy) */}
+            {/* PDF Download Button */}
             {(message.hasPdfButton || message.hasPDF) && !isTyping && (
               <button
-                onClick={onDownloadPDF} // ✅ Panggil fungsi download
-                className="glass-effect-download mt-3 w-full flex items-center justify-center space-x-2 px-4 py-2 bg-white/30 hover:bg-white/40 rounded-lg transition-all duration-300 text-sm font-medium text-gray-700 backdrop-blur-sm border border-white/20 hover:text-orange-600 hover:border-orange-200"
+                onClick={onDownloadPDF}
+                className="mt-3 w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 text-sm font-medium text-white"
+                style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)' }}
               >
                 <Download size={16} />
                 <span>Download Transkrip PDF</span>
@@ -308,69 +239,56 @@ const SingleChatMessage = ({ message, onDownloadPDF, onRetry }) => {
             )}
           </div>
 
-          {/* Timestamp + Retry Button */}
-          <div className={`flex items-center mt-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
-            <p className="text-xs text-gray-400">
+          {/* Timestamp + Retry */}
+          <div className={`flex items-center mt-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
+            <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', marginTop: '4px', textAlign: isUser ? 'right' : 'left' }}>
               {new Date(message.createdAt || message.timestamp || Date.now()).toLocaleTimeString('id-ID', {
-                hour: '2-digit',
-                minute: '2-digit'
+                hour: '2-digit', minute: '2-digit'
               })}
             </p>
-
-            {/* ✅ NEW: Retry Button untuk cancelled/error messages */}
             {isCancelledOrError && !isTyping && onRetry && (
               <button
                 onClick={onRetry}
-                className="ml-2 p-1.5 bg-orange-100 hover:bg-orange-200 rounded-lg transition-all duration-200 group/retry"
+                className="ml-2 p-1.5 rounded-lg transition-all duration-200 group/retry"
+                style={{ background: 'rgba(251,146,60,0.2)', border: '1px solid rgba(251,146,60,0.3)' }}
                 title="Coba lagi"
               >
-                <RotateCcw size={14} className="text-orange-600 group-hover/retry:rotate-[-45deg] transition-transform duration-200" />
+                <RotateCcw size={14} className="text-orange-300 group-hover/retry:rotate-[-45deg] transition-transform duration-200" />
               </button>
             )}
           </div>
         </div>
       </div>
-
     </div>
   );
 };
 
 // ==========================================
-// 🚀 MAIN COMPONENT: Chat Window Container
+// 🚀 MAIN: Chat Window Container
 // ==========================================
 
-// ✅ UPDATE: Terima prop onDownloadPDF dan onRetry
 const ChatWindow = ({ messages, isLoading, error, onDownloadPDF, onRetry }) => {
   const messagesEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading, error]);
 
-  // --- ERROR RENDERER ---
   const renderErrorState = () => {
     if (!error) return null;
-
     const isRateLimit = error.code === 'rate_limit_exceeded' || error.status === 429;
-
     if (isRateLimit) {
       return (
-        <div className="flex justify-center my-6 animate-in fade-in slide-in-from-bottom-4 w-full">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-w-md shadow-sm w-full mx-4">
+        <div className="flex justify-center my-6 w-full">
+          <div className="rounded-xl p-4 max-w-md w-full mx-4" style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)' }}>
             <div className="flex items-start space-x-3">
-              <div className="bg-red-100 p-2 rounded-full flex-shrink-0">
-                <Clock className="w-5 h-5 text-red-600" />
+              <div className="p-2 rounded-full flex-shrink-0" style={{ background: 'rgba(239,68,68,0.2)' }}>
+                <Clock className="w-5 h-5 text-red-300" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-red-800">Batas Penggunaan Tercapai</h3>
-                <p className="text-sm text-red-700 mt-1">
-                  {error.message || "Kuota token harian Anda telah habis."}
-                </p>
-                <div className="mt-3 flex items-center space-x-2 text-xs text-red-600 font-medium">
+                <h3 className="text-sm font-bold text-red-200">Batas Penggunaan Tercapai</h3>
+                <p className="text-sm text-red-300 mt-1">{error.message || "Kuota token harian Anda telah habis."}</p>
+                <div className="mt-3 flex items-center space-x-2 text-xs text-red-300 font-medium">
                   <span>⏳ Coba lagi nanti</span>
                   <span>•</span>
                   <span>Login untuk kuota lebih banyak</span>
@@ -381,75 +299,116 @@ const ChatWindow = ({ messages, isLoading, error, onDownloadPDF, onRetry }) => {
         </div>
       );
     }
-
-    // Generic Error
     return (
       <div className="flex justify-center my-4 w-full px-4">
-        <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 flex items-center shadow-sm max-w-lg w-full">
-          <AlertCircle className="w-5 h-5 text-orange-500 mr-2 flex-shrink-0" />
-          <span className="text-sm text-gray-700">{error.message || "Terjadi kesalahan sistem"}</span>
+        <div className="rounded-lg px-4 py-3 flex items-center max-w-lg w-full" style={{ background: 'rgba(251,146,60,0.15)', border: '1px solid rgba(251,146,60,0.3)' }}>
+          <AlertCircle className="w-5 h-5 text-orange-300 mr-2 flex-shrink-0" />
+          <span className="text-sm text-orange-200">{error.message || "Terjadi kesalahan sistem"}</span>
         </div>
       </div>
     );
   };
 
-  // --- EMPTY STATE (Tampilan Awal) ---
   if (messages.length === 0 && !error && !isLoading) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-0 animate-in fade-in duration-700 opacity-100">
-        <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mb-6 shadow-sm animate-bounce-slow">
-          <svg className="w-10 h-10 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 animate-bounce-slow"
+          style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(12px)' }}>
+          <svg className="w-10 h-10 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-3">
-          Sapa Tazkia AI
-        </h2>
-        <p className="text-gray-500 max-w-sm leading-relaxed">
-          Tanyakan apa saja tentang Tazkia. <br />
-        </p>
+        <h2 className="text-2xl font-bold text-white mb-3">Sapa Tazkia AI</h2>
+        <p className="text-white/50 max-w-sm leading-relaxed">Tanyakan apa saja tentang Tazkia.</p>
       </div>
     );
   }
 
-  // --- CONTENT STATE (Daftar Pesan) ---
   return (
     <div className="flex flex-col space-y-2 pb-4 w-full">
-
       {messages.map((msg, index) => (
-        <SingleChatMessage
-          key={index}
-          message={msg}
-          onDownloadPDF={onDownloadPDF}
-          onRetry={onRetry}  // ✅ Pass Retry handler ke child
-        />
+        <SingleChatMessage key={index} message={msg} onDownloadPDF={onDownloadPDF} onRetry={onRetry} />
       ))}
 
-      {/* Loading Indicator */}
-      {isLoading && (
-        <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 pl-2">
-          <div className="bg-white border border-gray-100 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center space-x-2">
-            <Loader2 size={16} className="animate-spin text-orange-500" />
-            <span className="text-sm text-gray-500 font-medium">Sedang berpikir...</span>
-          </div>
-        </div>
-      )}
+      {isLoading && <TypingIndicator />}
 
-      {/* Error State */}
       {renderErrorState()}
 
-      {/* Invisible element for auto-scroll */}
       <div ref={messagesEndRef} className="h-1" />
 
-      {/* CSS Styles - Moved to Window level to avoid redundancy */}
       <style>{`
-        .glass-effect {
-          background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(229, 231, 235, 0.5);
+        /* ── Keyframes ── */
+        @keyframes slideInRight {
+          from { transform: translateX(20px); opacity: 0; }
+          to   { transform: translateX(0);    opacity: 1; }
         }
-        
+        @keyframes slideUpFade {
+          from { transform: translateY(10px); opacity: 0; }
+          to   { transform: translateY(0);    opacity: 1; }
+        }
+        @keyframes typingBounce {
+          0%, 60%, 100% { transform: translateY(0); }
+          30%           { transform: translateY(-6px); }
+        }
+
+        /* ── User Bubble ── */
+        .user-bubble {
+          background: rgba(99, 102, 241, 0.45);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          border-radius: 18px 18px 4px 18px;
+          box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+          animation: slideInRight 0.3s ease-out;
+          transition: background 0.2s ease;
+        }
+        .user-bubble:hover {
+          background: rgba(99, 102, 241, 0.55);
+        }
+
+        /* ── AI Bubble ── */
+        .ai-bubble {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          border-radius: 18px 18px 18px 4px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+          animation: slideUpFade 0.4s ease;
+        }
+
+        /* ── Error/Cancelled Bubble ── */
+        .error-bubble {
+          background: rgba(251, 146, 60, 0.18);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(251, 146, 60, 0.3);
+          border-radius: 18px 18px 18px 4px;
+          animation: slideUpFade 0.4s ease;
+        }
+
+        /* ── Avatars ── */
+        .user-avatar {
+          background: rgba(99, 102, 241, 0.6);
+          border: 1px solid rgba(255,255,255,0.25);
+        }
+        .ai-avatar {
+          background: rgba(255, 255, 255, 0.15);
+          border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        /* ── Typing Dots ── */
+        .typing-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.6);
+          animation: typingBounce 1.2s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        /* ── Text inside bubbles ── */
         .arabic-text {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
           font-size: 18px;
@@ -458,9 +417,8 @@ const ChatWindow = ({ messages, isLoading, error, onDownloadPDF, onRetry }) => {
           line-height: 1.8;
           direction: rtl;
         }
-        
         .regular-text {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-family: 'Satoshi', sans-serif;
         }
       `}</style>
     </div>

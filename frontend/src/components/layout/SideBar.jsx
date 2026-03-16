@@ -139,7 +139,7 @@ const Sidebar = ({
     <img
       src="https://www.svgrepo.com/show/493722/sidebar-toggle-nav-side-aside.svg"
       alt="Toggle Sidebar"
-      className={`w-6 h-6 text-gray-700 transition-transform duration-300 ${open ? '' : 'transform rotate-180'}`}
+      className={`w-6 h-6 invert opacity-70 transition-transform duration-300 ${open ? '' : 'transform rotate-180'}`}
     />
   );
 
@@ -164,13 +164,13 @@ const Sidebar = ({
 
   return (
     <>
-      <div className={`hidden md:flex ${isSidebarOpen ? 'md:w-64' : 'md:w-20'} bg-amber-50 border-r border-gray-200 flex-col h-screen p-3 shadow-xl transition-all duration-300 relative ${className}`}>
+      <div className={`hidden md:flex ${isSidebarOpen ? 'md:w-64' : 'md:w-20'} border-r border-white/10 flex-col h-screen p-3 shadow-xl transition-all duration-300 relative ${className}`} style={{ background: 'linear-gradient(160deg, #060e3a 0%, #0f1e78 100%)' }}>
 
         {/* Header */}
         {isSidebarOpen ? (
           <div className="flex justify-between items-center mb-8 flex-shrink-0">
             <button
-              className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-3"
+              className="p-2 rounded-xl text-white/70 hover:bg-white/10 transition-colors flex items-center gap-3"
               title="Settings"
               onClick={onSettingsClick}
               disabled={isStartingNewChat || isDeleting}
@@ -179,7 +179,7 @@ const Sidebar = ({
             </button>
             <button
               onClick={onToggleSidebar}
-              className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
+              className="p-2 rounded-xl text-white/70 hover:bg-white/10 transition-colors"
               title="Tutup Sidebar"
               disabled={isStartingNewChat || isDeleting}
             >
@@ -190,7 +190,7 @@ const Sidebar = ({
           <div className="flex justify-center mb-8 flex-shrink-0">
             <button
               onClick={onToggleSidebar}
-              className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
+              className="p-2 rounded-xl text-white/70 hover:bg-white/10 transition-colors"
               title="Buka Sidebar"
               disabled={isStartingNewChat || isDeleting}
             >
@@ -203,9 +203,9 @@ const Sidebar = ({
         <div className="flex flex-col flex-shrink-0">
           <div className={`flex ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
             <button
-              className={`${isSidebarOpen ? 'w-full justify-center p-3' : 'w-12 h-12 justify-center'} h-12 bg-white border border-gray-300 text-gray-700 rounded-full transition-all flex items-center group relative gap-3 shadow-sm ${(isDeleting || isStartingNewChat)
-                ? 'opacity-50 cursor-not-allowed'
-                : 'hover:bg-gray-50 hover:shadow-md'
+              className={`${isSidebarOpen ? 'w-full justify-center p-3' : 'w-12 h-12 justify-center'} h-12 text-white rounded-full transition-all flex items-center group relative gap-3 backdrop-blur-sm border border-white/20 ${(isDeleting || isStartingNewChat)
+                ? 'opacity-50 cursor-not-allowed bg-white/5'
+                : 'bg-white/10 hover:bg-white/20'
                 }`}
               title={isStartingNewChat ? "Memulai chat baru..." : "New Chat"}
               onClick={handleNewChat}
@@ -228,15 +228,15 @@ const Sidebar = ({
           {isSidebarOpen && (
             <button
               onClick={toggleChatsSection}
-              className="w-full flex items-center justify-between p-2 text-gray-700 hover:text-gray-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-between p-2 text-white/70 hover:text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title={isChatsSectionOpen ? "Sembunyikan Chats" : "Tampilkan Chats"}
               disabled={isStartingNewChat || isDeleting}
             >
               <span className="text-sm font-semibold">Chats</span>
               {isChatsSectionOpen ? (
-                <ChevronDown size={16} className="text-gray-500" />
+                <ChevronDown size={16} className="text-white/50" />
               ) : (
-                <ChevronRight size={16} className="text-gray-500" />
+                <ChevronRight size={16} className="text-white/50" />
               )}
             </button>
           )}
@@ -248,31 +248,31 @@ const Sidebar = ({
             <div className="flex-1 overflow-y-auto mt-4 space-y-4 custom-scrollbar">
               {groupedChats.today.length > 0 && (
                 <div className="space-y-1">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Today</h3>
+                  <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">Today</h3>
                   {renderChatGroup(groupedChats.today)}
                 </div>
               )}
               {groupedChats.yesterday.length > 0 && (
                 <div className="space-y-1">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Yesterday</h3>
+                  <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">Yesterday</h3>
                   {renderChatGroup(groupedChats.yesterday)}
                 </div>
               )}
               {groupedChats.last7Days.length > 0 && (
                 <div className="space-y-1">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Previous 7 Days</h3>
+                  <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">Previous 7 Days</h3>
                   {renderChatGroup(groupedChats.last7Days)}
                 </div>
               )}
               {groupedChats.last30Days.length > 0 && (
                 <div className="space-y-1">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Previous 30 Days</h3>
+                  <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">Previous 30 Days</h3>
                   {renderChatGroup(groupedChats.last30Days)}
                 </div>
               )}
               {groupedChats.older.length > 0 && (
                 <div className="space-y-1">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">
+                  <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">
                     {formatMonthYear(groupedChats.older[0].timestamp)}
                   </h3>
                   {renderChatGroup(groupedChats.older)}
@@ -281,14 +281,14 @@ const Sidebar = ({
 
               {/* Empty/Loading States */}
               {chatHistory.length === 0 && user && (
-                <p className="p-2 text-xs text-gray-500 text-center">Belum ada riwayat chat.</p>
+                <p className="p-2 text-xs text-white/40 text-center">Belum ada riwayat chat.</p>
               )}
               {!user && (
-                <p className="p-2 text-xs text-gray-500 text-center">Login untuk melihat riwayat chat Anda.</p>
+                <p className="p-2 text-xs text-white/40 text-center">Login untuk melihat riwayat chat Anda.</p>
               )}
               {(isDeleting || isStartingNewChat) && (
                 <div className="p-2 text-center">
-                  <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                  <div className="flex items-center justify-center gap-2 text-xs text-white/50">
                     <Loader2 size={12} className="animate-spin" />
                     <span>{isStartingNewChat ? 'Memulai chat...' : 'Menghapus...'}</span>
                   </div>
@@ -304,8 +304,8 @@ const Sidebar = ({
         <div className="mt-8 flex-shrink-0">
           <div className="flex justify-center">
             <button
-              className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c80]'
-                } text-white rounded-xl shadow-lg transition-all flex items-center ${(isStartingNewChat || isDeleting) ? 'opacity-70 cursor-not-allowed' : ''
+              className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-white rounded-xl shadow-lg transition-all flex items-center backdrop-blur-md border border-white/30 ${user ? 'bg-white/15 hover:bg-white/25' : 'bg-white/15 hover:bg-white/25'
+                } ${(isStartingNewChat || isDeleting) ? 'opacity-70 cursor-not-allowed' : ''
                 }`}
               title={user ? `Logged in as ${getUserName()}` : 'Login as Mahasiswa'}
               onClick={handleProfileClick}
@@ -333,9 +333,9 @@ const Sidebar = ({
         <style>{`
           .custom-scrollbar::-webkit-scrollbar { width: 6px; }
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-          .custom-scrollbar::-webkit-scrollbar-thumb { background: #9CA3AF; border-radius: 3px; }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6B7280; }
-          .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #9CA3AF transparent; }
+          .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+          .custom-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
         `}</style>
       </div>
 
@@ -392,11 +392,11 @@ const Sidebar = ({
           />
 
           {/* Mobile Sidebar Panel */}
-          <div className="fixed left-0 top-0 h-full w-72 bg-amber-50 z-50 md:hidden shadow-2xl transform transition-transform duration-300 ease-out flex flex-col p-3">
+          <div className="fixed left-0 top-0 h-full w-72 z-50 md:hidden shadow-2xl transform transition-transform duration-300 ease-out flex flex-col p-3" style={{ background: 'linear-gradient(160deg, #060e3a 0%, #0f1e78 100%)' }}>
             {/* Close Button Header */}
             <div className="flex justify-between items-center mb-6 flex-shrink-0">
               <button
-                className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
+                className="p-2 rounded-xl text-white/70 hover:bg-white/10 transition-colors"
                 title="Settings"
                 onClick={onSettingsClick}
               >
@@ -404,7 +404,7 @@ const Sidebar = ({
               </button>
               <button
                 onClick={onCloseMobileSidebar}
-                className="p-2 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
+                className="p-2 rounded-xl text-white/70 hover:bg-white/10 transition-colors"
                 title="Close Sidebar"
               >
                 <X size={24} />
@@ -414,9 +414,9 @@ const Sidebar = ({
             {/* New Chat Button */}
             <div className="flex flex-col flex-shrink-0">
               <button
-                className={`w-full justify-center p-3 h-12 bg-white border border-gray-300 text-gray-700 rounded-full transition-all flex items-center gap-3 shadow-sm ${(isDeleting || isStartingNewChat)
-                    ? 'opacity-50 cursor-not-allowed'
-                    : 'hover:bg-gray-50 hover:shadow-md'
+                className={`w-full justify-center p-3 h-12 text-white rounded-full transition-all flex items-center gap-3 backdrop-blur-sm border border-white/20 ${(isDeleting || isStartingNewChat)
+                    ? 'opacity-50 cursor-not-allowed bg-white/5'
+                    : 'bg-white/10 hover:bg-white/20'
                   }`}
                 title={isStartingNewChat ? "Memulai chat baru..." : "New Chat"}
                 onClick={(e) => {
@@ -440,14 +440,14 @@ const Sidebar = ({
             <div className="mt-6 flex-shrink-0">
               <button
                 onClick={toggleChatsSection}
-                className="w-full flex items-center justify-between p-2 text-gray-700 hover:text-gray-900 rounded-lg transition-colors"
+                className="w-full flex items-center justify-between p-2 text-white/70 hover:text-white rounded-lg transition-colors"
                 title={isChatsSectionOpen ? "Sembunyikan Chats" : "Tampilkan Chats"}
               >
                 <span className="text-sm font-semibold">Chats</span>
                 {isChatsSectionOpen ? (
-                  <ChevronDown size={16} className="text-gray-500" />
+                  <ChevronDown size={16} className="text-white/50" />
                 ) : (
-                  <ChevronRight size={16} className="text-gray-500" />
+                  <ChevronRight size={16} className="text-white/50" />
                 )}
               </button>
             </div>
@@ -458,7 +458,7 @@ const Sidebar = ({
                 <div className="flex-1 overflow-y-auto mt-4 space-y-4 custom-scrollbar">
                   {groupedChats.today.length > 0 && (
                     <div className="space-y-1">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Today</h3>
+                      <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">Today</h3>
                       {groupedChats.today.map(chat => (
                         <div
                           key={chat.id}
@@ -466,7 +466,7 @@ const Sidebar = ({
                             handleSelectChat(chat.id);
                             onCloseMobileSidebar?.();
                           }}
-                          className={`flex items-center rounded-lg p-2 cursor-pointer ${currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
+                          className={`flex items-center rounded-lg p-2 cursor-pointer text-white/80 ${currentChatId === chat.id ? 'bg-white/20 font-semibold text-white' : 'hover:bg-white/10'
                             }`}
                         >
                           <span className="truncate text-sm">{chat.title}</span>
@@ -476,7 +476,7 @@ const Sidebar = ({
                   )}
                   {groupedChats.yesterday.length > 0 && (
                     <div className="space-y-1">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Yesterday</h3>
+                      <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">Yesterday</h3>
                       {groupedChats.yesterday.map(chat => (
                         <div
                           key={chat.id}
@@ -484,7 +484,7 @@ const Sidebar = ({
                             handleSelectChat(chat.id);
                             onCloseMobileSidebar?.();
                           }}
-                          className={`flex items-center rounded-lg p-2 cursor-pointer ${currentChatId === chat.id ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'
+                          className={`flex items-center rounded-lg p-2 cursor-pointer text-white/80 ${currentChatId === chat.id ? 'bg-white/20 font-semibold text-white' : 'hover:bg-white/10'
                             }`}
                         >
                           <span className="truncate text-sm">{chat.title}</span>
@@ -493,10 +493,10 @@ const Sidebar = ({
                     </div>
                   )}
                   {chatHistory.length === 0 && user && (
-                    <p className="p-2 text-xs text-gray-500 text-center">Belum ada riwayat chat.</p>
+                    <p className="p-2 text-xs text-white/40 text-center">Belum ada riwayat chat.</p>
                   )}
                   {!user && (
-                    <p className="p-2 text-xs text-gray-500 text-center">Login untuk melihat riwayat chat Anda.</p>
+                    <p className="p-2 text-xs text-white/40 text-center">Login untuk melihat riwayat chat Anda.</p>
                   )}
                 </div>
               )}
@@ -505,8 +505,7 @@ const Sidebar = ({
             {/* Profile Footer */}
             <div className="mt-4 flex-shrink-0">
               <button
-                className={`w-full justify-start p-3 h-12 ${user ? 'bg-[#172c66] hover:bg-[#172c90]' : 'bg-[#172c66] hover:bg-[#172c80]'
-                  } text-white rounded-xl shadow-lg transition-all flex items-center`}
+                className={`w-full justify-start p-3 h-12 text-white rounded-xl shadow-lg transition-all flex items-center backdrop-blur-md border border-white/30 ${user ? 'bg-white/15 hover:bg-white/25' : 'bg-white/15 hover:bg-white/25'}`}
                 title={user ? `Logged in as ${getUserName()}` : 'Login as Mahasiswa'}
                 onClick={(e) => {
                   handleProfileClick(e);
@@ -570,9 +569,9 @@ const ChatItem = ({
       className={`
         flex items-center group rounded-lg p-2 transition-colors cursor-pointer relative
         ${isActive
-          ? 'bg-gray-200 text-gray-800 font-semibold'
-          : 'hover:bg-gray-100 text-gray-700'
-        } 
+          ? 'bg-white/20 text-white font-semibold'
+          : 'hover:bg-white/10 text-white/70'
+        }
         ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
       `}
     >
@@ -586,12 +585,10 @@ const ChatItem = ({
       {onDeleteChat && isSidebarOpen && (
         <button
           onClick={handleMoreButtonClick}
-          // ✅ PERBAIKAN: Menghapus background color (hover:bg-gray-300)
-          // Sekarang hanya mengubah warna icon saat di-hover (hover:text-black)
           className={`
             p-1 rounded-md transition-all ml-1
-            ${isActive ? 'opacity-100 text-gray-600' : 'opacity-0 group-hover:opacity-100 text-gray-400'} 
-            hover:text-black 
+            ${isActive ? 'opacity-100 text-white/60' : 'opacity-0 group-hover:opacity-100 text-white/40'}
+            hover:text-white
             ${isLoading ? 'cursor-not-allowed' : ''}
           `}
           title="More options"
