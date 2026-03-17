@@ -71,4 +71,4 @@ Allow: /
 Disallow: /admin/
 Disallow: /api/
 
-Sitemap: https://sapa-tazkia.stmik-tazkia.ac.id/sitemap.xml
+Sitemap: https://sapa.tazkia.ac.id/sitemap.xml
