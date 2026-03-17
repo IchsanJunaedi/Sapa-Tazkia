@@ -1020,6 +1020,7 @@ const LandingPage = () => {
   };
 
   return (
+  <>
     <div className="min-h-screen flex font-sans overflow-hidden" style={{ background: 'linear-gradient(135deg, #0A1560 0%, #1E3BCC 55%, #3D4FE0 100%)' }}>
       {/* ✅ MODAL KONFIRMASI HAPUS */}
       <ConfirmationModal
@@ -1152,8 +1153,9 @@ const LandingPage = () => {
         onClose={closeModal}
         initialStep={initialModalStep}
       />
-      <SEOContent />
     </div>
+    <SEOContent />
+  </>
   );
 };
 
