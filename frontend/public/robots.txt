@@ -7,6 +7,18 @@ Allow: /
 Disallow: /admin/
 Disallow: /api/
 
+# Google
+User-agent: Googlebot
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+# Bing
+User-agent: Bingbot
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
 # --- AI Crawlers ---
 # Named stanzas are explicit for discoverability.
 # Each includes Disallow rules because named stanzas override the wildcard.
