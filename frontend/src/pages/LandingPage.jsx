@@ -1168,7 +1168,7 @@ const SEOContent = () => (
     <div className="max-w-4xl mx-auto">
       {/* H1 — hanya satu per halaman, wajib untuk SEO */}
       <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-        Sapa-Tazkia: AI Chatbot Akademik STMIK Tazkia
+        Sapa Tazkia | AI Chatbot Akademik Tazkia
       </h1>
 
       {/* Deskripsi utama dengan keyword density natural */}
