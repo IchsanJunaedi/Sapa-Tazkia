@@ -1,3 +1,52 @@
-# https://www.robotstxt.org/robotstxt.html
+# Sapa-Tazkia — STMIK Tazkia AI Chatbot
+# robots.txt: https://www.robotstxt.org/robotstxt.html
+
+# Standard search engines
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+# Google
+User-agent: Googlebot
+Allow: /
+
+# Bing
+User-agent: Bingbot
+Allow: /
+
+# --- AI Crawlers ---
+
+# OpenAI ChatGPT
+User-agent: ChatGPT-User
+Allow: /
+
+# OpenAI GPTBot (training crawler)
+User-agent: GPTBot
+Allow: /
+
+# Anthropic ClaudeBot
+User-agent: ClaudeBot
+Allow: /
+
+# Anthropic Claude-User
+User-agent: Claude-User
+Allow: /
+
+# Perplexity AI
+User-agent: PerplexityBot
+Allow: /
+
+# Google Gemini / Bard
+User-agent: Google-Extended
+Allow: /
+
+# Meta AI
+User-agent: Meta-ExternalAgent
+Allow: /
+
+# Common-Crawl (used by many AI training pipelines)
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://sapa-tazkia.stmik-tazkia.ac.id/sitemap.xml
