@@ -4,49 +4,59 @@
 # Standard search engines
 User-agent: *
 Allow: /
-Disallow: /admin
+Disallow: /admin/
 Disallow: /api/
 
-# Google
-User-agent: Googlebot
-Allow: /
-
-# Bing
-User-agent: Bingbot
-Allow: /
-
 # --- AI Crawlers ---
+# Named stanzas are explicit for discoverability.
+# Each includes Disallow rules because named stanzas override the wildcard.
 
 # OpenAI ChatGPT
 User-agent: ChatGPT-User
 Allow: /
+Disallow: /admin/
+Disallow: /api/
 
 # OpenAI GPTBot (training crawler)
 User-agent: GPTBot
 Allow: /
+Disallow: /admin/
+Disallow: /api/
 
 # Anthropic ClaudeBot
 User-agent: ClaudeBot
 Allow: /
+Disallow: /admin/
+Disallow: /api/
 
 # Anthropic Claude-User
 User-agent: Claude-User
 Allow: /
+Disallow: /admin/
+Disallow: /api/
 
 # Perplexity AI
 User-agent: PerplexityBot
 Allow: /
+Disallow: /admin/
+Disallow: /api/
 
 # Google Gemini / Bard
 User-agent: Google-Extended
 Allow: /
+Disallow: /admin/
+Disallow: /api/
 
 # Meta AI
 User-agent: Meta-ExternalAgent
 Allow: /
+Disallow: /admin/
+Disallow: /api/
 
 # Common-Crawl (used by many AI training pipelines)
 User-agent: CCBot
 Allow: /
+Disallow: /admin/
+Disallow: /api/
 
 Sitemap: https://sapa-tazkia.stmik-tazkia.ac.id/sitemap.xml
