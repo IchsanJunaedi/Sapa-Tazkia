@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { requireAdmin } = require('../middleware/authMiddleware');
-const { getChatLogs, getRealtimeAnalytics, getHistoryAnalytics, listKnowledgeBase, addKnowledgeDoc, deleteKnowledgeDoc } = require('../controllers/adminController');
+const { getChatLogs, getRealtimeAnalytics, getHistoryAnalytics, listKnowledgeBase, addKnowledgeDoc, deleteKnowledgeDoc, getBugReports } = require('../controllers/adminController');
 const logger = require('../utils/logger');
 
 // ============================================================
@@ -41,5 +41,8 @@ router.get('/analytics/history', getHistoryAnalytics);
 router.get('/knowledge-base', listKnowledgeBase);
 router.post('/knowledge-base', addKnowledgeDoc);
 router.delete('/knowledge-base/:id', deleteKnowledgeDoc);
+
+// Bug Reports
+router.get('/bug-reports', getBugReports);
 
 module.exports = router;

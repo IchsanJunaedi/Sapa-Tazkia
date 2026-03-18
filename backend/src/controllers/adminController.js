@@ -383,11 +383,25 @@ const deleteKnowledgeDoc = async (req, res) => {
   }
 };
 
+const getBugReports = async (req, res) => {
+  try {
+    const reports = await prisma.bugReport.findMany({
+      include: { user: { select: { fullName: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ success: true, reports });
+  } catch (error) {
+    console.error('❌ [ADMIN] getBugReports Error:', error);
+    return res.status(500).json({ success: false, message: 'Gagal mengambil laporan bug.' });
+  }
+};
+
 module.exports = {
     getChatLogs,
     getRealtimeAnalytics,
     getHistoryAnalytics,
     listKnowledgeBase,
     addKnowledgeDoc,
-    deleteKnowledgeDoc
+    deleteKnowledgeDoc,
+    getBugReports
 };
