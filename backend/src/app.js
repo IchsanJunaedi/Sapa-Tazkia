@@ -98,17 +98,17 @@ const initializeAnalyticsSystem = async () => {
 // CORS configuration - Enhanced with rate limit headers
 // ✅ SECURITY: Dynamic CORS origins based on environment
 const isProduction = process.env.NODE_ENV === 'production';
+const extraDevOrigins = process.env.DEV_CORS_ORIGINS
+  ? process.env.DEV_CORS_ORIGINS.split(',').map(o => o.trim())
+  : [];
 const allowedOrigins = isProduction
-  ? [
-    process.env.FRONTEND_URL || 'https://sapa.tazkia.ac.id'
-  ]
+  ? [process.env.FRONTEND_URL || 'https://sapa.tazkia.ac.id']
   : [
     process.env.FRONTEND_URL || 'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3001',
-    'http://192.168.100.48:3000',
-    'http://192.168.100.11:3000'
+    ...extraDevOrigins
   ];
 
 app.use(cors({

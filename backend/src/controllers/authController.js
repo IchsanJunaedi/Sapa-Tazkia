@@ -1,10 +1,10 @@
 const authService = require('../services/authService');
 const academicService = require('../services/academicService');
 const emailService = require('../services/emailService');
-const ragService = require('../services/ragService'); // ✅ IMPORT RAG SERVICE
-const openaiService = require('../services/openaiService'); // ✅ BARU: Import OpenAI Service untuk Title
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const ragService = require('../services/ragService');
+const openaiService = require('../services/openaiService');
+const prisma = require('../config/prismaClient');
+const logger = require('../utils/logger');
 const jwt = require('jsonwebtoken');
 const { authenticator } = require('otplib');
 const QRCode = require('qrcode');
@@ -14,9 +14,6 @@ const QRCode = require('qrcode');
 // ============================================================================
 
 const googleAuth = (req, res, next) => {
-  console.log('[DEBUG] Initiating Google OAuth');
-  console.log('[DEBUG] Session before auth:', req.sessionID);
-
   authService.passport.authenticate('google', {
     scope: ['profile', 'email'],
     prompt: 'select_account'
@@ -24,9 +21,6 @@ const googleAuth = (req, res, next) => {
 };
 
 const googleCallback = (req, res, next) => {
-  console.log('[DEBUG] Google OAuth callback received');
-  console.log('[DEBUG] Session ID in callback:', req.sessionID);
-
   authService.passport.authenticate('google', {
     failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`
   })(req, res, next);
@@ -35,27 +29,22 @@ const googleCallback = (req, res, next) => {
 // ✅ Google Callback Success
 const googleCallbackSuccess = async (req, res) => {
   try {
-    console.log('[DEBUG] Google callback success handler called');
-
     if (!req.user) {
-      console.error('[ERROR] No user in request after Google auth');
+      logger.error('[AUTH] No user in request after Google auth');
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=no_user_session`);
     }
 
     const userEmail = req.user.email;
-    console.log(`[DEBUG] Google OAuth successful for user: ${userEmail}`);
 
     // Validasi domain
     const validDomains = ['student.tazkia.ac.id', 'student.stmik.tazkia.ac.id', 'tazkia.ac.id'];
     const userDomain = userEmail.split('@')[1];
 
     if (!validDomains.includes(userDomain)) {
-      console.log(`🚫 [AUTH CONTROLLER] Google login rejected - Invalid domain: ${userEmail}`);
+      logger.warn(`[AUTH] Google login rejected - invalid domain: ${userDomain}`);
       // ✅ PERBAIKAN: Redirect ke landing page dengan auth_error agar error ditampilkan di modal
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/?auth_error=invalid_domain&message=${encodeURIComponent('Login gagal! Silakan gunakan email kampus Tazkia (@student.tazkia.ac.id, @student.stmik.tazkia.ac.id, atau @tazkia.ac.id)')}&email=${encodeURIComponent(userEmail)}`);
     }
-
-    console.log(`[DEBUG] Checking if user is new for: ${userEmail}`);
 
     const existingUser = await prisma.user.findUnique({
       where: { email: userEmail },
@@ -68,18 +57,12 @@ const googleCallbackSuccess = async (req, res) => {
       }
     });
 
-    console.log(`[DEBUG] Existing user query result:`, existingUser);
-
     // Logic deteksi new user (< 5 menit)
     const isNewUser = !existingUser ||
       (existingUser.authMethod === 'google' &&
         (new Date() - new Date(existingUser.createdAt)) < 300000);
 
-    console.log(`[DEBUG] User status - isNewUser: ${isNewUser}, existing: ${!!existingUser}`);
-
     const shouldVerifyEmail = isNewUser;
-
-    console.log(`[DEBUG] Final decision - shouldVerifyEmail: ${shouldVerifyEmail}`);
 
     // Generate token
     const token = authService.generateToken(req.user.id);
@@ -88,7 +71,7 @@ const googleCallbackSuccess = async (req, res) => {
     await authService.logoutAllUserSessions(req.user.id);
     await authService.createSession(req.user.id, token, req.ip, req.get('User-Agent'));
 
-    console.log(`[DEBUG] Database session created for user: ${req.user.email}`);
+    logger.info(`[AUTH] Google OAuth session created for user: ${req.user.id}`);
 
     const userData = {
       id: req.user.id,
@@ -102,19 +85,14 @@ const googleCallbackSuccess = async (req, res) => {
       isEmailVerified: shouldVerifyEmail ? false : req.user.isEmailVerified
     };
 
-    console.log(`[DEBUG] User data to send:`, userData);
-    console.log(`[DEBUG] Email verification required: ${shouldVerifyEmail}`);
-
     const encodedUserData = encodeURIComponent(JSON.stringify(userData));
     const verificationFlag = shouldVerifyEmail ? '&requires_verification=true' : '';
-
     const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}&user=${encodedUserData}&success=true${verificationFlag}`;
-    console.log(`[DEBUG] Redirecting to: ${redirectUrl}`);
 
     res.redirect(redirectUrl);
 
   } catch (error) {
-    console.error('[ERROR] Error in Google callback success:', error);
+    logger.error('[AUTH] Google callback error:', error.message);
     res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=server_error`);
   }
 };
@@ -126,7 +104,6 @@ const googleCallbackSuccess = async (req, res) => {
 const verifyEmailCode = async (req, res) => {
   try {
     const { email, code } = req.body;
-    console.log('🔍 [AUTH CONTROLLER] Verify email code request:', { email, code });
 
     if (!email || !code) return res.status(400).json({ success: false, message: 'Email dan kode verifikasi harus diisi' });
     if (code.length !== 6 || !/^\d{6}$/.test(code)) return res.status(400).json({ success: false, message: 'Kode verifikasi harus 6 digit angka' });
@@ -134,13 +111,11 @@ const verifyEmailCode = async (req, res) => {
     const result = await authService.verifyEmailCode(email, code);
 
     if (result.success) {
-      console.log('✅ [AUTH CONTROLLER] Email verification successful:', email);
-      // Kirim welcome email
+      logger.info(`[AUTH] Email verification successful: ${email}`);
       try {
         await emailService.sendWelcomeEmail(email, result.user.fullName || 'User', result.user.userType);
-        console.log('✅ [AUTH CONTROLLER] Welcome email sent to:', email);
       } catch (emailError) {
-        console.log('⚠️ [AUTH CONTROLLER] Failed to send welcome email:', emailError.message);
+        logger.warn(`[AUTH] Failed to send welcome email: ${emailError.message}`);
       }
 
       res.status(200).json({
@@ -161,11 +136,10 @@ const verifyEmailCode = async (req, res) => {
         requiresProfileCompletion: !result.user.isProfileComplete
       });
     } else {
-      console.log('❌ [AUTH CONTROLLER] Email verification failed:', result.message);
       res.status(400).json({ success: false, message: result.message });
     }
   } catch (error) {
-    console.error('❌ [AUTH CONTROLLER] Verify email code error:', error);
+    logger.error('[AUTH] Verify email code error:', error.message);
     if (error.message.includes('tidak valid') || error.message.includes('kadaluarsa')) return res.status(400).json({ success: false, message: error.message });
     if (error.message.includes('Terlalu banyak')) return res.status(429).json({ success: false, message: error.message });
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat verifikasi email' });
@@ -175,21 +149,17 @@ const verifyEmailCode = async (req, res) => {
 const resendVerificationCode = async (req, res) => {
   try {
     const { email } = req.body;
-    console.log('🔍 [AUTH CONTROLLER] Resend verification code request:', email);
-
     if (!email) return res.status(400).json({ success: false, message: 'Email harus diisi' });
 
     const result = await authService.resendVerificationCode(email);
 
     if (result.success) {
-      console.log('✅ [AUTH CONTROLLER] Verification code resent to:', email);
       res.status(200).json({ success: true, message: result.message });
     } else {
-      console.log('❌ [AUTH CONTROLLER] Resend verification code failed:', result.message);
       res.status(400).json({ success: false, message: result.message });
     }
   } catch (error) {
-    console.error('❌ [AUTH CONTROLLER] Resend verification code error:', error);
+    logger.error('[AUTH] Resend verification code error:', error.message);
     if (error.message === 'Email sudah terverifikasi' || error.message === 'User tidak ditemukan') return res.status(400).json({ success: false, message: error.message });
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat mengirim ulang kode' });
   }
@@ -198,8 +168,6 @@ const resendVerificationCode = async (req, res) => {
 const checkEmailVerification = async (req, res) => {
   try {
     const { email } = req.params;
-    console.log('🔍 [AUTH CONTROLLER] Check email verification status:', email);
-
     if (!email) return res.status(400).json({ success: false, message: 'Email harus diisi' });
 
     const user = await prisma.user.findUnique({
@@ -219,7 +187,7 @@ const checkEmailVerification = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ [AUTH CONTROLLER] Check verification error:', error);
+    logger.error('[AUTH] Check verification error:', error.message);
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
 };
@@ -231,25 +199,22 @@ const checkEmailVerification = async (req, res) => {
 const register = async (req, res) => {
   try {
     const { fullName, nim, email, password } = req.body;
-    console.log('🔍 [AUTH CONTROLLER] Register attempt:', { fullName, nim, email });
 
     if (!fullName || !nim || !email || !password) return res.status(400).json({ success: false, message: 'Semua field harus diisi' });
 
     const result = await authService.register({ fullName, nim, email, password });
 
     if (result.success) {
-      console.log('✅ [AUTH CONTROLLER] Registration successful:', email);
       if (result.requiresVerification) {
         res.status(201).json({ success: true, message: result.message, requiresVerification: true, data: { email: result.data.email } });
       } else {
         res.status(201).json(result);
       }
     } else {
-      console.log('❌ [AUTH CONTROLLER] Registration failed:', result.message);
       res.status(400).json(result);
     }
   } catch (error) {
-    console.error('❌ [AUTH CONTROLLER] Register error:', error);
+    logger.error('[AUTH] Register error:', error.message);
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat registrasi' });
   }
 };
@@ -260,7 +225,6 @@ const login = async (req, res) => {
     const ipAddress = req.ip;
     const userAgent = req.get('User-Agent');
 
-    console.log(`[DEBUG] Login attempt for identifier: ${identifier}`);
 
     if (!identifier || !password) return res.status(400).json({ success: false, message: 'Email/NIM dan password harus diisi' });
 
@@ -282,7 +246,7 @@ const login = async (req, res) => {
       }
 
       req.login({ id: result.user.id, email: result.user.email }, (err) => {
-        if (err) console.log('[DEBUG] Passport login in regular login failed:', err);
+        if (err) logger.warn('[AUTH] Passport login error:', err.message);
       });
 
       res.status(200).json({
@@ -302,14 +266,13 @@ const login = async (req, res) => {
         }
       });
     } else {
-      console.log(`[DEBUG] Login failed for identifier: ${identifier} - ${result.message}`);
       if (result.requiresVerification) {
         return res.status(403).json({ success: false, message: result.message, requiresVerification: true, email: result.email });
       }
       res.status(401).json({ success: false, message: result.message });
     }
   } catch (error) {
-    console.error('[ERROR] Login controller error:', error);
+    logger.error('[AUTH] Login error:', error.message);
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat login' });
   }
 };
@@ -317,7 +280,6 @@ const login = async (req, res) => {
 const registerWithEmail = async (req, res) => {
   try {
     const { email } = req.body;
-    console.log('🔍 [AUTH CONTROLLER] Register with email request:', email);
 
     if (!email) return res.status(400).json({ success: false, message: 'Email harus diisi' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ success: false, message: 'Format email tidak valid' });
@@ -325,14 +287,12 @@ const registerWithEmail = async (req, res) => {
     const result = await authService.registerWithEmail(email);
 
     if (result.success) {
-      console.log('✅ [AUTH CONTROLLER] Email registration successful:', email);
       res.status(201).json({ success: true, message: result.message, requiresVerification: true, data: { email: result.data.email } });
     } else {
-      console.log('❌ [AUTH CONTROLLER] Email registration failed:', result.message);
       res.status(400).json({ success: false, message: result.message });
     }
   } catch (error) {
-    console.error('❌ [AUTH CONTROLLER] Register with email error:', error);
+    logger.error('[AUTH] Register with email error:', error.message);
     if (error.message === 'Email already registered') return res.status(409).json({ success: false, message: 'Email sudah terdaftar' });
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat registrasi' });
   }
@@ -346,22 +306,19 @@ const verifyStudent = async (req, res) => {
   try {
     const { nim, fullName, birthDate } = req.body;
     const userId = req.user.id;
-    console.log('🔍 [AUTH CONTROLLER] Verifying student:', { nim, fullName, birthDate, userId });
 
     if (!nim || !fullName || !birthDate) return res.status(400).json({ success: false, message: 'Data tidak lengkap' });
 
     const validationResult = await academicService.validateStudent(nim, fullName, birthDate);
 
     if (validationResult.valid) {
-      console.log('✅ [AUTH CONTROLLER] Student validation successful:', validationResult.data);
       await authService.updateUserVerification(userId, { nim: validationResult.data.nim, fullName: validationResult.data.fullName });
       res.json({ success: true, valid: true, data: validationResult.data, message: validationResult.message });
     } else {
-      console.log('❌ [AUTH CONTROLLER] Student validation failed');
       res.status(400).json({ success: false, valid: false, message: validationResult.message });
     }
   } catch (error) {
-    console.error('❌ [AUTH CONTROLLER] Verify student error:', error);
+    logger.error('[AUTH] Verify student error:', error.message);
     res.status(500).json({ success: false, message: 'Terjadi kesalahan sistem saat verifikasi' });
   }
 };
@@ -370,12 +327,11 @@ const updateVerification = async (req, res) => {
   try {
     const { nim, fullName } = req.body;
     const userId = req.user.id;
-    console.log('🔍 [AUTH CONTROLLER] Updating verification:', { userId, nim, fullName });
 
     await authService.updateUserVerification(req.user.id, { nim, fullName });
     res.json({ success: true, message: 'Status verifikasi berhasil diperbarui' });
   } catch (error) {
-    console.error('❌ [AUTH CONTROLLER] Update verification error:', error);
+    logger.error('[AUTH] Update verification error:', error.message);
     res.status(500).json({ success: false, message: 'Gagal memperbarui status verifikasi' });
   }
 };
@@ -384,12 +340,11 @@ const updateProfile = async (req, res) => {
   try {
     const { email, nim, fullName } = req.body;
     const userId = req.user.id;
-    console.log('🔍 [AUTH CONTROLLER] Updating profile:', { userId, email, nim, fullName });
 
     await authService.updateUserProfile(req.user.id, { email, nim, fullName });
     res.json({ success: true, message: 'Profile berhasil diperbarui' });
   } catch (error) {
-    console.error('❌ [AUTH CONTROLLER] Update profile error:', error);
+    logger.error('[AUTH] Update profile error:', error.message);
     res.status(500).json({ success: false, message: 'Gagal memperbarui profile' });
   }
 };
@@ -401,7 +356,7 @@ const checkNIM = async (req, res) => {
     const result = await authService.checkNIMAvailability(nim);
     res.json({ success: true, available: result.available, message: result.message });
   } catch (error) {
-    console.error('[ERROR] Check NIM controller error:', error);
+    logger.error('[AUTH] Check NIM error:', error.message);
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat mengecek NIM' });
   }
 };
@@ -414,8 +369,6 @@ const verify = async (req, res) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) return res.status(401).json({ valid: false, message: 'Token tidak provided' });
-
-    console.log(`[DEBUG] Token verification attempt`);
 
     const result = await authService.verifySession(token);
     if (result.valid) {
@@ -438,7 +391,7 @@ const verify = async (req, res) => {
       res.status(401).json({ success: false, valid: false, message: result.message });
     }
   } catch (error) {
-    console.error('[ERROR] Verify controller error:', error);
+    logger.error('[AUTH] Verify token error:', error.message);
     res.status(500).json({ success: false, valid: false, message: 'Terjadi kesalahan server saat verifikasi token' });
   }
 };
@@ -462,41 +415,35 @@ const logout = async (req, res) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) return res.status(400).json({ success: false, message: 'Token tidak provided' });
 
-    console.log(`[DEBUG] Logout attempt for user: ${req.user?.id}`);
-
     req.logout((err) => {
-      if (err) console.log('[DEBUG] Passport logout error:', err);
+      if (err) logger.warn('[AUTH] Passport logout error:', err.message);
     });
 
     const result = await authService.logout(token);
     req.session.destroy((err) => {
-      if (err) console.log('[DEBUG] Session destroy error:', err);
+      if (err) logger.warn('[AUTH] Session destroy error:', err.message);
     });
 
     if (result.success) res.json({ success: true, message: result.message });
     else res.status(400).json({ success: false, message: result.message });
   } catch (error) {
-    console.error('[ERROR] Logout controller error:', error);
+    logger.error('[AUTH] Logout error:', error.message);
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat logout' });
   }
 };
 
 const getProfile = async (req, res) => {
   try {
-    console.log('[DEBUG] Get profile - User:', req.user);
     if (!req.user) return res.status(401).json({ success: false, message: 'User tidak terautentikasi' });
-    console.log(`[DEBUG] Get profile for user: ${req.user.email}`);
     res.json({ success: true, user: req.user });
   } catch (error) {
-    console.error('[ERROR] Get profile controller error:', error);
+    logger.error('[AUTH] Get profile error:', error.message);
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat mengambil profil' });
   }
 };
 
 const checkAuth = (req, res) => {
-  console.log('[DEBUG] Check auth - Session ID:', req.sessionID);
-  console.log('[DEBUG] Check auth - User:', req.user);
-  res.json({ authenticated: req.isAuthenticated ? req.isAuthenticated() : false, user: req.user || null, sessionID: req.sessionID });
+  res.json({ authenticated: req.isAuthenticated ? req.isAuthenticated() : false, user: req.user || null });
 };
 
 // ============================================================================
@@ -524,7 +471,6 @@ const chat = async (req, res) => {
       return res.status(400).json({ success: false, message: "Message is required" });
     }
 
-    console.log(`👤 [AUTH CHAT] User: ${userId} | Msg: "${message}" | Stream: ${stream}`);
 
     // Step 1: Retrieve History
     let targetConversationId = conversationId ? parseInt(conversationId) : undefined;

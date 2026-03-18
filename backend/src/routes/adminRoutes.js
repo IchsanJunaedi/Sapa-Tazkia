@@ -15,8 +15,19 @@ const allowedAdminIPs = process.env.ADMIN_ALLOWED_IPS
   ? process.env.ADMIN_ALLOWED_IPS.split(',').map(ip => ip.trim())
   : null;
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const ipWhitelist = (req, res, next) => {
-  if (!allowedAdminIPs) return next(); // not configured = allow all
+  // Jika ADMIN_ALLOWED_IPS tidak dikonfigurasi:
+  //   - production → tolak semua (fail-secure)
+  //   - development → izinkan semua (kemudahan dev)
+  if (!allowedAdminIPs) {
+    if (isProduction) {
+      logger.warn('[ADMIN] ADMIN_ALLOWED_IPS not set — blocking all admin access in production');
+      return res.status(403).json({ success: false, message: 'Admin access not configured' });
+    }
+    return next();
+  }
 
   const clientIP = (req.ip || req.socket.remoteAddress || '').replace('::ffff:', '');
 

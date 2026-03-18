@@ -24,14 +24,21 @@ class RedisService {
 
   initialize() {
     const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-    
+    const redisPassword = process.env.REDIS_PASSWORD;
+
+    const redisOptions = {
+      retryStrategy: (times) => Math.min(times * 50, 2000),
+      maxRetriesPerRequest: 3,
+      enableReadyCheck: false,
+      lazyConnect: false
+    };
+
+    if (redisPassword) {
+      redisOptions.password = redisPassword;
+    }
+
     try {
-      this.client = new Redis(redisUrl, {
-        retryStrategy: (times) => Math.min(times * 50, 2000),
-        maxRetriesPerRequest: 3,
-        enableReadyCheck: false,
-        lazyConnect: false 
-      });
+      this.client = new Redis(redisUrl, redisOptions);
 
       this.initEventListeners();
       logger.info('Redis service initialized');
