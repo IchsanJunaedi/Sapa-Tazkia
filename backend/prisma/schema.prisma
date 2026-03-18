@@ -44,6 +44,7 @@ model User {
   grades        AcademicGrade[]
   academicSummary AcademicSummary?
   sessions      Session[]
+  bugReports    BugReport[]
 
   @@map("users")
 }
@@ -245,4 +246,18 @@ model AnalyticsSnapshot {
 
   @@index([date])
   @@map("analytics_snapshots")
+}
+
+//
+// ==================== BUG REPORTS ====================
+//
+
+model BugReport {
+  id        Int      @id @default(autoincrement())
+  title     String   @db.VarChar(200)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@map("bug_reports")
 }
