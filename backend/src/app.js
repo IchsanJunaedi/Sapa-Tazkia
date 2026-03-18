@@ -19,6 +19,7 @@ const guestRoutes = require('./routes/guestRoutes');
 const rateLimitRoutes = require('./routes/rateLimitRoutes'); // ✅ NEW: Rate limit routes
 const academicRoutes = require('./routes/academicRoutes');   // ✅ NEW: Academic Routes (Ditambahkan)
 const adminRoutes = require('./routes/adminRoutes');         // ✅ NEW: Admin Routes
+const bugReportRoutes = require('./routes/bugReportRoutes'); // ✅ NEW: Bug Report Routes
 
 // Import services
 const authService = require('./services/authService');
@@ -503,6 +504,9 @@ app.use('/api/rate-limit', rateLimitRoutes);
 
 // Admin Endpoints
 app.use('/api/admin', adminRoutes);
+
+// Bug Reports
+app.use('/api/bug-reports', bugReportRoutes);
 
 // ✅ NEW: Academic Routes (Ditambahkan sesuai request)
 app.use('/api/academic', academicRoutes);
