@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { PenSquare, User, Settings, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2, Menu, X } from 'lucide-react';
+import { PenSquare, User, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2, Menu, X } from 'lucide-react';
+import ProfilePopover from './ProfilePopover';
 
 const Sidebar = ({
   user,
@@ -169,14 +170,7 @@ const Sidebar = ({
         {/* Header */}
         {isSidebarOpen ? (
           <div className="flex justify-between items-center mb-8 flex-shrink-0">
-            <button
-              className="p-2 rounded-xl text-white/70 hover:bg-white/10 transition-colors flex items-center gap-3"
-              title="Settings"
-              onClick={onSettingsClick}
-              disabled={isStartingNewChat || isDeleting}
-            >
-              <Settings size={24} />
-            </button>
+
             <button
               onClick={onToggleSidebar}
               className="p-2 rounded-xl text-white/70 hover:bg-white/10 transition-colors"
@@ -360,26 +354,14 @@ const Sidebar = ({
       )}
 
       {isProfilePopupVisible && user && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={handleCloseAllPopups} />
-          <div className="fixed z-50 bg-white rounded-xl shadow-xl border border-gray-200 w-64" style={{ left: `${popupPosition.x}px`, top: `${popupPosition.y - 10}px` }}>
-            <div className="p-4 border-b border-gray-100">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-[#172c66] rounded-full flex items-center justify-center"><User size={20} className="text-white" /></div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-gray-800 truncate">{getUserName()}</h3>
-                  <p className="text-xs text-gray-500 truncate">{getUserEmail()}</p>
-                </div>
-              </div>
-              <div className="text-xs text-gray-400">{getUserNIM()}</div>
-            </div>
-            <div className="p-2">
-              <button onClick={handleLogout} disabled={isStartingNewChat || isDeleting} className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-red-600 hover:bg-red-50">
-                <LogOut size={16} /> <span>Log out</span>
-              </button>
-            </div>
-          </div>
-        </>
+        <ProfilePopover
+          getUserName={getUserName}
+          getUserEmail={getUserEmail}
+          position={popupPosition}
+          onLogout={handleLogout}
+          onSettingsClick={onSettingsClick}
+          onClose={handleCloseAllPopups}
+        />
       )}
 
       {/* Mobile Overlay Sidebar */}
@@ -395,13 +377,7 @@ const Sidebar = ({
           <div className="fixed left-0 top-0 h-full w-72 z-50 md:hidden shadow-2xl transform transition-transform duration-300 ease-out flex flex-col p-3" style={{ background: 'linear-gradient(160deg, #060e3a 0%, #0f1e78 100%)' }}>
             {/* Close Button Header */}
             <div className="flex justify-between items-center mb-6 flex-shrink-0">
-              <button
-                className="p-2 rounded-xl text-white/70 hover:bg-white/10 transition-colors"
-                title="Settings"
-                onClick={onSettingsClick}
-              >
-                <Settings size={24} />
-              </button>
+
               <button
                 onClick={onCloseMobileSidebar}
                 className="p-2 rounded-xl text-white/70 hover:bg-white/10 transition-colors"
