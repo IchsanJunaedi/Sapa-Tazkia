@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { LogOut, HelpCircle, ChevronRight, Settings } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LogOut, HelpCircle, ChevronRight, ChevronDown, Settings } from 'lucide-react';
 
 const HELP_ITEMS = [
-  { label: 'Help center' },
-  { label: 'Terms & policies' },
-  { label: 'Team dev' },
-  { label: 'Report a bug' },
+  { label: 'Help center', path: '/help' },
+  { label: 'Terms & policies', path: '/terms' },
+  { label: 'Team dev', path: null },
+  { label: 'Report a bug', path: '/report-bug' },
 ];
 
 export default function ProfilePopover({
@@ -17,6 +18,20 @@ export default function ProfilePopover({
   onClose,
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
+  const closeTimerRef = useRef(null);
+  const navigate = useNavigate();
+  const isMobile = window.innerWidth < 640;
+
+  const handleHelpEnter = () => {
+    if (isMobile) return;
+    clearTimeout(closeTimerRef.current);
+    setHelpOpen(true);
+  };
+
+  const handleHelpLeave = () => {
+    if (isMobile) return;
+    closeTimerRef.current = setTimeout(() => setHelpOpen(false), 150);
+  };
 
   return (
     <>
@@ -46,11 +61,11 @@ export default function ProfilePopover({
             <span>Settings</span>
           </button>
 
-          {/* Help — with flyout on hover */}
+          {/* Help — hover flyout on desktop, accordion on mobile */}
           <div
             className="relative"
-            onMouseEnter={() => setHelpOpen(true)}
-            onMouseLeave={() => setHelpOpen(false)}
+            onMouseEnter={handleHelpEnter}
+            onMouseLeave={handleHelpLeave}
           >
             <button
               onClick={() => setHelpOpen((v) => !v)}
@@ -58,19 +73,46 @@ export default function ProfilePopover({
             >
               <HelpCircle size={15} className="text-gray-300" />
               <span className="flex-1 text-left">Help</span>
-              <ChevronRight size={14} className="text-gray-400" />
+              {isMobile
+                ? <ChevronDown size={14} className={`text-gray-400 transition-transform ${helpOpen ? 'rotate-180' : ''}`} />
+                : <ChevronRight size={14} className="text-gray-400" />
+              }
             </button>
 
-            {/* Flyout sub-menu — positioned to the right of the main popover */}
-            {helpOpen && (
+            {/* Desktop: flyout to the right */}
+            {helpOpen && !isMobile && (
               <div
                 className="absolute top-0 w-52 rounded-xl shadow-2xl border border-white/10 bg-[#1e2a4a] p-1.5"
                 style={{ left: '100%', marginLeft: '4px', zIndex: 60 }}
+                onMouseEnter={handleHelpEnter}
+                onMouseLeave={handleHelpLeave}
               >
                 {HELP_ITEMS.map((item) => (
                   <button
                     key={item.label}
-                    className="w-full text-left px-3 py-2 text-sm rounded-lg transition-colors hover:bg-white/10"
+                    onClick={() => { if (item.path) { navigate(item.path); onClose(); } }}
+                    disabled={!item.path}
+                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                      item.path ? 'hover:bg-white/10' : 'opacity-40 cursor-not-allowed'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Mobile: expand inline (accordion) */}
+            {helpOpen && isMobile && (
+              <div className="mt-0.5 ml-3 border-l border-white/10 pl-3 space-y-0.5">
+                {HELP_ITEMS.map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={() => { if (item.path) { navigate(item.path); onClose(); } }}
+                    disabled={!item.path}
+                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors text-gray-300 ${
+                      item.path ? 'hover:bg-white/10' : 'opacity-40 cursor-not-allowed'
+                    }`}
                   >
                     {item.label}
                   </button>
