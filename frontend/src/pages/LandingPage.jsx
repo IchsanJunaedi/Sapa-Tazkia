@@ -815,6 +815,12 @@ const LandingPage = () => {
 
     // Only proceed if we have user data and not loading
     if (!authLoading && isAuthenticated && user) {
+      // Admin hanya boleh di dashboard — redirect langsung
+      if (user.userType === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+        return;
+      }
+
       console.log('🔍 [LANDING PAGE] Checking profile status:', {
         isProfileComplete: user.isProfileComplete,
         fullName: user.fullName,
