@@ -17,6 +17,7 @@ import {
     Plus,
     Trash2,
     HelpCircle,
+    Bug,
     RefreshCw,
     X
 } from 'lucide-react';
@@ -710,6 +711,81 @@ const KnowledgeBaseView = () => {
     );
 };
 
+// ─── Bug Reports View ─────────────────────────────────────────────────────────
+
+const BugReportsView = () => {
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const fetchReports = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await axios.get(`${API}/admin/bug-reports`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                setReports(res.data.reports);
+            } catch (err) {
+                setError(err.response?.data?.message || 'Gagal memuat laporan bug');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchReports();
+    }, []);
+
+    if (loading) return <p className="text-[#a1a1aa] text-sm p-2">Memuat laporan...</p>;
+    if (error) return <p className="text-red-400 text-sm p-2">{error}</p>;
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h3 className="text-[#e4e4e7] font-semibold">Bug Reports</h3>
+                <span className="text-xs text-[#71717a]">{reports.length} laporan</span>
+            </div>
+            {reports.length === 0 ? (
+                <p className="text-[#71717a] text-sm">Belum ada laporan bug.</p>
+            ) : (
+                <div className="bg-[#18181b] border border-[#27272a] rounded-xl overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-[#27272a]">
+                                <th className="text-left px-4 py-3 text-[#71717a] font-medium text-xs">No</th>
+                                <th className="text-left px-4 py-3 text-[#71717a] font-medium text-xs">Judul Bug</th>
+                                <th className="text-left px-4 py-3 text-[#71717a] font-medium text-xs">Dilaporkan oleh</th>
+                                <th className="text-left px-4 py-3 text-[#71717a] font-medium text-xs">Tanggal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {reports.map((r, idx) => (
+                                <tr
+                                    key={r.id}
+                                    className="border-b border-[#27272a] last:border-0 hover:bg-[#27272a]/50 transition-colors"
+                                >
+                                    <td className="px-4 py-3 text-[#71717a]">{idx + 1}</td>
+                                    <td className="px-4 py-3 text-[#e4e4e7]">{r.title}</td>
+                                    <td className="px-4 py-3 text-[#a1a1aa]">
+                                        <div className="text-sm">{r.user?.fullName}</div>
+                                        <div className="text-xs text-[#71717a]">{r.user?.email}</div>
+                                    </td>
+                                    <td className="px-4 py-3 text-[#71717a] text-xs whitespace-nowrap">
+                                        {new Date(r.createdAt).toLocaleDateString('id-ID', {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            year: 'numeric',
+                                        })}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // ─── Main AdminDashboard ──────────────────────────────────────────────────────
 
 const AdminDashboard = () => {
@@ -789,12 +865,14 @@ const AdminDashboard = () => {
         analytics: 'Analytics',
         logs: 'Live Chat Logs',
         'knowledge-base': 'Knowledge Base',
+        'bug-reports': 'Bug Reports',
     };
 
     const navItems = [
         { id: 'analytics', label: 'Analytics', icon: <LayoutDashboard size={18} /> },
         { id: 'logs', label: 'Chat Logs', icon: <MessageSquare size={18} /> },
         { id: 'knowledge-base', label: 'Knowledge Base', icon: <BookOpen size={18} /> },
+        { id: 'bug-reports', label: 'Bug Reports', icon: <Bug size={18} /> },
     ];
 
     return (
@@ -865,6 +943,9 @@ const AdminDashboard = () => {
 
                         {/* ── Knowledge Base Tab ─────────────────────────── */}
                         {activeTab === 'knowledge-base' && <KnowledgeBaseView />}
+
+                        {/* ── Bug Reports Tab ────────────────────────────── */}
+                        {activeTab === 'bug-reports' && <BugReportsView />}
 
                         {/* ── Chat Logs Tab ──────────────────────────────── */}
                         {activeTab === 'logs' && (
