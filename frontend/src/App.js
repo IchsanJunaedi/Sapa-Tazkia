@@ -16,6 +16,11 @@ import AcademicPage from './pages/AcademicPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
 
+// ✅ NEW: Import Info Pages
+import HelpCenterPage from './pages/HelpCenterPage';
+import TermsPoliciesPage from './pages/TermsPoliciesPage';
+import ReportBugPage from './pages/ReportBugPage';
+
 // ✅ NEW: Custom Wrapper for Admin Login Redirect
 const AdminLoginRoute = ({ children }) => {
   const storedUser = localStorage.getItem('user');
@@ -42,6 +47,10 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
+
+          {/* ✅ NEW: Static Info Pages (public) */}
+          <Route path="/help" element={<HelpCenterPage />} />
+          <Route path="/terms" element={<TermsPoliciesPage />} />
 
           {/* Public Admin Routes */}
           <Route path="/admin/login" element={
@@ -81,6 +90,16 @@ function App() {
             element={
               <ProtectedRoute adminOnly={true}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ✅ NEW: Report a Bug (protected) */}
+          <Route
+            path="/report-bug"
+            element={
+              <ProtectedRoute>
+                <ReportBugPage />
               </ProtectedRoute>
             }
           />
