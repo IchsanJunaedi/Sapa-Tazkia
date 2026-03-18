@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, HelpCircle, ChevronRight, ChevronDown, Settings } from 'lucide-react';
+import { LogOut, HelpCircle, ChevronRight, ChevronDown, Settings, Info } from 'lucide-react';
 
 const HELP_ITEMS = [
   { label: 'Help center', path: '/help' },
@@ -61,6 +61,15 @@ export default function ProfilePopover({
             <span>Settings</span>
           </button>
 
+          {/* Tentang */}
+          <button
+            onClick={() => { navigate('/tentang'); onClose(); }}
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-white/10"
+          >
+            <Info size={15} className="text-gray-300" />
+            <span>Tentang</span>
+          </button>
+
           {/* Help — hover flyout on desktop, accordion on mobile */}
           <div
             className="relative"
@@ -82,7 +91,7 @@ export default function ProfilePopover({
             {/* Desktop: flyout to the right */}
             {helpOpen && !isMobile && (
               <div
-                className="absolute top-0 w-52 rounded-xl shadow-2xl border border-white/10 bg-[#1e2a4a] p-1.5"
+                className="absolute bottom-0 w-52 rounded-xl shadow-2xl border border-white/10 bg-[#1e2a4a] p-1.5"
                 style={{ left: '100%', marginLeft: '4px', zIndex: 60 }}
                 onMouseEnter={handleHelpEnter}
                 onMouseLeave={handleHelpLeave}

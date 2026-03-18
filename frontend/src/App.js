@@ -20,6 +20,7 @@ import AdminLogin from './pages/AdminLogin';
 import HelpCenterPage from './pages/HelpCenterPage';
 import TermsPoliciesPage from './pages/TermsPoliciesPage';
 import ReportBugPage from './pages/ReportBugPage';
+import TentangPage from './pages/TentangPage';
 
 // ✅ NEW: Custom Wrapper for Admin Login Redirect
 const AdminLoginRoute = ({ children }) => {
@@ -51,6 +52,7 @@ function App() {
           {/* ✅ NEW: Static Info Pages (public) */}
           <Route path="/help" element={<HelpCenterPage />} />
           <Route path="/terms" element={<TermsPoliciesPage />} />
+          <Route path="/tentang" element={<TentangPage />} />
 
           {/* Public Admin Routes */}
           <Route path="/admin/login" element={
