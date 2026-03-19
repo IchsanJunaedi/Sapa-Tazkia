@@ -13,7 +13,10 @@ async function getSession(sessionId) {
   const raw = await redisService.get(`${GUEST_SESSION_PREFIX}${sessionId}`);
   if (!raw) return null;
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // Validate structure — guard against corrupted sessions
+    if (!parsed || !Array.isArray(parsed.messages)) return null;
+    return parsed;
   } catch {
     return null;
   }
