@@ -1,0 +1,12 @@
+**/node_modules/
+
+
+.env 
+docker-compose.yml
+geminiService.js  
+mysql_data
+.env.production
+
+# Log files
+logs/*.log
+logs/*.gz

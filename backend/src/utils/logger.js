@@ -1,100 +1,136 @@
 // backend/src/utils/logger.js
+const winston = require('winston');
+require('winston-daily-rotate-file');
+const path = require('path');
 
-/**
- * Enhanced Logger Utility - Environment-based Logging
- * 
- * Di Production (NODE_ENV=production):
- *   - info, debug, request: HIDDEN (tidak muncul)
- *   - warn, error, security: TETAP MUNCUL (penting untuk monitoring)
- * 
- * Di Development atau DEBUG_MODE=true:
- *   - Semua log muncul
- * 
- * Usage:
- *   const logger = require('./utils/logger');
- *   logger.info('Info message');
- *   logger.debug('Debug message');
- *   logger.warn('Warning message');
- *   logger.error('Error message');
- */
+const isProduction = process.env.NODE_ENV === 'production';
+const isDebugEnabled = process.env.DEBUG_MODE === 'true' || process.env.RATE_LIMIT_DEBUG === 'true';
 
-class Logger {
-  constructor() {
-    this.isProduction = process.env.NODE_ENV === 'production';
-    this.isDebugEnabled = process.env.DEBUG_MODE === 'true' ||
-      process.env.RATE_LIMIT_DEBUG === 'true';
-  }
+// ─── Formats ───────────────────────────────────────────────────────────────
 
-  getTimestamp() {
-    return new Date().toISOString();
-  }
+const jsonFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.errors({ stack: true }),
+  winston.format.json()
+);
 
-  /**
-   * Info - Hanya muncul di development atau jika DEBUG_MODE=true
-   */
-  info(message, ...args) {
-    if (!this.isProduction || this.isDebugEnabled) {
-      console.log(`[${this.getTimestamp()}] [INFO] ${message}`, ...args);
-    }
-  }
+const devFormat = winston.format.combine(
+  winston.format.colorize(),
+  winston.format.timestamp({ format: 'HH:mm:ss' }),
+  winston.format.printf(({ level, message, timestamp, ...meta }) => {
+    const metaStr = Object.keys(meta).length ? ' ' + JSON.stringify(meta) : '';
+    return `[${timestamp}] ${level}: ${message}${metaStr}`;
+  })
+);
 
-  /**
-   * Error - SELALU muncul (critical untuk debugging)
-   */
-  error(message, ...args) {
-    console.error(`[${this.getTimestamp()}] [ERROR] ${message}`, ...args);
-  }
+// ─── Transports ────────────────────────────────────────────────────────────
 
-  /**
-   * Warn - SELALU muncul (penting untuk monitoring)
-   */
-  warn(message, ...args) {
-    console.warn(`[${this.getTimestamp()}] [WARN] ${message}`, ...args);
-  }
+const transports = [
+  new winston.transports.Console({
+    format: isProduction ? jsonFormat : devFormat,
+    silent: false
+  })
+];
 
-  /**
-   * Debug - Hanya muncul di development atau jika DEBUG_MODE=true
-   */
-  debug(message, ...args) {
-    if (!this.isProduction || this.isDebugEnabled) {
-      console.log(`[${this.getTimestamp()}] [DEBUG] ${message}`, ...args);
-    }
-  }
+if (isProduction || process.env.LOG_TO_FILE === 'true') {
+  const logsDir = path.join(__dirname, '../../logs');
 
-  /**
-   * Rate Limit - Hanya muncul jika RATE_LIMIT_DEBUG=true
-   */
-  rateLimit(message, ...args) {
-    if (!this.isProduction || this.isDebugEnabled) {
-      console.log(`[${this.getTimestamp()}] [RATE LIMIT] ${message}`, ...args);
-    }
-  }
+  transports.push(
+    new winston.transports.DailyRotateFile({
+      filename: path.join(logsDir, 'combined-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxFiles: '14d',
+      format: jsonFormat,
+      level: 'debug'
+    })
+  );
 
-  /**
-   * Redis - Hanya muncul di development
-   */
-  redis(message, ...args) {
-    if (!this.isProduction || this.isDebugEnabled) {
-      console.log(`[${this.getTimestamp()}] [REDIS] ${message}`, ...args);
-    }
-  }
-
-  /**
-   * Security - SELALU muncul (penting untuk audit)
-   */
-  security(message, ...args) {
-    console.log(`[${this.getTimestamp()}] [SECURITY] ${message}`, ...args);
-  }
-
-  /**
-   * Request - Log HTTP requests (hanya development)
-   */
-  request(method, url, status) {
-    if (!this.isProduction || this.isDebugEnabled) {
-      console.log(`[${this.getTimestamp()}] [REQUEST] ${method} ${url} - ${status}`);
-    }
-  }
+  transports.push(
+    new winston.transports.DailyRotateFile({
+      filename: path.join(logsDir, 'error-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxFiles: '30d',
+      format: jsonFormat,
+      level: 'error'
+    })
+  );
 }
 
-// Export singleton instance
-module.exports = new Logger();
+// ─── Base Winston instance ──────────────────────────────────────────────────
+
+const winstonLogger = winston.createLogger({
+  level: isProduction && !isDebugEnabled ? 'warn' : 'debug',
+  transports
+});
+
+// ─── Public API (drop-in replacement for old Logger class) ─────────────────
+
+const logger = {
+  /**
+   * Info — hidden in production unless DEBUG_MODE=true
+   */
+  info(message, ...args) {
+    if (!isProduction || isDebugEnabled) {
+      winstonLogger.info(message, args.length === 1 ? args[0] : args.length > 1 ? args : undefined);
+    }
+  },
+
+  /**
+   * Error — always logged
+   */
+  error(message, ...args) {
+    winstonLogger.error(message, args.length === 1 ? args[0] : args.length > 1 ? args : undefined);
+  },
+
+  /**
+   * Warn — always logged
+   */
+  warn(message, ...args) {
+    winstonLogger.warn(message, args.length === 1 ? args[0] : args.length > 1 ? args : undefined);
+  },
+
+  /**
+   * Debug — hidden in production unless DEBUG_MODE=true
+   */
+  debug(message, ...args) {
+    if (!isProduction || isDebugEnabled) {
+      winstonLogger.debug(message, args.length === 1 ? args[0] : args.length > 1 ? args : undefined);
+    }
+  },
+
+  /**
+   * Security — always logged (audit trail)
+   */
+  security(message, ...args) {
+    winstonLogger.warn(`[SECURITY] ${message}`, args.length === 1 ? args[0] : args.length > 1 ? args : undefined);
+  },
+
+  /**
+   * Request — HTTP logging, dev only
+   */
+  request(method, url, status) {
+    if (!isProduction || isDebugEnabled) {
+      winstonLogger.debug(`[REQUEST] ${method} ${url} - ${status}`);
+    }
+  },
+
+  /**
+   * RateLimit — alias for debug, used in rateLimitService/rateLimitMiddleware
+   */
+  rateLimit(message, ...args) {
+    if (!isProduction || isDebugEnabled) {
+      winstonLogger.debug(`[RATE LIMIT] ${message}`, args.length === 1 ? args[0] : args.length > 1 ? args : undefined);
+    }
+  },
+
+  /**
+   * Redis — alias for debug, used in redisService
+   */
+  redis(message, ...args) {
+    if (!isProduction || isDebugEnabled) {
+      winstonLogger.debug(`[REDIS] ${message}`, args.length === 1 ? args[0] : args.length > 1 ? args : undefined);
+    }
+  }
+};
+
+module.exports = logger;
