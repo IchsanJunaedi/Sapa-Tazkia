@@ -1,6 +1,7 @@
 const prisma = require('../config/prismaClient');
 const guestController = require('./guestController');
 const ragService = require('../services/ragService');
+const logger = require('../utils/logger');
 
 /**
  * Get unified chat logs (Users + Guests)
@@ -44,14 +45,11 @@ const getChatLogs = async (req, res) => {
             return pairs;
         });
 
-        // 2. Fetch Guest Sessions (from Memory)
-        // Since guestSessions isn't directly exported as iterable we might need to expose it,
-        // or we just estimate. Wait, let's look at guestController.js if it exposes getGuestSessions.
-        // It doesn't. We'll add a minimal exposed function or just mock it temporarily until we update guestController.
+        // 2. Fetch Guest Sessions (from Redis)
         let formattedGuestLogs = [];
-        if (typeof guestController.getAllActiveSessions === 'function') {
-            const guestSessions = guestController.getAllActiveSessions();
-            for (const [sessionId, session] of guestSessions.entries()) {
+        try {
+            const guestSessionsList = await guestController.getAllActiveSessions();
+            for (const { sessionId, session } of guestSessionsList) {
                 for (let i = 0; i < session.messages.length; i++) {
                     if (session.messages[i].role === 'user') {
                         const userMsg = session.messages[i];
@@ -59,7 +57,7 @@ const getChatLogs = async (req, res) => {
 
                         formattedGuestLogs.push({
                             id: `guest-${sessionId}-${i}`,
-                            timestamp: session.createdAt, // approximation
+                            timestamp: session.createdAt,
                             userType: 'Guest',
                             identifier: sessionId,
                             message: userMsg.content,
@@ -71,6 +69,8 @@ const getChatLogs = async (req, res) => {
                     }
                 }
             }
+        } catch (guestErr) {
+            logger.warn('[ADMIN] Failed to fetch guest sessions:', guestErr.message);
         }
 
         // 3. Combine and Sort

@@ -1,116 +1,115 @@
+// backend/src/controllers/guestController.js
 const ragService = require('../services/ragService');
 const rateLimitService = require('../services/rateLimitService');
-const { generateAIResponse } = require('../services/openaiService');
 const redisService = require('../services/redisService');
+const logger = require('../utils/logger');
 
-// In-memory storage untuk Guest
-const guestSessions = new Map();
+const GUEST_SESSION_PREFIX = 'guest:session:';
+const GUEST_SESSION_TTL = 86400; // 24 hours
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+async function getSession(sessionId) {
+  const raw = await redisService.get(`${GUEST_SESSION_PREFIX}${sessionId}`);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function saveSession(sessionId, session) {
+  await redisService.set(
+    `${GUEST_SESSION_PREFIX}${sessionId}`,
+    JSON.stringify(session),
+    GUEST_SESSION_TTL
+  );
+}
+
+// ─── Controllers ───────────────────────────────────────────────────────────
 
 const guestChat = async (req, res) => {
   const abortController = new AbortController();
-  const { message, sessionId, stream = true } = req.body; // Default stream: true
+  const { message, sessionId, stream = true } = req.body;
   const ipAddress = req.ip || '127.0.0.1';
 
-  // 🛑 Listener untuk pembatalan
   req.on('close', () => {
-    if (!res.writableEnded) {
-      abortController.abort();
-    }
+    if (!res.writableEnded) abortController.abort();
   });
 
   if (!message || message.trim() === '') {
-    return res.status(400).json({ success: false, message: "Message required" });
+    return res.status(400).json({ success: false, message: 'Message required' });
   }
 
   const currentSessionId = sessionId || `guest-${Date.now()}`;
-  console.log(`👤 [GUEST] Chat from IP: ${ipAddress} | Stream: ${stream}`);
+  logger.info(`[GUEST] Chat from IP: ${ipAddress} | Stream: ${stream}`);
 
   try {
-    // 1. Prepare History
-    let conversationHistory = [];
-    if (guestSessions.has(currentSessionId)) {
-      const session = guestSessions.get(currentSessionId);
-      conversationHistory = session.messages.slice(-6).map(msg => ({
-        role: msg.role === 'bot' ? 'assistant' : 'user',
-        content: msg.content
-      }));
-    }
+    // 1. Load history from Redis
+    const existingSession = await getSession(currentSessionId);
+    const conversationHistory = existingSession
+      ? existingSession.messages.slice(-6).map(msg => ({
+          role: msg.role === 'bot' ? 'assistant' : 'user',
+          content: msg.content
+        }))
+      : [];
 
     // 2. Call RAG Service
     const ragResult = await ragService.answerQuestion(
       message,
       conversationHistory,
-      { abortSignal: abortController.signal, stream: stream }
+      { abortSignal: abortController.signal, stream }
     );
 
-    // =================================================================
-    // A. STREAMING HANDLER
-    // =================================================================
+    // ─── A. STREAMING ──────────────────────────────────────────────────────
     if (stream && ragResult.isStream) {
-
-      // Set Headers for SSE
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      let fullAnswer = "";
+      let fullAnswer = '';
       let tokenUsage = 0;
 
-      // Send Initial Data (Docs Info)
       res.write(`data: ${JSON.stringify({ type: 'meta', docs: ragResult.docsDetail })}\n\n`);
 
       try {
         for await (const chunk of ragResult.stream) {
-          const content = chunk.choices[0]?.delta?.content || "";
-
+          const content = chunk.choices[0]?.delta?.content || '';
           if (content) {
             fullAnswer += content;
             res.write(`data: ${JSON.stringify({ type: 'content', chunk: content })}\n\n`);
           }
-
-          // Beberapa provider mengirim usage di chunk terakhir
-          if (chunk.usage) {
-            tokenUsage = chunk.usage.total_tokens;
-          }
+          if (chunk.usage) tokenUsage = chunk.usage.total_tokens;
         }
       } catch (streamError) {
-        console.error("Stream interrupted", streamError);
+        logger.error('Stream interrupted', streamError.message);
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream interrupted' })}\n\n`);
       }
 
-      // Estimate Usage if not provided
       if (!tokenUsage) {
         tokenUsage = Math.ceil((message.length + fullAnswer.length) / 4) + 100;
       }
 
-      // ✅ FIX: Calculate remaining tokens real-time for UI
       let remainingTokens = null;
       let limitTokens = null;
       try {
         const quota = await rateLimitService.getQuotaStatus(ipAddress, 'guest');
         remainingTokens = Math.max(0, quota.remaining - tokenUsage);
         limitTokens = quota.limit;
-      } catch (e) { }
+      } catch (_) {}
 
-      // Finalize Request
-      res.write(`data: ${JSON.stringify({
-        type: 'done',
-        usage: tokenUsage,
-        remaining: remainingTokens,
-        limit: limitTokens
-      })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'done', usage: tokenUsage, remaining: remainingTokens, limit: limitTokens })}\n\n`);
       res.end();
 
-      // Post-Processing (Async): Save Session & Rate Limit
-      await handlePostChat(currentSessionId, message, fullAnswer, ipAddress, tokenUsage, ragResult.cacheKey);
+      // NOTE: cacheKey intentionally omitted — the original code had this commented out
+      // (the cache write inside handlePostChat was already disabled). Removing it
+      // simplifies the signature with no functional change.
+      await handlePostChat(currentSessionId, message, fullAnswer, ipAddress, tokenUsage);
       return;
     }
 
-    // =================================================================
-    // B. NON-STREAMING FALLBACK (JSON)
-    // =================================================================
-
-    // Send JSON Response
+    // ─── B. NON-STREAMING ──────────────────────────────────────────────────
     const finalAnswer = ragResult.answer;
     const realTokenUsage = ragResult.usage ? ragResult.usage.total_tokens : 0;
 
@@ -124,103 +123,105 @@ const guestChat = async (req, res) => {
     await handlePostChat(currentSessionId, message, finalAnswer, ipAddress, realTokenUsage);
 
   } catch (error) {
-    console.error('❌ [GUEST ERROR]', error.message);
+    logger.error('[GUEST ERROR]', error.message);
     if (!res.headersSent) {
-      res.status(500).json({ success: false, message: "System Error" });
+      res.status(500).json({ success: false, message: 'System Error' });
     } else {
-      res.end(); // Close stream if error occurs mid-stream
+      res.end();
     }
   }
 };
 
-// Helper: Save Session & Track Usage
-async function handlePostChat(sessionId, userMsg, botMsg, ip, usage, cacheKey = null) {
+async function handlePostChat(sessionId, userMsg, botMsg, ip, usage) {
   try {
-    // 1. Save Session
-    if (!guestSessions.has(sessionId)) {
-      guestSessions.set(sessionId, { messages: [], createdAt: new Date(), lastActivity: new Date() });
-    }
-    const session = guestSessions.get(sessionId);
-    session.messages.push({ role: 'user', content: userMsg });
-    session.messages.push({ role: 'bot', content: botMsg, tokenUsage: usage });
-    session.lastActivity = new Date();
+    const existing = await getSession(sessionId) || {
+      messages: [],
+      ip,
+      createdAt: new Date().toISOString(),
+      lastActivity: new Date().toISOString()
+    };
 
-    // 2. Track Usage
+    existing.messages.push({ role: 'user', content: userMsg });
+    existing.messages.push({ role: 'bot', content: botMsg, tokenUsage: usage });
+    existing.lastActivity = new Date().toISOString();
+
+    await saveSession(sessionId, existing);
+
     if (usage > 0) {
       await rateLimitService.trackTokenUsage(null, ip, usage);
     }
-
-    // 3. Cache the full result (If streaming, we construct the cache object manually here)
-    if (cacheKey && botMsg) {
-      const cachePayload = {
-        answer: botMsg,
-        usage: { total_tokens: usage },
-        docsFound: 0 // We don't have docs info easily here without passing it down, but it's optional for cache display
-      };
-      //  await redisService.set(cacheKey, cachePayload, 3600 * 6); 
-      // Note: Caching streamed response is tricky because we need the docs info too. 
-      // For now, we skip caching streamed responses or accept we lose docs info in cache.
-    }
-
   } catch (e) {
-    console.error("Post Chat Error:", e.message);
+    logger.error('Post Chat Error:', e.message);
   }
 }
 
-// ... (Rest of the controller methods: getGuestConversation, etc. - UNCHANGED) ...
 const getGuestConversation = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    if (!guestSessions.has(sessionId)) return res.json({ success: true, messages: [] });
-    const session = guestSessions.get(sessionId);
-    session.lastActivity = new Date();
+    const session = await getSession(sessionId);
+    if (!session) return res.json({ success: true, messages: [] });
     res.json({ success: true, messages: session.messages });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Error getting conversation" });
+    res.status(500).json({ success: false, message: 'Error getting conversation' });
   }
 };
 
 const getGuestSessionInfo = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    if (!guestSessions.has(sessionId)) return res.status(404).json({ success: false, message: "Session not found" });
-    const session = guestSessions.get(sessionId);
+    const session = await getSession(sessionId);
+    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+
     res.json({
       success: true,
       data: {
-        sessionId: sessionId,
+        sessionId,
         messageCount: session.messages.length,
-        createdAt: session.createdAt || new Date(),
+        createdAt: session.createdAt,
         lastActivity: session.lastActivity,
-        ageInMinutes: Math.round((new Date() - (session.createdAt || new Date())) / (1000 * 60))
+        ageInMinutes: Math.round((Date.now() - new Date(session.createdAt).getTime()) / (1000 * 60))
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Error info" });
+    res.status(500).json({ success: false, message: 'Error info' });
   }
 };
 
 const clearGuestSession = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    if (guestSessions.has(sessionId)) guestSessions.delete(sessionId);
-    res.json({ success: true, message: "Cleared" });
+    await redisService.del(`${GUEST_SESSION_PREFIX}${sessionId}`);
+    res.json({ success: true, message: 'Cleared' });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Error clearing" });
+    res.status(500).json({ success: false, message: 'Error clearing' });
   }
 };
 
-const cleanupOldSessions = () => {
-  const now = new Date();
-  const MAX_AGE = 2 * 60 * 60 * 1000; // 2 Jam
-  for (const [sessionId, session] of guestSessions.entries()) {
-    if (now - session.lastActivity > MAX_AGE) guestSessions.delete(sessionId);
+/**
+ * Returns all active guest sessions from Redis.
+ * Used by adminController.getChatLogs.
+ * Returns array of { sessionId, session } objects.
+ */
+const getAllActiveSessions = async () => {
+  try {
+    const keys = await redisService.keys(`${GUEST_SESSION_PREFIX}*`);
+    const sessions = [];
+    for (const key of keys) {
+      const raw = await redisService.get(key);
+      if (raw) {
+        try {
+          const session = JSON.parse(raw);
+          const sessionId = key.replace(GUEST_SESSION_PREFIX, '');
+          sessions.push({ sessionId, session });
+        } catch (_) {}
+      }
+    }
+    return sessions;
+  } catch (e) {
+    logger.error('getAllActiveSessions error:', e.message);
+    return [];
   }
 };
-
-setInterval(cleanupOldSessions, 30 * 60 * 1000);
-
-const getAllActiveSessions = () => guestSessions;
 
 module.exports = {
   guestChat,

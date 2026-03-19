@@ -120,6 +120,16 @@ class RedisService {
     }
   }
 
+  async keys(pattern) {
+    try {
+      if (!this.client) return [];
+      return await this.client.keys(pattern);
+    } catch (error) {
+      logger.error(`Redis keys error [${pattern}]:`, error.message);
+      return [];
+    }
+  }
+
   // =================================================================
   // 2. COUNTER OPERATIONS (CRITICAL FOR RATE LIMIT)
   // =================================================================
