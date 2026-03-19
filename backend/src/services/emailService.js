@@ -350,6 +350,39 @@ const sendWelcomeEmail = async (to, userName, userType = 'student') => {
 };
 
 /**
+ * Send password reset email
+ */
+const sendPasswordResetEmail = async (email, resetUrl) => {
+  const subject = 'Reset Password - Sapa-Tazkia';
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #2563eb;">Reset Password</h2>
+      <p>Kami menerima permintaan reset password untuk akun Anda. Klik tombol di bawah untuk membuat password baru:</p>
+
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${resetUrl}"
+           style="background-color: #2563eb; color: white; padding: 12px 24px;
+                  text-decoration: none; border-radius: 6px; display: inline-block;">
+          Reset Password
+        </a>
+      </div>
+
+      <p style="color: #6b7280; font-size: 14px;">
+        Link ini akan kadaluarsa dalam <strong>15 menit</strong>.
+        Jika Anda tidak meminta reset password, abaikan email ini.
+      </p>
+
+      <p style="color: #6b7280; font-size: 12px;">
+        Atau salin link berikut ke browser Anda:<br/>
+        <span style="word-break: break-all;">${resetUrl}</span>
+      </p>
+    </div>
+  `;
+  await sendEmail(email, subject, html);
+  return true;
+};
+
+/**
  * Test koneksi email service
  */
 const testEmailConnection = async () => {
@@ -382,6 +415,7 @@ const testEmailConnection = async () => {
 module.exports = {
   sendEmail,
   sendVerificationEmail,
+  sendPasswordResetEmail,
   sendWelcomeEmail,
   testEmailConnection,
   generateVerificationEmailHTML,

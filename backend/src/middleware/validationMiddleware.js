@@ -149,6 +149,27 @@ const validateNimParam = [
     handleValidationErrors
 ];
 
+// validateForgotPassword — requires email OR nim
+const validateForgotPassword = [
+  (req, res, next) => {
+    if (!req.body.email && !req.body.nim) {
+      return res.status(400).json({ success: false, message: 'Email atau NIM harus diisi.' });
+    }
+    next();
+  },
+  body('email').optional().isEmail().withMessage('Format email tidak valid'),
+  body('nim').optional().isString().withMessage('NIM tidak valid'),
+  handleValidationErrors
+];
+
+const validateResetPassword = [
+  body('token').notEmpty().withMessage('Token harus diisi'),
+  body('newPassword')
+    .isLength({ min: 8 }).withMessage('Password minimal 8 karakter')
+    .matches(/^(?=.*[a-zA-Z])(?=.*[0-9])/).withMessage('Password harus mengandung huruf dan angka'),
+  handleValidationErrors
+];
+
 module.exports = {
     handleValidationErrors,
     validateRegister,
@@ -158,5 +179,7 @@ module.exports = {
     validateRefreshToken,
     validateChatMessage,
     validateGuestChatMessage,
-    validateNimParam
+    validateNimParam,
+    validateForgotPassword,
+    validateResetPassword
 };

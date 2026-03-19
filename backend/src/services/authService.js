@@ -14,6 +14,9 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 // Import email service
 const emailService = require('./emailService');
 
+// Import Redis service
+const redisService = require('./redisService');
+
 // Import logger
 const logger = require('../utils/logger');
 
@@ -1166,6 +1169,77 @@ const issueSessionToken = async (userId, ipAddress, userAgent) => {
 };
 
 // ========================================================
+// FORGOT PASSWORD / RESET PASSWORD
+// ========================================================
+
+/**
+ * Initiate forgot password flow.
+ * Always returns success: true to prevent email enumeration.
+ */
+const forgotPassword = async ({ email, nim }) => {
+  // Find user by email or nim
+  const whereClause = email ? { email } : { nim };
+  const user = await prisma.user.findFirst({ where: whereClause });
+
+  // Always succeed — never leak whether the email/nim exists
+  if (!user) {
+    logger.info('[AUTH] Forgot password: user not found, returning success silently');
+    return { success: true };
+  }
+
+  // Rate limit: max 3 requests per hour per email
+  const rlKey = `pwd_reset_rl:${user.email}`;
+  const attempts = await redisService.incr(rlKey);
+  if (attempts === 1) {
+    await redisService.expire(rlKey, 3600); // 1 hour window
+  }
+  if (attempts > 3) {
+    throw new Error('Terlalu banyak permintaan reset password. Coba lagi dalam 1 jam.');
+  }
+
+  // Generate secure token
+  const token = crypto.randomBytes(32).toString('hex');
+  await redisService.set(`pwd_reset:${token}`, String(user.id), 900); // 15 minutes
+
+  // Build reset URL
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+
+  await emailService.sendPasswordResetEmail(user.email, resetUrl);
+  logger.security(`[AUTH] Password reset email sent to userId: ${user.id}`);
+
+  return { success: true };
+};
+
+/**
+ * Complete password reset with token + new password.
+ */
+const resetPassword = async ({ token, newPassword }) => {
+  // Validate token from Redis
+  const userIdStr = await redisService.get(`pwd_reset:${token}`);
+  if (!userIdStr) {
+    throw new Error('Token reset tidak valid atau sudah kadaluarsa.');
+  }
+
+  const userId = parseInt(userIdStr, 10);
+
+  // Hash new password
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+
+  // Update user password
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash }
+  });
+
+  // Invalidate token — single use
+  await redisService.del(`pwd_reset:${token}`);
+
+  logger.security(`[AUTH] Password reset completed for userId: ${userId}`);
+  return { success: true };
+};
+
+// ========================================================
 // EXPORTS
 // ========================================================
 module.exports = {
@@ -1190,5 +1264,7 @@ module.exports = {
   verifyEmailCode,
   resendVerificationCode,
   issueSessionToken,
+  forgotPassword,
+  resetPassword,
   passport,
 };

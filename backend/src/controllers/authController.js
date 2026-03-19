@@ -771,6 +771,39 @@ const adminSetup2FA = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/auth/forgot-password
+ */
+const forgotPassword = async (req, res) => {
+  try {
+    const { email, nim } = req.body;
+    await authService.forgotPassword({ email, nim });
+    res.json({
+      success: true,
+      message: 'Jika email terdaftar, link reset password akan dikirim.'
+    });
+  } catch (error) {
+    if (error.message.includes('Terlalu banyak')) {
+      return res.status(429).json({ success: false, message: error.message });
+    }
+    logger.error('[AUTH CTRL] forgotPassword error:', error.message);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan.' });
+  }
+};
+
+/**
+ * POST /api/auth/reset-password
+ */
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    await authService.resetPassword({ token, newPassword });
+    res.json({ success: true, message: 'Password berhasil direset. Silakan login.' });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   googleAuth, googleCallback, googleCallbackSuccess,
   login, register, registerWithEmail,
@@ -778,5 +811,6 @@ module.exports = {
   verifyStudent, updateVerification, updateProfile, checkNIM,
   logout, verify, getProfile, checkAuth, healthCheck,
   chat, refreshToken,
-  adminVerify2FA, adminSetup2FA
+  adminVerify2FA, adminSetup2FA,
+  forgotPassword, resetPassword
 };

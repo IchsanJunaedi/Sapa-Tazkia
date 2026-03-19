@@ -12,7 +12,9 @@ const {
   validateLogin,
   validateVerifyEmail,
   validateRefreshToken,
-  validateNimParam
+  validateNimParam,
+  validateForgotPassword,
+  validateResetPassword
 } = require('../middleware/validationMiddleware');
 
 // ========================================================
@@ -188,6 +190,10 @@ router.post('/register-email', strictLimiter, validateRegisterEmail, authControl
  *         description: Refresh token tidak valid atau expired
  */
 router.post('/refresh', strictLimiter, validateRefreshToken, authController.refreshToken);
+
+// Forgot / Reset Password
+router.post('/forgot-password', strictLimiter, validateForgotPassword, authController.forgotPassword);
+router.post('/reset-password', strictLimiter, validateResetPassword, authController.resetPassword);
 
 // ========================================================
 // ✅ EMAIL VERIFICATION ROUTES (HIGH RISK)
