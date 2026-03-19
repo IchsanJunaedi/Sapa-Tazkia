@@ -292,8 +292,9 @@ const findOrCreateUserByEmail = async (email, googleData = null) => {
     let userType = 'regular';
     let fullName = '';
 
-    if (email.includes('@student.tazkia.ac.id') || email.includes('@student.stmik.tazkia.ac.id')) {
+    if (email.includes('@student.tazkia.ac.id') || email.includes('@student.stmik.tazkia.ac.id') || email.includes('@tazkia.ac.id')) {
       // Extract NIM from student email: 102834567812.gab@student.tazkia.ac.id
+      // @tazkia.ac.id = staff/dosen (no NIM extraction, treated same as campus internal)
       const nimMatch = email.match(/^(\d+)\./);
       if (nimMatch && nimMatch[1]) {
         nim = nimMatch[1];
@@ -418,8 +419,9 @@ const registerWithEmail = async (email) => {
     let nim = null;
     let userType = 'regular';
 
-    if (email.includes('@student.tazkia.ac.id') || email.includes('@student.stmik.tazkia.ac.id')) {
+    if (email.includes('@student.tazkia.ac.id') || email.includes('@student.stmik.tazkia.ac.id') || email.includes('@tazkia.ac.id')) {
       // Extract NIM from student email: 102834567812.gab@student.tazkia.ac.id
+      // @tazkia.ac.id = staff/dosen (no NIM in email, will get generated NIM with 'E' prefix)
       const nimMatch = email.match(/^(\d+)\./);
       if (nimMatch && nimMatch[1]) {
         nim = nimMatch[1];
@@ -511,6 +513,14 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           }
 
           const userEmail = profile.emails[0].value;
+
+          // Hanya izinkan domain kampus Tazkia
+          const allowedDomains = ['@student.tazkia.ac.id', '@student.stmik.tazkia.ac.id', '@tazkia.ac.id'];
+          const isAllowed = allowedDomains.some(domain => userEmail.endsWith(domain));
+          if (!isAllowed) {
+            console.warn(`[AUTH] Google login rejected — non-campus email: ${userEmail}`);
+            return done(null, false, { message: 'Hanya akun email kampus Tazkia yang diizinkan.' });
+          }
 
           // ✅ PERBAIKAN: Gunakan fungsi findOrCreateUserByEmail yang sudah diperbaiki
           const { user, isNewUser } = await findOrCreateUserByEmail(userEmail, {

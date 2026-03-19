@@ -106,7 +106,8 @@ router.get('/google/callback',
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/login', strictLimiter, validateLogin, authController.login);
+// TODO: Re-enable NIM+password login when SIAKAD API is integrated
+// router.post('/login', strictLimiter, validateLogin, authController.login);
 
 /**
  * @swagger
@@ -137,7 +138,8 @@ router.post('/login', strictLimiter, validateLogin, authController.login);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/register', strictLimiter, validateRegister, authController.register);
+// TODO: Re-enable NIM+password register when SIAKAD API is integrated
+// router.post('/register', strictLimiter, validateRegister, authController.register);
 
 /**
  * @swagger
@@ -159,7 +161,8 @@ router.post('/register', strictLimiter, validateRegister, authController.registe
  *       200:
  *         description: Kode OTP dikirim ke email
  */
-router.post('/register-email', strictLimiter, validateRegisterEmail, authController.registerWithEmail);
+// TODO: Re-enable email registration when SIAKAD API is integrated
+// router.post('/register-email', strictLimiter, validateRegisterEmail, authController.registerWithEmail);
 
 /**
  * @swagger
@@ -192,9 +195,9 @@ router.post('/register-email', strictLimiter, validateRegisterEmail, authControl
  */
 router.post('/refresh', strictLimiter, validateRefreshToken, authController.refreshToken);
 
-// Forgot / Reset Password
-router.post('/forgot-password', strictLimiter, validateForgotPassword, authController.forgotPassword);
-router.post('/reset-password', strictLimiter, validateResetPassword, authController.resetPassword);
+// TODO: Re-enable forgot/reset password when SIAKAD API is integrated (NIM+password flow)
+// router.post('/forgot-password', strictLimiter, validateForgotPassword, authController.forgotPassword);
+// router.post('/reset-password', strictLimiter, validateResetPassword, authController.resetPassword);
 
 // ========================================================
 // ✅ EMAIL VERIFICATION ROUTES (HIGH RISK)
@@ -227,18 +230,21 @@ router.post('/reset-password', strictLimiter, validateResetPassword, authControl
  *       400:
  *         description: Kode tidak valid atau expired
  */
-router.post('/verify-email', strictLimiter, validateVerifyEmail, authController.verifyEmailCode);
+// TODO: Re-enable email verification when SIAKAD API is integrated
+// router.post('/verify-email', strictLimiter, validateVerifyEmail, authController.verifyEmailCode);
 
 /**
  * @route   POST /api/auth/resend-verification
  * @limit   STRICT (Mencegah Email Bombing)
  */
-router.post('/resend-verification', strictLimiter, authController.resendVerificationCode);
+// TODO: Re-enable when SIAKAD API is integrated
+// router.post('/resend-verification', strictLimiter, authController.resendVerificationCode);
 
 /**
  * @route   GET /api/auth/check-verification/:email
  */
-router.get('/check-verification/:email', generalLimiter, authController.checkEmailVerification);
+// TODO: Re-enable when SIAKAD API is integrated
+// router.get('/check-verification/:email', generalLimiter, authController.checkEmailVerification);
 
 // ========================================================
 // UTILITY ROUTES
@@ -248,7 +254,8 @@ router.get('/check-verification/:email', generalLimiter, authController.checkEma
  * @route   GET /api/auth/check-nim/:nim
  * @limit   STRICT (Anti Scraping Data NIM)
  */
-router.get('/check-nim/:nim', strictLimiter, authController.checkNIM);
+// TODO: Re-enable when SIAKAD API is integrated
+// router.get('/check-nim/:nim', strictLimiter, authController.checkNIM);
 
 // ========================================================
 // PROTECTED ROUTES (LOGGED IN USERS)
@@ -277,7 +284,8 @@ router.patch('/update-verification', authMiddleware.requireAuth, generalLimiter,
 
 router.patch('/update-profile', authMiddleware.requireAuth, generalLimiter, authController.updateProfile);
 
-router.put('/change-password', authMiddleware.requireAuth, generalLimiter, validateChangePassword, authController.changePassword);
+// TODO: Re-enable when SIAKAD API is integrated (only relevant for NIM+password users)
+// router.put('/change-password', authMiddleware.requireAuth, generalLimiter, validateChangePassword, authController.changePassword);
 
 // ========================================================
 // TEST ROUTES
