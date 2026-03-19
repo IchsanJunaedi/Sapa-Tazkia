@@ -157,7 +157,7 @@ const validateForgotPassword = [
     }
     next();
   },
-  body('email').optional().isEmail().withMessage('Format email tidak valid'),
+  body('email').optional().isEmail().normalizeEmail().withMessage('Format email tidak valid'),
   body('nim').optional().isString().withMessage('NIM tidak valid'),
   handleValidationErrors
 ];

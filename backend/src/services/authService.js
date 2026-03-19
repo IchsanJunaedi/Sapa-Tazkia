@@ -1187,6 +1187,12 @@ const forgotPassword = async ({ email, nim }) => {
     return { success: true };
   }
 
+  // Guard: all users should have email (required field), but handle gracefully
+  if (!user.email) {
+    logger.info('[AUTH] Forgot password: user has no email address, returning success silently');
+    return { success: true };
+  }
+
   // Rate limit: max 3 requests per hour per email
   const rlKey = `pwd_reset_rl:${user.email}`;
   const attempts = await redisService.incr(rlKey);
