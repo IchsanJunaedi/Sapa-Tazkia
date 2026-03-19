@@ -45,7 +45,7 @@ const guestChat = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Message required' });
   }
 
-  const currentSessionId = sessionId || `guest-${Date.now()}`;
+  const currentSessionId = (sessionId && typeof sessionId === 'string' ? sessionId.slice(0, 64) : null) || `guest-${Date.now()}`;
   logger.info(`[GUEST] Chat from IP: ${ipAddress} | Stream: ${stream}`);
 
   try {
@@ -216,7 +216,9 @@ const getAllActiveSessions = async () => {
           const session = JSON.parse(raw);
           const sessionId = key.replace(GUEST_SESSION_PREFIX, '');
           sessions.push({ sessionId, session });
-        } catch (_) {}
+        } catch (parseErr) {
+          logger.warn(`[GUEST] Corrupted session skipped: ${key}`, parseErr.message);
+        }
       }
     }
     return sessions;
