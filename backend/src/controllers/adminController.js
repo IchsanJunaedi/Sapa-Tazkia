@@ -396,6 +396,39 @@ const getBugReports = async (req, res) => {
   }
 };
 
+/**
+ * PATCH /api/admin/bug-reports/:id
+ * Update bug report status and admin notes.
+ */
+const updateBugReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, adminNotes } = req.body;
+
+    const data = {};
+    if (status) data.status = status;
+    if (adminNotes !== undefined) data.adminNotes = adminNotes;
+
+    // Auto-set resolvedAt when closing
+    if (status === 'RESOLVED' || status === 'CLOSED') {
+      data.resolvedAt = new Date();
+    }
+
+    const updated = await prisma.bugReport.update({
+      where: { id: parseInt(id, 10) },
+      data,
+      include: { user: { select: { fullName: true, email: true } } }
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, message: 'Bug report not found.' });
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
     getChatLogs,
     getRealtimeAnalytics,
@@ -403,5 +436,6 @@ module.exports = {
     listKnowledgeBase,
     addKnowledgeDoc,
     deleteKnowledgeDoc,
-    getBugReports
+    getBugReports,
+    updateBugReport
 };

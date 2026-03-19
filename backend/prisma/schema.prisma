@@ -253,11 +253,33 @@ model AnalyticsSnapshot {
 //
 
 model BugReport {
-  id        Int      @id @default(autoincrement())
-  title     String   @db.VarChar(200)
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
+  id            Int         @id @default(autoincrement())
+  title         String      @db.VarChar(200)
+  description   String?     @db.Text
+  severity      BugSeverity @default(MEDIUM)
+  status        BugStatus   @default(OPEN)
+  pageUrl       String?     @db.VarChar(500)
+  userAgent     String?     @db.VarChar(500)
+  screenshotUrl String?     @db.VarChar(500)
+  adminNotes    String?     @db.Text
+  resolvedAt    DateTime?
+  userId        Int
+  user          User        @relation(fields: [userId], references: [id])
+  createdAt     DateTime    @default(now())
 
   @@map("bug_reports")
+}
+
+enum BugSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum BugStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
 }

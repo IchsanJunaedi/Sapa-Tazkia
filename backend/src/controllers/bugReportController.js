@@ -2,7 +2,8 @@ const prisma = require('../config/prismaClient');
 
 const createBugReport = async (req, res) => {
   try {
-    const { title } = req.body;
+    const { title, description, severity, pageUrl } = req.body;
+    const userAgent = req.headers['user-agent'] || null;
 
     if (!title || title.trim().length < 10) {
       return res.status(400).json({ success: false, message: 'Judul minimal 10 karakter.' });
@@ -12,7 +13,14 @@ const createBugReport = async (req, res) => {
     }
 
     const report = await prisma.bugReport.create({
-      data: { title: title.trim(), userId: req.user.id },
+      data: {
+        title: title.trim(),
+        description: description || null,
+        severity: severity || 'MEDIUM',
+        pageUrl: pageUrl || null,
+        userAgent,
+        userId: req.user.id
+      },
     });
 
     return res.status(201).json({ success: true, id: report.id });
