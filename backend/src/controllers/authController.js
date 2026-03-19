@@ -435,7 +435,30 @@ const logout = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, message: 'User tidak terautentikasi' });
-    res.json({ success: true, user: req.user });
+
+    // Fetch fresh user data including programStudi relation (not stored in JWT payload)
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        nim: true,
+        status: true,
+        authMethod: true,
+        userType: true,
+        isProfileComplete: true,
+        isEmailVerified: true,
+        phone: true,
+        angkatan: true,
+        programStudiId: true,
+        programStudi: { select: { id: true, name: true, code: true, faculty: true } }
+      }
+    });
+
+    if (!user) return res.status(401).json({ success: false, message: 'User tidak ditemukan' });
+
+    res.json({ success: true, user });
   } catch (error) {
     logger.error('[AUTH] Get profile error:', error.message);
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat mengambil profil' });
@@ -804,6 +827,23 @@ const resetPassword = async (req, res) => {
   }
 };
 
+/**
+ * PUT /api/auth/change-password
+ */
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    await authService.changePassword({
+      userId: req.user.id,
+      currentPassword,
+      newPassword
+    });
+    res.json({ success: true, message: 'Password berhasil diubah.' });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   googleAuth, googleCallback, googleCallbackSuccess,
   login, register, registerWithEmail,
@@ -812,5 +852,5 @@ module.exports = {
   logout, verify, getProfile, checkAuth, healthCheck,
   chat, refreshToken,
   adminVerify2FA, adminSetup2FA,
-  forgotPassword, resetPassword
+  forgotPassword, resetPassword, changePassword
 };

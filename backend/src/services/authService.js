@@ -795,18 +795,44 @@ const updateUserVerification = async (userId, verificationData) => {
 };
 
 /**
+ * Change password for authenticated user.
+ * Requires verification of current password.
+ */
+const changePassword = async ({ userId, currentPassword, newPassword }) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error('User tidak ditemukan.');
+
+  // Verify current password
+  const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!isMatch) throw new Error('Password saat ini tidak sesuai.');
+
+  // Prevent reuse of same password
+  const isSame = await bcrypt.compare(newPassword, user.passwordHash);
+  if (isSame) throw new Error('Password baru tidak boleh sama dengan password lama.');
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+
+  logger.security(`[AUTH] Password changed for userId: ${userId}`);
+  return { success: true };
+};
+
+/**
  * Update user profile
  */
 const updateUserProfile = async (userId, profileData) => {
   try {
+    const { email, nim, fullName, programStudiId } = profileData;
     console.log('🔍 [AUTH SERVICE] Updating user profile:', { userId, profileData });
 
     const updateData = {
-      email: profileData.email,
-      nim: profileData.nim,
-      fullName: profileData.fullName,
+      email: email,
+      nim: nim,
+      fullName: fullName,
       isProfileComplete: true // Mark as complete after profile update
     };
+
+    if (programStudiId !== undefined) updateData.programStudiId = parseInt(programStudiId, 10);
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
@@ -1263,6 +1289,7 @@ module.exports = {
   checkNIMAvailability,
   updateUserVerification,
   updateUserProfile,
+  changePassword,
   findOrCreateUserByEmail,
   registerWithEmail,
   generateVerificationCode,

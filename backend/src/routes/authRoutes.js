@@ -14,7 +14,8 @@ const {
   validateRefreshToken,
   validateNimParam,
   validateForgotPassword,
-  validateResetPassword
+  validateResetPassword,
+  validateChangePassword
 } = require('../middleware/validationMiddleware');
 
 // ========================================================
@@ -275,6 +276,8 @@ router.post('/verify-student', authMiddleware.requireAuth, strictLimiter, authCo
 router.patch('/update-verification', authMiddleware.requireAuth, generalLimiter, authController.updateVerification);
 
 router.patch('/update-profile', authMiddleware.requireAuth, generalLimiter, authController.updateProfile);
+
+router.put('/change-password', authMiddleware.requireAuth, generalLimiter, validateChangePassword, authController.changePassword);
 
 // ========================================================
 // TEST ROUTES

@@ -170,6 +170,14 @@ const validateResetPassword = [
   handleValidationErrors
 ];
 
+const validateChangePassword = [
+  body('currentPassword').notEmpty().withMessage('Password saat ini harus diisi'),
+  body('newPassword')
+    .isLength({ min: 8 }).withMessage('Password baru minimal 8 karakter')
+    .matches(/^(?=.*[a-zA-Z])(?=.*[0-9])/).withMessage('Password harus mengandung huruf dan angka'),
+  handleValidationErrors
+];
+
 module.exports = {
     handleValidationErrors,
     validateRegister,
@@ -181,5 +189,6 @@ module.exports = {
     validateGuestChatMessage,
     validateNimParam,
     validateForgotPassword,
-    validateResetPassword
+    validateResetPassword,
+    validateChangePassword
 };
