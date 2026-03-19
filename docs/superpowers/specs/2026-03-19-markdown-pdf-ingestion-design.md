@@ -71,12 +71,21 @@ Admin uploads PDF (AdminDashboard)
 ### Chunking Strategy
 - Target chunk size: **1500 characters**
 - Overlap: **200 characters** between adjacent chunks (prevents context loss at boundaries)
-- Split on sentence boundaries where possible (`.`, `!`, `?` followed by space/newline)
-- Minimum chunk size: **100 characters** (skip tiny chunks — page numbers, headers, etc.)
-- Each chunk tagged with metadata: `source_file`, `category`, `chunk_index`
+- Split on sentence boundaries where possible: period/exclamation/question mark followed by a **capital letter or newline**, and the preceding token is **longer than 2 characters** — this avoids false splits on abbreviations (`No.`, `Dr.`, `SKS`), decimal numbers (`3.75`), and numbered lists (`1. Tujuan`)
+- This is a best-effort heuristic; the 200-char overlap compensates for imperfect boundaries
+- Minimum chunk size: **100 characters** (skip tiny chunks — page numbers, headers, footers)
+- Each chunk tagged with metadata: `source_file` (file name), `category`, `chunk_index`, `title` (file name used as title for `[[Sumber: X]]` context prefix)
+
+### Payload Field Fix (prerequisite)
+`ragService.addDocument` currently stores text under `payload.content`, but the search pipeline (`compileContext`) reads `payload.text`. This means documents added via `addDocument` are retrieved by cosine similarity but their content is empty string in the GPT context — a silent data correctness bug.
+
+**Fix:** Add `text: content` to the payload object in `ragService.addDocument` so both `payload.text` and `payload.content` are populated. Also add `title: metadata.title || metadata.source || 'Dokumen'` so the `[[Sumber: X]]` prefix in context is meaningful.
+
+This fix applies to both the existing manual text input and the new PDF upload.
 
 ### Backend Changes
 **Files modified:**
+- `backend/src/services/ragService.js` — fix `addDocument` payload to include `text` and `title` fields
 - `backend/src/controllers/adminController.js` — add `uploadPdfDoc` handler
 - `backend/src/routes/adminRoutes.js` — register `POST /knowledge-base/upload-pdf` with multer middleware
 
@@ -86,9 +95,14 @@ Admin uploads PDF (AdminDashboard)
 - Auth: admin required (existing `requireAdmin` middleware)
 - Content-Type: `multipart/form-data`
 - Fields: `file` (PDF, max 10MB), `category` (optional string, default `'pdf-upload'`)
-- Validation: file must be `application/pdf`, max 10MB, min text extraction 50 chars
+- Validation (two layers):
+  1. `fileFilter` — reject if `mimetype !== 'application/pdf'`
+  2. Magic bytes — check `buffer.slice(0, 4).toString() === '%PDF'` after multer processes the file
+- Max 10MB limit — safe for current single-admin use case; revisit if multi-admin concurrent uploads become a concern
+- Rate limiting: not added — upload endpoint is behind `requireAdmin` (trusted actor); runaway cost risk is acceptable at this access level
+- Min text extraction: 50 chars (reject scanned/image-only PDFs)
 - Response: `{ success, fileName, chunksAdded, totalChars }`
-- Error cases: non-PDF file, file too large, PDF has no extractable text (scanned image), parse failure
+- Error cases: non-PDF file, failed magic bytes check, file too large, PDF has no extractable text (scanned image), parse failure
 
 ### Frontend Changes
 **Only `frontend/src/pages/AdminDashboard.jsx` (`KnowledgeBaseView` component) is modified.**
@@ -105,6 +119,12 @@ Add a second button "Upload PDF" next to the existing "Add Document" button. Cli
 The two forms (Add Document / Upload PDF) are mutually exclusive — opening one closes the other.
 
 ---
+
+## Known Limitations
+
+- **Admin KB list cap:** `ragService.listDocuments()` uses `limit: 100`. A single large PDF can produce 50+ chunks. After 2+ PDF uploads the admin table silently truncates at 100 items. This is a pre-existing issue; pagination is future work.
+- **Scanned PDFs:** `pdf-parse` only extracts text layer. Image-only PDFs return empty text and are rejected with a clear error.
+- **Typing-to-markdown transition:** When `isTyping` transitions to `false`, plain text switches to `ReactMarkdown` in a single render frame. For long responses with complex markdown (large tables), this may produce a brief layout shift. A small CSS opacity transition on the markdown container mitigates this.
 
 ## What Is NOT in Scope
 
