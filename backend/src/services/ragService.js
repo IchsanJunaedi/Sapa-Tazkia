@@ -344,6 +344,10 @@ class RagService {
       const createdAt = new Date().toISOString();
       const payload = {
         content,
+        // `text` is the canonical field read by compileContext (doc.payload.text)
+        // `...metadata` is spread last, so caller-provided text/title will override these defaults
+        text: content,
+        title: metadata.title || metadata.source || 'Dokumen',
         source: metadata.source || 'manual',
         category: metadata.category || 'manual',
         createdAt,
