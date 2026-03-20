@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { requireAdmin } = require('../middleware/authMiddleware');
-const { getChatLogs, getRealtimeAnalytics, getHistoryAnalytics, listKnowledgeBase, addKnowledgeDoc, deleteKnowledgeDoc, getBugReports, updateBugReport } = require('../controllers/adminController');
+const { getChatLogs, getRealtimeAnalytics, getHistoryAnalytics, listKnowledgeBase, addKnowledgeDoc, deleteKnowledgeDoc, getBugReports, updateBugReport, uploadPdfDoc, pdfUpload } = require('../controllers/adminController');
 const logger = require('../utils/logger');
 
 // ============================================================
@@ -52,6 +52,15 @@ router.get('/analytics/history', getHistoryAnalytics);
 router.get('/knowledge-base', listKnowledgeBase);
 router.post('/knowledge-base', addKnowledgeDoc);
 router.delete('/knowledge-base/:id', deleteKnowledgeDoc);
+router.post('/knowledge-base/upload-pdf', (req, res, next) => {
+  pdfUpload.single('file')(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ success: false, message: 'File too large. Maximum size is 10MB.' });
+    }
+    if (err) return res.status(400).json({ success: false, message: err.message });
+    next();
+  });
+}, uploadPdfDoc);
 
 // Bug Reports
 router.get('/bug-reports', getBugReports);

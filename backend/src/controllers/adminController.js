@@ -2,6 +2,15 @@ const prisma = require('../config/prismaClient');
 const guestController = require('./guestController');
 const ragService = require('../services/ragService');
 const logger = require('../utils/logger');
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
+const { chunkText } = require('../utils/textChunker');
+
+// Multer — memory storage (no disk writes), 10MB limit.
+const pdfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
 
 /**
  * Get unified chat logs (Users + Guests)
@@ -429,6 +438,70 @@ const updateBugReport = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/admin/knowledge-base/upload-pdf
+ * Upload a PDF file, extract text, chunk it, and embed all chunks into Qdrant.
+ */
+const uploadPdfDoc = async (req, res) => {
+  try {
+    // 1. Validate file presence
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded. Send a PDF as form-data field "file".' });
+    }
+
+    // 2. Validate MIME type (layer 1)
+    if (req.file.mimetype !== 'application/pdf') {
+      return res.status(400).json({ success: false, message: 'Only PDF files are allowed.' });
+    }
+
+    // 3. Validate magic bytes — %PDF (layer 2, prevents spoofed MIME type)
+    const magic = req.file.buffer.slice(0, 4).toString();
+    if (magic !== '%PDF') {
+      return res.status(400).json({ success: false, message: 'File is not a valid PDF (magic bytes check failed).' });
+    }
+
+    // 4. Parse PDF text
+    const pdfData = await pdfParse(req.file.buffer);
+    const rawText = pdfData.text || '';
+
+    if (rawText.trim().length < 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'No text could be extracted from this PDF. It may be a scanned image-only document.'
+      });
+    }
+
+    // 5. Chunk text and embed
+    const fileName = req.file.originalname;
+    const category = req.body.category || 'pdf-upload';
+    const chunks = chunkText(rawText);
+
+    let chunksAdded = 0;
+    for (let i = 0; i < chunks.length; i++) {
+      await ragService.addDocument(chunks[i], {
+        source: fileName,
+        title: fileName,
+        category,
+        chunk_index: i
+      });
+      chunksAdded++;
+    }
+
+    logger.info(`[ADMIN] PDF ingested: ${fileName} → ${chunksAdded} chunks (${rawText.trim().length} chars)`);
+
+    res.status(201).json({
+      success: true,
+      fileName,
+      chunksAdded,
+      totalChars: rawText.trim().length
+    });
+
+  } catch (error) {
+    logger.error('[ADMIN] uploadPdfDoc error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to process PDF.' });
+  }
+};
+
 module.exports = {
     getChatLogs,
     getRealtimeAnalytics,
@@ -437,5 +510,7 @@ module.exports = {
     addKnowledgeDoc,
     deleteKnowledgeDoc,
     getBugReports,
-    updateBugReport
+    updateBugReport,
+    uploadPdfDoc,
+    pdfUpload
 };
