@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { User, Bot, Download, Copy, CheckCheck } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 // ==========================================
 // 🛠️ HELPER FUNCTIONS (FORMATTING)
@@ -11,9 +15,67 @@ const cleanMessageContent = (text) => {
   return text.replace(/Invalid Date\s*$/, '').trim();
 };
 
+// ✅ Shared Arabic detection regex
+const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+// ✅ Full markdown renderer — used for completed bot messages only (not during typing animation)
+const MarkdownRenderer = ({ content }) => {
+  const hasArabic = arabicRegex.test(content);
+
+  return (
+    <div className={`markdown-body${hasArabic ? ' rtl' : ''}`}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ node, inline, className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || '');
+            if (!inline && match) {
+              return (
+                <SyntaxHighlighter
+                  style={oneDark}
+                  language={match[1]}
+                  PreTag="div"
+                  customStyle={{ borderRadius: '8px', fontSize: '0.875rem', marginBottom: '0.75rem' }}
+                  {...props}
+                >
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              );
+            }
+            return (
+              <code className="inline-code" {...props}>
+                {children}
+              </code>
+            );
+          },
+          a({ href, children }) {
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            );
+          },
+          p({ children }) {
+            const text = typeof children === 'string' ? children : '';
+            if (arabicRegex.test(text)) {
+              return (
+                <p dir="rtl" style={{ unicodeBidi: 'plaintext', textAlign: 'right', fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", fontSize: '18px', fontWeight: '500', lineHeight: '1.8', marginBottom: '0.5rem' }}>
+                  {children}
+                </p>
+              );
+            }
+            return <p>{children}</p>;
+          }
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+};
+
 // ✅ 2. Deteksi dan format teks Arabic
 const formatMessageWithArabic = (text) => {
-  const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
   return text.split('\n').map((line, index) => {
     const hasArabic = arabicRegex.test(line);
@@ -86,7 +148,6 @@ const formatMessageContent = (text) => {
   if (!text) return null;
 
   const cleanedText = cleanMessageContent(text);
-  const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
   if (arabicRegex.test(cleanedText)) {
     return formatMessageWithArabic(cleanedText);
@@ -187,8 +248,22 @@ const ChatMessage = ({ message }) => {
                 : 'font-normal text-[15px] leading-[1.7] tracking-wide'
               }
             `}>
-              {/* Teks yang diformat */}
-              {formatMessageContent(displayContent)}
+              {isUser ? (
+                // User messages: always plain text, no markdown
+                displayContent
+              ) : isTyping ? (
+                // Bot messages during typing animation: plain text to avoid markdown flicker
+                // (partial markdown like **text or ```code can look broken mid-animation)
+                formatMessageContent(displayContent)
+              ) : (
+                // Bot messages after animation completes: full markdown
+                // Use message.content (not displayContent) — both are equal at this point,
+                // but message.content is the canonical source and avoids stale partial text
+                // if the component re-renders during the final animation tick.
+                <div style={{ opacity: 1, transition: 'opacity 0.15s ease-in' }}>
+                  <MarkdownRenderer content={cleanMessageContent(message.content)} />
+                </div>
+              )}
             </div>
 
             {/* Copy Button */}
@@ -268,6 +343,30 @@ const ChatMessage = ({ message }) => {
         .regular-text {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
+        .markdown-body p { margin-bottom: 0.75rem; line-height: 1.7; }
+        .markdown-body p:last-child { margin-bottom: 0; }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+          font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; color: #1f2937;
+        }
+        .markdown-body h1 { font-size: 1.25rem; }
+        .markdown-body h2 { font-size: 1.125rem; }
+        .markdown-body h3 { font-size: 1rem; }
+        .markdown-body ul, .markdown-body ol { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+        .markdown-body ul { list-style-type: disc; }
+        .markdown-body ol { list-style-type: decimal; }
+        .markdown-body li { margin-bottom: 0.25rem; line-height: 1.6; }
+        .markdown-body table { width: 100%; border-collapse: collapse; margin-bottom: 0.75rem; font-size: 0.875rem; }
+        .markdown-body th, .markdown-body td { border: 1px solid rgba(0,0,0,0.15); padding: 0.4rem 0.75rem; text-align: left; }
+        .markdown-body th { background: rgba(0,0,0,0.06); font-weight: 600; }
+        .markdown-body tr:nth-child(even) { background: rgba(0,0,0,0.03); }
+        .markdown-body blockquote { border-left: 3px solid rgba(0,0,0,0.2); padding-left: 0.75rem; margin: 0.5rem 0; color: rgba(0,0,0,0.6); font-style: italic; }
+        .markdown-body .inline-code { background: rgba(0,0,0,0.08); padding: 0.1rem 0.35rem; border-radius: 4px; font-family: 'Courier New', Courier, monospace; font-size: 0.875em; color: #c7254e; }
+        .markdown-body a { color: #2563eb; text-decoration: underline; }
+        .markdown-body a:hover { color: #1d4ed8; }
+        .markdown-body hr { border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 1rem 0; }
+        .markdown-body.rtl { direction: rtl; text-align: right; }
+        .markdown-body strong { font-weight: 600; color: #111827; }
+        .markdown-body em { font-style: italic; }
       `}</style>
     </div>
   );
