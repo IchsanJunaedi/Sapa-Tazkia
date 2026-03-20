@@ -19,7 +19,8 @@ import {
     HelpCircle,
     Bug,
     RefreshCw,
-    X
+    X,
+    Upload
 } from 'lucide-react';
 import {
     BarChart,
@@ -488,6 +489,12 @@ const KnowledgeBaseView = () => {
     const [formData, setFormData] = useState({ content: '', source: '', category: '' });
     const [formError, setFormError] = useState('');
     const [deleteId, setDeleteId] = useState(null);
+    const [showPdfForm, setShowPdfForm] = useState(false);
+    const [pdfFile, setPdfFile] = useState(null);
+    const [pdfCategory, setPdfCategory] = useState('');
+    const [pdfSubmitting, setPdfSubmitting] = useState(false);
+    const [pdfError, setPdfError] = useState('');
+    const [pdfSuccess, setPdfSuccess] = useState('');
 
     const fetchDocs = useCallback(async () => {
         try {
@@ -545,6 +552,37 @@ const KnowledgeBaseView = () => {
         }
     };
 
+    const handleUploadPdf = async (e) => {
+        e.preventDefault();
+        if (!pdfFile) { setPdfError('Please select a PDF file.'); return; }
+        if (pdfFile.type !== 'application/pdf') { setPdfError('Only PDF files are allowed.'); return; }
+        if (pdfFile.size > 10 * 1024 * 1024) { setPdfError('File too large. Maximum size is 10MB.'); return; }
+
+        try {
+            setPdfSubmitting(true);
+            setPdfError('');
+            setPdfSuccess('');
+            const token = localStorage.getItem('token');
+            const form = new FormData();
+            form.append('file', pdfFile);
+            if (pdfCategory.trim()) form.append('category', pdfCategory.trim());
+
+            const res = await axios.post(`${API}/admin/knowledge-base/upload-pdf`, form, {
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+            });
+
+            setPdfSuccess(`✓ ${res.data.fileName} — ${res.data.chunksAdded} chunks embedded`);
+            setPdfFile(null);
+            setPdfCategory('');
+            setShowPdfForm(false);
+            await fetchDocs();
+        } catch (err) {
+            setPdfError(err.response?.data?.message || 'Failed to upload PDF.');
+        } finally {
+            setPdfSubmitting(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header row */}
@@ -561,11 +599,18 @@ const KnowledgeBaseView = () => {
                         Refresh
                     </button>
                     <button
-                        onClick={() => { setShowForm(!showForm); setFormError(''); }}
+                        onClick={() => { setShowForm(!showForm); setShowPdfForm(false); setFormError(''); }}
                         className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-all"
                     >
                         {showForm ? <X size={14} /> : <Plus size={14} />}
                         {showForm ? 'Cancel' : 'Add Document'}
+                    </button>
+                    <button
+                        onClick={() => { setShowPdfForm(!showPdfForm); setShowForm(false); setPdfError(''); setPdfSuccess(''); }}
+                        className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all"
+                    >
+                        {showPdfForm ? <X size={14} /> : <Upload size={14} />}
+                        {showPdfForm ? 'Cancel' : 'Upload PDF'}
                     </button>
                 </div>
             </div>
@@ -628,10 +673,67 @@ const KnowledgeBaseView = () => {
                 </div>
             )}
 
+            {/* PDF Upload form */}
+            {showPdfForm && (
+                <div className="bg-[#18181b] border border-blue-500/30 rounded-xl p-5">
+                    <h3 className="text-sm font-semibold text-[#e4e4e7] mb-1">Upload PDF</h3>
+                    <p className="text-xs text-[#71717a] mb-4">Teks akan diekstrak, di-chunk (~1500 karakter), dan di-embed ke Qdrant secara otomatis.</p>
+                    <form onSubmit={handleUploadPdf} className="space-y-4">
+                        <div>
+                            <label className="block text-xs text-[#a1a1aa] mb-1.5">
+                                PDF File <span className="text-red-400">*</span>
+                                <span className="text-[#71717a] ml-1">(max 10MB, text-layer only)</span>
+                            </label>
+                            <input
+                                type="file"
+                                accept="application/pdf"
+                                onChange={(e) => { setPdfFile(e.target.files[0] || null); setPdfError(''); }}
+                                className="w-full px-3 py-2 bg-[#09090b] border border-[#27272a] rounded-lg text-sm text-[#e4e4e7] file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-blue-600 file:text-white hover:file:bg-blue-700 focus:outline-none focus:border-blue-500 transition-all"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-[#a1a1aa] mb-1.5">Category</label>
+                            <input
+                                type="text"
+                                value={pdfCategory}
+                                onChange={(e) => setPdfCategory(e.target.value)}
+                                placeholder="e.g. modul-kuliah (default: pdf-upload)"
+                                className="w-full px-3 py-2 bg-[#09090b] border border-[#27272a] rounded-lg text-sm text-[#e4e4e7] placeholder-[#71717a] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                            />
+                        </div>
+                        {pdfError && <p className="text-red-400 text-xs">{pdfError}</p>}
+                        <div className="flex justify-end">
+                            <button
+                                type="submit"
+                                disabled={pdfSubmitting || !pdfFile}
+                                className="flex items-center gap-2 px-5 py-2.5 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                {pdfSubmitting ? (
+                                    <div className="animate-spin w-4 h-4 rounded-full border-2 border-white border-t-transparent" />
+                                ) : (
+                                    <Upload size={14} />
+                                )}
+                                {pdfSubmitting ? 'Processing PDF...' : 'Upload & Embed'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
             {/* Error */}
             {error && (
                 <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                     {error}
+                </div>
+            )}
+
+            {/* PDF success banner */}
+            {pdfSuccess && (
+                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm flex items-center gap-2">
+                    <span>{pdfSuccess}</span>
+                    <button onClick={() => setPdfSuccess('')} className="ml-auto text-green-300 hover:text-green-100">
+                        <X size={14} />
+                    </button>
                 </div>
             )}
 
