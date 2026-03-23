@@ -5,6 +5,7 @@ import api from '../api/axiosConfig';
 import { Plus, X, ArrowUp, Menu } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Sidebar from '../components/layout/SideBar';
+import SuggestedPromptCards from '../components/chat/SuggestedPromptCards';
 import Swal from 'sweetalert2'; // ✅ TAMBAHAN: Import SweetAlert2
 
 // --- Komponen GradientText ---
@@ -1150,6 +1151,8 @@ const LandingPage = () => {
               </p>
             </div>
           </div>
+
+          <SuggestedPromptCards />
         </div>
       </div>
 

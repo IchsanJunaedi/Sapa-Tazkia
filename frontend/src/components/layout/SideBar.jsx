@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
-import { PenSquare, User, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2, Menu, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { PenSquare, User, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2, Menu, X, Sun, Moon, Search } from 'lucide-react';
 import ProfilePopover from './ProfilePopover';
+import { useTheme } from '../../context/ThemeContext';
+import api from '../../api/axiosConfig';
+import NotificationDropdown from '../common/NotificationDropdown';
 
 const Sidebar = ({
   user,
@@ -21,11 +24,35 @@ const Sidebar = ({
   isMobileSidebarOpen = false,
   onCloseMobileSidebar
 }) => {
+  const { theme, toggleTheme } = useTheme();
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [isProfilePopupVisible, setIsProfilePopupVisible] = useState(false);
   const [isChatsSectionOpen, setIsChatsSectionOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchResults(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await api.get(`/ai/conversations/search?q=${encodeURIComponent(searchQuery)}`);
+        setSearchResults(res.data.conversations || []);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // ✅ FUNGSI: Helper
   const getUserName = () => {
@@ -236,35 +263,76 @@ const Sidebar = ({
           )}
         </div>
 
+        {/* Search Input */}
+        {isSidebarOpen && (
+          <div className="relative px-3 pb-2">
+            <Search size={14} className="absolute left-5 top-1/2 -translate-y-1/2 text-white/40" />
+            <input
+              type="text"
+              placeholder="Cari percakapan..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-7 pr-3 py-1.5 rounded-lg text-xs bg-white/10 text-white
+                placeholder-white/30 border border-white/10 focus:outline-none focus:border-white/30"
+            />
+          </div>
+        )}
+
         {/* Chat Lists */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {isChatsSectionOpen && isSidebarOpen ? (
             <div className="flex-1 overflow-y-auto mt-4 space-y-4 custom-scrollbar">
-              {groupedChats.today.length > 0 && (
+              {searchResults !== null ? (
+                <div className="space-y-1">
+                  {isSearching && (
+                    <div className="flex items-center justify-center gap-2 p-2 text-xs text-white/50">
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>Mencari...</span>
+                    </div>
+                  )}
+                  {!isSearching && searchResults.length === 0 && (
+                    <p className="p-2 text-xs text-white/40 text-center">Tidak ada hasil.</p>
+                  )}
+                  {searchResults.map(chat => (
+                    <ChatItem
+                      key={chat.id}
+                      chat={chat}
+                      currentChatId={currentChatId}
+                      onSelectChat={handleSelectChat}
+                      onDeleteChat={onDeleteChat}
+                      isDeleting={isDeleting}
+                      isStartingNewChat={isStartingNewChat}
+                      handleMoreClick={handleMoreClick}
+                      isSidebarOpen={isSidebarOpen}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {searchResults === null && groupedChats.today.length > 0 && (
                 <div className="space-y-1">
                   <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">Today</h3>
                   {renderChatGroup(groupedChats.today)}
                 </div>
               )}
-              {groupedChats.yesterday.length > 0 && (
+              {searchResults === null && groupedChats.yesterday.length > 0 && (
                 <div className="space-y-1">
                   <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">Yesterday</h3>
                   {renderChatGroup(groupedChats.yesterday)}
                 </div>
               )}
-              {groupedChats.last7Days.length > 0 && (
+              {searchResults === null && groupedChats.last7Days.length > 0 && (
                 <div className="space-y-1">
                   <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">Previous 7 Days</h3>
                   {renderChatGroup(groupedChats.last7Days)}
                 </div>
               )}
-              {groupedChats.last30Days.length > 0 && (
+              {searchResults === null && groupedChats.last30Days.length > 0 && (
                 <div className="space-y-1">
                   <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">Previous 30 Days</h3>
                   {renderChatGroup(groupedChats.last30Days)}
                 </div>
               )}
-              {groupedChats.older.length > 0 && (
+              {searchResults === null && groupedChats.older.length > 0 && (
                 <div className="space-y-1">
                   <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide px-2">
                     {formatMonthYear(groupedChats.older[0].timestamp)}
@@ -274,10 +342,10 @@ const Sidebar = ({
               )}
 
               {/* Empty/Loading States */}
-              {chatHistory.length === 0 && user && (
+              {searchResults === null && chatHistory.length === 0 && user && (
                 <p className="p-2 text-xs text-white/40 text-center">Belum ada riwayat chat.</p>
               )}
-              {!user && (
+              {searchResults === null && !user && (
                 <p className="p-2 text-xs text-white/40 text-center">Login untuk melihat riwayat chat Anda.</p>
               )}
               {(isDeleting || isStartingNewChat) && (
@@ -296,6 +364,22 @@ const Sidebar = ({
 
         {/* Profile Footer */}
         <div className="mt-8 flex-shrink-0">
+          {/* Theme Toggle + Notification Row */}
+          <div className="flex items-center gap-1 mb-2">
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg text-sm
+                text-white/60 hover:text-white hover:bg-white/10
+                transition-colors"
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              {isSidebarOpen && (
+                <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+              )}
+            </button>
+            <NotificationDropdown />
+          </div>
           <div className="flex justify-center">
             <button
               className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-white rounded-xl shadow-lg transition-all flex items-center backdrop-blur-md border border-white/30 ${user ? 'bg-white/15 hover:bg-white/25' : 'bg-white/15 hover:bg-white/25'
@@ -480,6 +564,20 @@ const Sidebar = ({
 
             {/* Profile Footer */}
             <div className="mt-4 flex-shrink-0">
+              {/* Theme Toggle Button + Notification (Mobile) */}
+              <div className="flex items-center gap-1 mb-2">
+                <button
+                  onClick={toggleTheme}
+                  title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                  className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg text-sm
+                    text-white/60 hover:text-white hover:bg-white/10
+                    transition-colors"
+                >
+                  {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                  <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+                </button>
+                <NotificationDropdown />
+              </div>
               <button
                 className={`w-full justify-start p-3 h-12 text-white rounded-xl shadow-lg transition-all flex items-center backdrop-blur-md border border-white/30 ${user ? 'bg-white/15 hover:bg-white/25' : 'bg-white/15 hover:bg-white/25'}`}
                 title={user ? `Logged in as ${getUserName()}` : 'Login as Mahasiswa'}

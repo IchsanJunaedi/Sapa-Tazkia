@@ -396,6 +396,30 @@ const testOpenAIConnectionHandler = async (req, res) => {
     res.json(result);
 };
 
+const searchConversations = async (req, res) => {
+    const { q } = req.query;
+    if (!q || q.trim().length < 2) {
+        return res.status(400).json({ success: false, message: 'Query minimal 2 karakter' });
+    }
+    try {
+        const conversations = await prisma.conversation.findMany({
+            where: {
+                userId: req.user.id,
+                OR: [
+                    { title: { contains: q.trim() } },
+                    { messages: { some: { content: { contains: q.trim() } } } },
+                ],
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+            select: { id: true, title: true, createdAt: true, _count: { select: { messages: true } } },
+        });
+        res.json({ success: true, conversations });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Gagal mencari percakapan' });
+    }
+};
+
 // =================================================================
 // 3. EXPORTS (PASTIKAN SEMUA FUNGSI ADA DI SINI)
 // =================================================================
@@ -408,5 +432,6 @@ module.exports = {
     analyzeAcademicPerformance,
     getStudyRecommendations,
     testAI,
-    testOpenAIConnection: testOpenAIConnectionHandler
+    testOpenAIConnection: testOpenAIConnectionHandler,
+    searchConversations
 };

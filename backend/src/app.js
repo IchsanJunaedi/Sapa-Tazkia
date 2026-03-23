@@ -20,6 +20,7 @@ const rateLimitRoutes = require('./routes/rateLimitRoutes'); // ✅ NEW: Rate li
 const academicRoutes = require('./routes/academicRoutes');   // ✅ NEW: Academic Routes (Ditambahkan)
 const adminRoutes = require('./routes/adminRoutes');         // ✅ NEW: Admin Routes
 const bugReportRoutes = require('./routes/bugReportRoutes'); // ✅ NEW: Bug Report Routes
+const notificationRoutes = require('./routes/notificationRoutes');
 
 // Import services
 const authService = require('./services/authService');
@@ -510,6 +511,9 @@ app.use('/api/bug-reports', bugReportRoutes);
 
 // ✅ NEW: Academic Routes (Ditambahkan sesuai request)
 app.use('/api/academic', academicRoutes);
+
+// Notification Routes
+app.use('/api/notifications', notificationRoutes);
 
 // ========================================================
 // ERROR HANDLING MIDDLEWARE - ENHANCED WITH RATE LIMIT ERRORS

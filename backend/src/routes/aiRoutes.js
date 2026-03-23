@@ -163,11 +163,17 @@ const addRateLimitHeaders = (req, res, rateLimitInfo) => {
   }
 };
 
+const { getPublicPrompts, getRagPrompts } = require('../controllers/suggestedPromptController');
+
 /**
  * ============================================================================
  * 1. PUBLIC / HYBRID ROUTES (BISA GUEST, BISA LOGIN) - ENHANCED RATE LIMITING
  * ============================================================================
  */
+
+// ✅ SUGGESTED PROMPTS — RAG route MUST come before generic to avoid :id conflict
+router.get('/suggested-prompts/rag', getRagPrompts);
+router.get('/suggested-prompts', getPublicPrompts);
 
 // ✅ CHAT ROUTE UTAMA (RAG INTEGRATED) - ENHANCED RATE LIMITING
 router.post('/chat', 
@@ -391,6 +397,7 @@ router.post('/ingest',
 );
 
 // ✅ MANAJEMEN PERCAKAPAN (PROTECTED) - NO RATE LIMIT (Read-only operations)
+router.get('/conversations/search', authMiddleware.requireAuth, aiController.searchConversations);
 router.get('/conversations', authMiddleware.requireAuth, aiController.getConversations);
 
 // ✅ FIX: Ganti :chatId menjadi :id agar sesuai dengan Controller
