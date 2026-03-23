@@ -967,6 +967,10 @@ const AdminDashboard = () => {
     const [newPromptText, setNewPromptText] = useState('');
     const [newPromptCategory, setNewPromptCategory] = useState('');
 
+    const [announcements, setAnnouncements] = useState([]);
+    const [newAnnouncementTitle, setNewAnnouncementTitle] = useState('');
+    const [newAnnouncementMessage, setNewAnnouncementMessage] = useState('');
+
     const fetchPrompts = async () => {
         try {
             const token = localStorage.getItem('token');
@@ -1017,12 +1021,40 @@ const AdminDashboard = () => {
         fetchPrompts();
     }, [activeTab]);
 
+    const fetchAnnouncements = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${API}/admin/announcements`, { headers: { Authorization: `Bearer ${token}` } });
+            setAnnouncements(res.data.data || []);
+        } catch (err) { console.error(err); }
+    };
+
+    const handleCreateAnnouncement = async () => {
+        if (!newAnnouncementTitle.trim() || !newAnnouncementMessage.trim()) return;
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(`${API}/admin/announcements`,
+                { title: newAnnouncementTitle, message: newAnnouncementMessage },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setNewAnnouncementTitle('');
+            setNewAnnouncementMessage('');
+            fetchAnnouncements();
+        } catch (err) { console.error(err); }
+    };
+
+    useEffect(() => {
+        if (activeTab !== 'announcements') return;
+        fetchAnnouncements();
+    }, [activeTab]);
+
     const tabTitles = {
         analytics: 'Analytics',
         logs: 'Live Chat Logs',
         'knowledge-base': 'Knowledge Base',
         'bug-reports': 'Bug Reports',
         prompts: 'Suggested Prompts',
+        announcements: 'Pengumuman',
     };
 
     const navItems = [
@@ -1031,6 +1063,7 @@ const AdminDashboard = () => {
         { id: 'knowledge-base', label: 'Knowledge Base', icon: <BookOpen size={18} /> },
         { id: 'bug-reports', label: 'Bug Reports', icon: <Bug size={18} /> },
         { id: 'prompts', label: 'Suggested Prompts', icon: <HelpCircle size={18} /> },
+        { id: 'announcements', label: 'Pengumuman', icon: <MessageSquare size={18} /> },
     ];
 
     return (
@@ -1182,6 +1215,55 @@ const AdminDashboard = () => {
                                             )}
                                         </tbody>
                                     </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Announcements Tab ──────────────────────────── */}
+                        {activeTab === 'announcements' && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-white mb-4">Pengumuman</h3>
+
+                                {/* Form */}
+                                <div className="flex flex-col gap-2 mb-6 max-w-lg">
+                                    <input
+                                        value={newAnnouncementTitle}
+                                        onChange={e => setNewAnnouncementTitle(e.target.value)}
+                                        placeholder="Judul pengumuman..."
+                                        className="px-3 py-2 rounded-lg bg-white/10 text-white text-sm border border-white/20 focus:outline-none focus:border-white/40"
+                                    />
+                                    <textarea
+                                        value={newAnnouncementMessage}
+                                        onChange={e => setNewAnnouncementMessage(e.target.value)}
+                                        placeholder="Isi pengumuman..."
+                                        rows={3}
+                                        className="px-3 py-2 rounded-lg bg-white/10 text-white text-sm border border-white/20 focus:outline-none focus:border-white/40 resize-none"
+                                    />
+                                    <button
+                                        onClick={handleCreateAnnouncement}
+                                        className="self-start px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg transition-colors"
+                                    >
+                                        Kirim Pengumuman
+                                    </button>
+                                </div>
+
+                                {/* Daftar */}
+                                <div className="space-y-3">
+                                    {announcements.map(a => (
+                                        <div key={a.id} className="p-4 rounded-xl bg-white/5 border border-white/10">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <p className="text-sm font-semibold text-white">{a.title}</p>
+                                                <span className="text-xs text-white/30 flex-shrink-0">
+                                                    {new Date(a.createdAt).toLocaleDateString('id-ID')}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-white/60 mt-1">{a.message}</p>
+                                            <p className="text-xs text-white/30 mt-2">{a._count?.notifications || 0} penerima</p>
+                                        </div>
+                                    ))}
+                                    {announcements.length === 0 && (
+                                        <p className="text-center text-white/30 text-sm py-8">Belum ada pengumuman</p>
+                                    )}
                                 </div>
                             </div>
                         )}

@@ -3,6 +3,7 @@ import { PenSquare, User, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRi
 import ProfilePopover from './ProfilePopover';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../api/axiosConfig';
+import NotificationDropdown from '../common/NotificationDropdown';
 
 const Sidebar = ({
   user,
@@ -363,19 +364,22 @@ const Sidebar = ({
 
         {/* Profile Footer */}
         <div className="mt-8 flex-shrink-0">
-          {/* Theme Toggle Button */}
-          <button
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm
-              text-white/60 hover:text-white hover:bg-white/10
-              transition-colors mb-2"
-          >
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            {isSidebarOpen && (
-              <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-            )}
-          </button>
+          {/* Theme Toggle + Notification Row */}
+          <div className="flex items-center gap-1 mb-2">
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg text-sm
+                text-white/60 hover:text-white hover:bg-white/10
+                transition-colors"
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              {isSidebarOpen && (
+                <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+              )}
+            </button>
+            <NotificationDropdown />
+          </div>
           <div className="flex justify-center">
             <button
               className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-white rounded-xl shadow-lg transition-all flex items-center backdrop-blur-md border border-white/30 ${user ? 'bg-white/15 hover:bg-white/25' : 'bg-white/15 hover:bg-white/25'
@@ -560,17 +564,20 @@ const Sidebar = ({
 
             {/* Profile Footer */}
             <div className="mt-4 flex-shrink-0">
-              {/* Theme Toggle Button (Mobile) */}
-              <button
-                onClick={toggleTheme}
-                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm
-                  text-white/60 hover:text-white hover:bg-white/10
-                  transition-colors mb-2"
-              >
-                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-              </button>
+              {/* Theme Toggle Button + Notification (Mobile) */}
+              <div className="flex items-center gap-1 mb-2">
+                <button
+                  onClick={toggleTheme}
+                  title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                  className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg text-sm
+                    text-white/60 hover:text-white hover:bg-white/10
+                    transition-colors"
+                >
+                  {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                  <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+                </button>
+                <NotificationDropdown />
+              </div>
               <button
                 className={`w-full justify-start p-3 h-12 text-white rounded-xl shadow-lg transition-all flex items-center backdrop-blur-md border border-white/30 ${user ? 'bg-white/15 hover:bg-white/25' : 'bg-white/15 hover:bg-white/25'}`}
                 title={user ? `Logged in as ${getUserName()}` : 'Login as Mahasiswa'}
