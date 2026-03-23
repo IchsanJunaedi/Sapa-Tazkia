@@ -4,6 +4,7 @@ const { requireAdmin } = require('../middleware/authMiddleware');
 const { getChatLogs, getRealtimeAnalytics, getHistoryAnalytics, listKnowledgeBase, addKnowledgeDoc, deleteKnowledgeDoc, getBugReports, updateBugReport, uploadPdfDoc, pdfUpload } = require('../controllers/adminController');
 const { getAllPrompts, createPrompt, updatePrompt, togglePrompt, deletePrompt } =
   require('../controllers/suggestedPromptController');
+const { createAnnouncement, getAnnouncements } = require('../controllers/notificationController');
 const logger = require('../utils/logger');
 
 // ============================================================
@@ -67,6 +68,10 @@ router.post('/knowledge-base/upload-pdf', (req, res, next) => {
 // Bug Reports
 router.get('/bug-reports', getBugReports);
 router.patch('/bug-reports/:id', updateBugReport);
+
+// Announcements
+router.post('/announcements', createAnnouncement);
+router.get('/announcements', getAnnouncements);
 
 // Suggested Prompts — toggle MUST come before /:id to avoid conflict
 router.get('/suggested-prompts', getAllPrompts);
