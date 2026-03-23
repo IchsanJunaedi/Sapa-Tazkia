@@ -45,6 +45,7 @@ model User {
   academicSummary AcademicSummary?
   sessions      Session[]
   bugReports    BugReport[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -282,4 +283,51 @@ enum BugStatus {
   IN_PROGRESS
   RESOLVED
   CLOSED
+}
+
+// ==================== SUGGESTED PROMPTS ====================
+
+enum PromptSource {
+  manual
+  rag
+}
+
+model SuggestedPrompt {
+  id        Int          @id @default(autoincrement())
+  text      String
+  category  String?
+  source    PromptSource @default(manual)
+  isActive  Boolean      @default(true)
+  order     Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([isActive, order])
+  @@map("suggested_prompts")
+}
+
+// ==================== NOTIFICATIONS ====================
+
+model Announcement {
+  id            Int            @id @default(autoincrement())
+  title         String         @db.VarChar(200)
+  message       String         @db.Text
+  createdAt     DateTime       @default(now())
+  notifications Notification[]
+
+  @@map("announcements")
+}
+
+model Notification {
+  id             Int          @id @default(autoincrement())
+  userId         Int
+  announcementId Int
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, announcementId])
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
 }
