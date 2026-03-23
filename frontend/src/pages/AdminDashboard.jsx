@@ -963,11 +963,66 @@ const AdminDashboard = () => {
         return matchesSearch && matchesType && matchesDate;
     });
 
+    const [prompts, setPrompts] = useState([]);
+    const [newPromptText, setNewPromptText] = useState('');
+    const [newPromptCategory, setNewPromptCategory] = useState('');
+
+    const fetchPrompts = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${API}/admin/suggested-prompts`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setPrompts(res.data.data || []);
+        } catch (err) { console.error(err); }
+    };
+
+    const handleAddPrompt = async () => {
+        if (!newPromptText.trim()) return;
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(`${API}/admin/suggested-prompts`,
+                { text: newPromptText, category: newPromptCategory || undefined },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setNewPromptText('');
+            setNewPromptCategory('');
+            fetchPrompts();
+        } catch (err) { console.error(err); }
+    };
+
+    const handleTogglePrompt = async (id) => {
+        try {
+            const token = localStorage.getItem('token');
+            await axios.patch(`${API}/admin/suggested-prompts/${id}/toggle`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchPrompts();
+        } catch (err) { console.error(err); }
+    };
+
+    const handleDeletePrompt = async (id) => {
+        if (!window.confirm('Hapus prompt ini?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`${API}/admin/suggested-prompts/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchPrompts();
+        } catch (err) { console.error(err); }
+    };
+
+    useEffect(() => {
+        if (activeTab !== 'prompts') return;
+        fetchPrompts();
+    }, [activeTab]);
+
     const tabTitles = {
         analytics: 'Analytics',
         logs: 'Live Chat Logs',
         'knowledge-base': 'Knowledge Base',
         'bug-reports': 'Bug Reports',
+        prompts: 'Suggested Prompts',
     };
 
     const navItems = [
@@ -975,6 +1030,7 @@ const AdminDashboard = () => {
         { id: 'logs', label: 'Chat Logs', icon: <MessageSquare size={18} /> },
         { id: 'knowledge-base', label: 'Knowledge Base', icon: <BookOpen size={18} /> },
         { id: 'bug-reports', label: 'Bug Reports', icon: <Bug size={18} /> },
+        { id: 'prompts', label: 'Suggested Prompts', icon: <HelpCircle size={18} /> },
     ];
 
     return (
@@ -1048,6 +1104,87 @@ const AdminDashboard = () => {
 
                         {/* ── Bug Reports Tab ────────────────────────────── */}
                         {activeTab === 'bug-reports' && <BugReportsView />}
+
+                        {/* ── Suggested Prompts Tab ──────────────────────── */}
+                        {activeTab === 'prompts' && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-white mb-4">Suggested Prompts</h3>
+
+                                {/* Form tambah */}
+                                <div className="flex gap-2 mb-6 flex-wrap">
+                                    <input
+                                        value={newPromptText}
+                                        onChange={e => setNewPromptText(e.target.value)}
+                                        placeholder="Teks pertanyaan..."
+                                        className="flex-1 min-w-48 px-3 py-2 rounded-lg bg-white/10 text-white text-sm border border-white/20 focus:outline-none focus:border-white/40"
+                                        onKeyDown={e => e.key === 'Enter' && handleAddPrompt()}
+                                    />
+                                    <input
+                                        value={newPromptCategory}
+                                        onChange={e => setNewPromptCategory(e.target.value)}
+                                        placeholder="Kategori (opsional)"
+                                        className="w-40 px-3 py-2 rounded-lg bg-white/10 text-white text-sm border border-white/20 focus:outline-none focus:border-white/40"
+                                    />
+                                    <button
+                                        onClick={handleAddPrompt}
+                                        className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg transition-colors"
+                                    >
+                                        Tambah
+                                    </button>
+                                </div>
+
+                                {/* Tabel */}
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="text-left text-white/50 border-b border-white/10">
+                                                <th className="pb-2 pr-4">Teks</th>
+                                                <th className="pb-2 pr-4">Kategori</th>
+                                                <th className="pb-2 pr-4">Source</th>
+                                                <th className="pb-2 pr-4">Aktif</th>
+                                                <th className="pb-2">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {prompts.map(p => (
+                                                <tr key={p.id} className="border-b border-white/5">
+                                                    <td className="py-2 pr-4 text-white/80 max-w-xs truncate">{p.text}</td>
+                                                    <td className="py-2 pr-4 text-white/50">{p.category || '—'}</td>
+                                                    <td className="py-2 pr-4">
+                                                        <span className={`px-2 py-0.5 rounded text-xs ${
+                                                            p.source === 'rag' ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'
+                                                        }`}>
+                                                            {p.source}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2 pr-4">
+                                                        <button
+                                                            onClick={() => handleTogglePrompt(p.id)}
+                                                            className={`w-10 h-5 rounded-full transition-colors ${p.isActive ? 'bg-orange-500' : 'bg-white/20'}`}
+                                                        />
+                                                    </td>
+                                                    <td className="py-2">
+                                                        <button
+                                                            onClick={() => handleDeletePrompt(p.id)}
+                                                            className="text-red-400 hover:text-red-300 text-xs transition-colors"
+                                                        >
+                                                            Hapus
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {prompts.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={5} className="py-8 text-center text-white/30 text-sm">
+                                                        Belum ada suggested prompts
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
 
                         {/* ── Chat Logs Tab ──────────────────────────────── */}
                         {activeTab === 'logs' && (
