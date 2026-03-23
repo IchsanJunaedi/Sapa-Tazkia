@@ -234,6 +234,18 @@ const ChatPage = () => {
         return () => clearTimeout(timeoutId);
     }, [isNewChat, currentChatId, messages, isGuest]);
 
+    // Auto-send prompt from navigation state (e.g. SuggestedPromptCards)
+    useEffect(() => {
+        if (location.state?.prompt) {
+            const promptText = location.state.prompt;
+            navigate(location.pathname, { replace: true, state: {} });
+            setTimeout(() => {
+                handleSendMessage(promptText);
+            }, 300);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Run once on mount only
+
     const getUserName = useCallback(() => {
         const fullName = user?.name || user?.fullName || user?.username || 'User';
         const words = fullName.split(' ').slice(0, 2);

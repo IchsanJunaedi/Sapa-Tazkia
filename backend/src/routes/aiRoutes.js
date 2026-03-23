@@ -397,6 +397,7 @@ router.post('/ingest',
 );
 
 // ✅ MANAJEMEN PERCAKAPAN (PROTECTED) - NO RATE LIMIT (Read-only operations)
+router.get('/conversations/search', authMiddleware.requireAuth, aiController.searchConversations);
 router.get('/conversations', authMiddleware.requireAuth, aiController.getConversations);
 
 // ✅ FIX: Ganti :chatId menjadi :id agar sesuai dengan Controller
