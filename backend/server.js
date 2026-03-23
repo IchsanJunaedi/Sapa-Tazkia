@@ -1,8 +1,9 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const { PrismaClient } = require('@prisma/client');
-const passport = require('passport'); // Import Passport
-require('dotenv').config(); // Panggil dotenv PALING PERTAMA
+const passport = require('passport');
+require('dotenv').config();
 
 // --- PENTING: Memuat Konfigurasi Passport, Serializer, dan Strategi ---
 // Passport dan strateginya (GoogleStrategy) harus dijalankan sekali di awal.
@@ -10,7 +11,8 @@ require('./src/services/authService');
 
 // --- Impor Service & Middleware ---
 const { generateGeminiResponse, testGeminiConnection } = require('./src/services/geminiService');
-const { requireAuth, optionalAuth } = require('./src/middleware/authMiddleware'); // Pastikan authMiddleware Anda bekerja dengan JWT
+const { requireAuth, optionalAuth } = require('./src/middleware/authMiddleware');
+const rateLimitMiddleware = require('./src/middleware/rateLimitMiddleware');
 const { getAcademicSummary, getGradesBySemester, getTranscript } = require('./src/services/academicService');
 const { generateTranscriptPDF } = require('./src/services/pdfService');
 
@@ -26,7 +28,6 @@ const PORT = process.env.PORT || 5000;
 // --- Konfigurasi CORS (PERBAIKAN LENGKAP) ---
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
-  'http://192.168.100.48:3000' 
 ];
 
 const corsOptions = {
@@ -43,6 +44,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.use(helmet());
 
 app.use(express.json());
 
@@ -50,25 +52,7 @@ app.use(express.json());
 app.use(passport.initialize());
 // app.use(passport.session()); <-- Dihapus karena kita pakai JWT/Token
 
-// Rate limiting map (Tetap sama)
-const rateLimitMap = new Map();
-
-function rateLimiter(req, res, next) {
-  const userId = req.user?.id || req.body.userId || 'anonymous';
-  const today = new Date().toDateString();
-  const key = `${userId}-${today}`;
-  const count = rateLimitMap.get(key) || 0;
-  if (count >= 100) {
-    return res.status(429).json({
-      error: 'Rate limit exceeded',
-      message: 'Anda telah mencapai batas maksimal request per hari.'
-    });
-  }
-  rateLimitMap.set(key, count + 1);
-  next();
-}
-
-// Helper functions (Tetap sama)
+// Helper functions
 function detectIntent(message) {
   const lowerMessage = message.toLowerCase();
   if (lowerMessage.includes('pendaftaran') || lowerMessage.includes('daftar')) {
@@ -243,7 +227,7 @@ app.post('/api/test-ai', async (req, res) => {
 /**
  * POST /api/chat
  */
-app.post('/api/chat', optionalAuth, rateLimiter, async (req, res) => {
+app.post('/api/chat', optionalAuth, rateLimitMiddleware(), async (req, res) => {
   const startTime = Date.now();
   try {
     const { message, conversationId: reqConversationId } = req.body;
@@ -455,9 +439,18 @@ app.delete('/api/chat/conversation/:conversationId', requireAuth, async (req, re
   }
 });
 
+// ==================== GLOBAL ERROR HANDLER ====================
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err.message, err.stack);
+  res.status(err.status || 500).json({
+    success: false,
+    message: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message
+  });
+});
+
 // ==================== SERVER START ====================
 
-// Graceful shutdown (Tetap sama)
+// Graceful shutdown
 process.on('SIGINT', async () => {
   await prisma.$disconnect();
   process.exit(0);
