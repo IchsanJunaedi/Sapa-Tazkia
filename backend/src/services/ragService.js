@@ -313,6 +313,18 @@ class RagService {
 
   async deleteCollection() { try { await client.deleteCollection(COLLECTION_NAME); } catch { } }
 
+  async getSampleDocuments(limit = 6) {
+    try {
+      const docs = await this.listDocuments();
+      return (docs || []).slice(0, limit).map(doc => ({
+        text: doc.source !== 'unknown' ? doc.source : doc.content?.substring(0, 80),
+        suggestedQuestion: doc.source && doc.source !== 'unknown' ? `Apa itu ${doc.source}?` : null,
+      })).filter(d => d.text);
+    } catch {
+      return [];
+    }
+  }
+
   // =============================================================================
   // 4. DOCUMENT MANAGEMENT (CRUD)
   // =============================================================================
