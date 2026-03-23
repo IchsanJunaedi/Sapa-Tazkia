@@ -2,6 +2,14 @@
 <html lang="id">
   <head>
     <meta charset="utf-8" />
+    <script>
+  (function() {
+    var saved = localStorage.getItem('sapa_theme');
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = saved || (prefersDark ? 'dark' : 'light');
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+  })();
+</script>
     <link rel="icon" href="%PUBLIC_URL%/a2.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f97316" />
