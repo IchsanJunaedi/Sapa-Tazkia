@@ -1,5 +1,4 @@
 import React, { useState, useContext, createContext, useEffect } from 'react';
-// --- BARU: Impor untuk React Router ---
 import {
   BrowserRouter,
   Routes,
@@ -8,47 +7,8 @@ import {
   useNavigate
 } from 'react-router-dom';
 
-// --- BARU: Import ChatPage ---
-import ChatPage from './pages/ChatPage'; // Sesuaikan path dengan struktur project Anda
-
-// --- Mock Axios (api) ---
-// (Kode Mock API Anda tetap sama, tidak perlu diubah)
-const api = {
-  defaults: { headers: { common: {} } },
-  post: async (url, data) => {
-    console.log("MOCK API POST:", url, data);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    if (url === '/auth/login' && data.nim === '12345' && data.password === 'password') {
-      console.log("Mock API: Login sukses");
-      return { data: { token: 'mock-token-123', user: { nim: '12345', name: 'Mahasiswa Mock' } } };
-    }
-    if (url === '/auth/register') {
-      console.log("Mock API: Register sukses");
-      return { data: { token: 'mock-token-register', user: { nim: data.nim, name: data.nama || 'User Baru' } } };
-    }
-    console.error("Mock API: Invalid credentials");
-    throw new Error("NIM atau Password salah");
-  },
-  get: async (url) => {
-    console.log("MOCK API GET:", url);
-    console.log("With Headers:", api.defaults.headers.common);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const token = api.defaults.headers.common['Authorization'];
-
-    // --- PERBAIKAN DI MOCK API ---
-    // Menambahkan token dari Google Callback agar 'me' berhasil
-    const googleToken = 'ini-adalah-mock-token-dari-google';
-    if (url === '/auth/me' && (token === 'Bearer mock-token-123' || token === 'Bearer mock-token-register' || token === `Bearer ${googleToken}`)) {
-      // --- AKHIR PERBAIKAN ---
-      console.log("Mock API: /me sukses");
-      return { data: { user: { nim: '241572010024', name: 'Muhammad Ichsan Junaedi' } } };
-    }
-
-    console.error("Mock API: Invalid token");
-    throw new Error("Invalid token");
-  }
-};
-// --- End Mock Axios (api) ---
+import ChatPage from './pages/ChatPage';
+import api, { setAuthHeaders, clearAuthHeaders } from './api/axiosConfig';
 
 // --- AuthContext ---
 // (Kode AuthContext, AuthProvider, dan useAuth Anda tetap sama)
@@ -64,7 +24,7 @@ const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('token');
       if (token) {
         try {
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          setAuthHeaders(token);
           const response = await api.get('/auth/me');
           setUser(response.data.user);
           setIsAuthenticated(true); // ✅ BARU: Set authenticated true
@@ -97,8 +57,7 @@ const AuthProvider = ({ children }) => {
 
         // Jika backend HANYA kirim token, kita perlu panggil /me
         if (!userData) {
-          // Set token dulu agar 'me' berhasil
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          setAuthHeaders(token);
           const response = await api.get('/auth/me');
           userData = response.data.user;
         }
@@ -106,7 +65,7 @@ const AuthProvider = ({ children }) => {
 
       // --- Logika Umum untuk KEDUA Skenario ---
       localStorage.setItem('token', token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      setAuthHeaders(token);
       setUser(userData);
       setIsAuthenticated(true); // ✅ BARU: Set authenticated true
 
@@ -143,8 +102,8 @@ const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
-    setIsAuthenticated(false); // ✅ BARU: Set authenticated false
-    delete api.defaults.headers.common['Authorization'];
+    setIsAuthenticated(false);
+    clearAuthHeaders();
     window.location.href = '/';
   };
 
@@ -196,22 +155,15 @@ const AuthCallback = () => {
     const token = searchParams.get('token');
     const userParam = searchParams.get('user');
 
-    // --- LOGIKA UNTUK MOCK API ---
-    const mockToken = 'ini-adalah-mock-token-dari-google';
-    const mockUser = { nim: '241572010024', name: 'Muhammad Ichsan Junaedi' };
-
     const processLogin = async () => {
-      const finalToken = token || mockToken;
-      const finalUserString = userParam || JSON.stringify(mockUser);
-
-      if (finalToken) {
+      if (token) {
         try {
-          const userObject = JSON.parse(decodeURIComponent(finalUserString));
-          await login(finalToken, userObject);
-          navigate('/chat'); // ✅ PERBAIKAN: Arahkan ke /chat setelah login sukses
+          const userObject = userParam ? JSON.parse(decodeURIComponent(userParam)) : null;
+          await login(token, userObject);
+          navigate('/chat');
         } catch (err) {
           console.error("Gagal memproses callback:", err);
-          setError("Login Google gagal. Mencoba mengurai data user.");
+          setError("Login Google gagal. Silakan coba lagi.");
           setTimeout(() => navigate('/'), 3000);
         }
       } else {
@@ -308,7 +260,7 @@ const LoginPage = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">NIM</label>
             <input
               type="text"
-              placeholder="Masukkan NIM Anda (Coba: 12345)"
+              placeholder="Masukkan NIM Anda"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
               value={nim}
               onChange={(e) => setNim(e.target.value)}
@@ -319,7 +271,7 @@ const LoginPage = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
             <input
               type="password"
-              placeholder="Masukkan Password (Coba: password)"
+              placeholder="Masukkan Password"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
