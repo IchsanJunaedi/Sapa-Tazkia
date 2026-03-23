@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { PenSquare, User, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2, Menu, X } from 'lucide-react';
+import { PenSquare, User, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2, Menu, X, Sun, Moon } from 'lucide-react';
 import ProfilePopover from './ProfilePopover';
+import { useTheme } from '../../context/ThemeContext';
 
 const Sidebar = ({
   user,
@@ -21,6 +22,7 @@ const Sidebar = ({
   isMobileSidebarOpen = false,
   onCloseMobileSidebar
 }) => {
+  const { theme, toggleTheme } = useTheme();
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
@@ -296,6 +298,19 @@ const Sidebar = ({
 
         {/* Profile Footer */}
         <div className="mt-8 flex-shrink-0">
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm
+              text-white/60 hover:text-white hover:bg-white/10
+              transition-colors mb-2"
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            {isSidebarOpen && (
+              <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+            )}
+          </button>
           <div className="flex justify-center">
             <button
               className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-white rounded-xl shadow-lg transition-all flex items-center backdrop-blur-md border border-white/30 ${user ? 'bg-white/15 hover:bg-white/25' : 'bg-white/15 hover:bg-white/25'
@@ -480,6 +495,17 @@ const Sidebar = ({
 
             {/* Profile Footer */}
             <div className="mt-4 flex-shrink-0">
+              {/* Theme Toggle Button (Mobile) */}
+              <button
+                onClick={toggleTheme}
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm
+                  text-white/60 hover:text-white hover:bg-white/10
+                  transition-colors mb-2"
+              >
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+              </button>
               <button
                 className={`w-full justify-start p-3 h-12 text-white rounded-xl shadow-lg transition-all flex items-center backdrop-blur-md border border-white/30 ${user ? 'bg-white/15 hover:bg-white/25' : 'bg-white/15 hover:bg-white/25'}`}
                 title={user ? `Logged in as ${getUserName()}` : 'Login as Mahasiswa'}
