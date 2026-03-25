@@ -51,6 +51,8 @@ services:
     command: >
       redis-server
       --save 60 1
+      --appendonly yes
+      --appendfsync everysec
       --loglevel warning
       --requirepass ${REDIS_PASSWORD:-}
     healthcheck:
