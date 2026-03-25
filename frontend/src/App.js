@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
 import LandingPage from './pages/LandingPage';
+import MarketingLandingPage from './pages/MarketingLandingPage';
 import LoginPage from './pages/LoginPage';
 import ChatPage from './pages/ChatPage';
 import AboutYouPage from './pages/AboutYouPage';
@@ -23,6 +24,7 @@ import HelpCenterPage from './pages/HelpCenterPage';
 import TermsPoliciesPage from './pages/TermsPoliciesPage';
 import ReportBugPage from './pages/ReportBugPage';
 import TentangPage from './pages/TentangPage';
+import DocsPage from './pages/DocsPage';
 
 // ✅ NEW: Custom Wrapper for Admin Login Redirect
 const AdminLoginRoute = ({ children }) => {
@@ -47,8 +49,12 @@ function App() {
       <AuthProvider>
         <NotificationProvider>
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<LandingPage />} />
+          {/* ✅ Marketing Landing Page — public homepage */}
+          <Route path="/" element={<MarketingLandingPage />} />
+
+          {/* ✅ Chat Interface (LandingPage) — handles its own auth modal */}
+          <Route path="/chat" element={<LandingPage />} />
+
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
@@ -57,6 +63,7 @@ function App() {
           <Route path="/help" element={<HelpCenterPage />} />
           <Route path="/terms" element={<TermsPoliciesPage />} />
           <Route path="/tentang" element={<TentangPage />} />
+          <Route path="/docs" element={<DocsPage />} />
 
           {/* Public Admin Routes */}
           <Route path="/admin/login" element={
@@ -112,17 +119,7 @@ function App() {
 
           {/* Route untuk ChatPage */}
 
-          {/* 1. Route untuk New Chat (Chat Baru) */}
-          <Route
-            path="/chat"
-            element={
-              <ProtectedRoute>
-                <ChatPage />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* 2. Route untuk History Chat (Agar bisa refresh) */}
+          {/* Direct chat session (deeplink by chatId) */}
           <Route
             path="/chat/:chatId"
             element={

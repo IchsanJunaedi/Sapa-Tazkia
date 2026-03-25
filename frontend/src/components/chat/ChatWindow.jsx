@@ -325,7 +325,7 @@ const ChatWindow = ({ messages, isLoading, error, onDownloadPDF, onRetry }) => {
   }
 
   return (
-    <div className="flex flex-col space-y-2 pb-4 w-full">
+    <div className="flex flex-col space-y-2 pt-4 pb-4 w-full">
       {messages.map((msg, index) => (
         <SingleChatMessage key={index} message={msg} onDownloadPDF={onDownloadPDF} onRetry={onRetry} />
       ))}

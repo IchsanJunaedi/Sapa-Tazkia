@@ -32,7 +32,7 @@ const AuthCallback = () => {
       if (user && user.userType === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       } else {
-        navigate('/chat', { replace: true });
+        navigate('/', { replace: true });
       }
       return;
     }
@@ -182,14 +182,8 @@ const AuthCallback = () => {
             console.log('🔍 [AUTH CALLBACK] ADMIN USER - Redirecting to Dashboard');
             navigate('/admin/dashboard', { replace: true });
           } else {
-            console.log('🔍 [AUTH CALLBACK] RETURNING NORMAL USER - Redirecting to Chat');
-            navigate('/chat', {
-              replace: true,
-              state: {
-                from: 'auth-callback',
-                welcomeBack: true
-              }
-            });
+            console.log('🔍 [AUTH CALLBACK] RETURNING NORMAL USER - Redirecting to Landing Page');
+            navigate('/', { replace: true });
           }
 
         } catch (parseError) {

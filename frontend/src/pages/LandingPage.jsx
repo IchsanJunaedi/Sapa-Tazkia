@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
 import { Plus, X, ArrowUp, Menu } from 'lucide-react';
@@ -607,6 +607,11 @@ const AuthModal = ({ isOpen, onClose, initialStep = 0 }) => {
 const LandingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // ✅ Guest mode: skip auth modal if ?guest=true
+  const isGuest = searchParams.get('guest') === 'true';
+
   const {
     user,
     logout,
@@ -638,13 +643,18 @@ const LandingPage = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // ✅ TAMBAHAN: Auto open modal jika ada pending verification
+  // ✅ Guest mode: skip modal jika isGuest = true
   useEffect(() => {
+    if (isGuest) {
+      console.log('🔍 [LANDING PAGE] Guest mode detected, skipping auth modal');
+      return;
+    }
     if (pendingVerification && pendingEmail && !isModalOpen) {
       console.log('🔍 [LANDING PAGE] Auto-opening modal for pending verification');
       setInitialModalStep(1);
       setIsModalOpen(true);
     }
-  }, [pendingVerification, pendingEmail, isModalOpen]);
+  }, [pendingVerification, pendingEmail, isModalOpen, isGuest]);
 
   // ✅ TAMBAHAN: Load chat history untuk user yang login
   const loadChatHistory = useCallback(async () => {
@@ -991,10 +1001,10 @@ const LandingPage = () => {
         fromLandingPage: true // ✅ TAMBAHAN: Flag khusus untuk identifikasi dari landing page
       };
 
-      // Navigate ke chat page dengan state
-      navigate('/chat', {
+      // Navigate ke ChatPage dengan state (chatId 'new' = buat percakapan baru)
+      navigate('/chat/new', {
         state: navigationState,
-        replace: false // Biarkan replace: false agar user bisa kembali ke landing page
+        replace: false
       });
     }
   };
@@ -1009,9 +1019,10 @@ const LandingPage = () => {
   // ✅ PERBAIKAN: Fungsi untuk langsung ke chat sebagai guest - DIPERBAIKI
   const handleGuestChat = () => {
     console.log('🔍 [LANDING PAGE] Starting guest chat');
-    navigate('/chat', {
+    navigate('/chat/new', {
       state: {
-        isGuest: true
+        isGuest: true,
+        fromLandingPage: true
       }
     });
   };
@@ -1124,7 +1135,7 @@ const LandingPage = () => {
                 placeholder="Message Sapa Tazkia"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyPress}
                 className="flex-1 px-2 py-2 text-lg text-white placeholder-white/50 focus:outline-none bg-transparent"
               />
               <button
