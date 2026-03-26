@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { PenSquare, User, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2, Menu, X, Sun, Moon, Search } from 'lucide-react';
+import { PenSquare, User, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2, Menu, X, Search } from 'lucide-react';
 import ProfilePopover from './ProfilePopover';
-import { useTheme } from '../../context/ThemeContext';
 import api from '../../api/axiosConfig';
 import NotificationDropdown from '../common/NotificationDropdown';
 
@@ -24,7 +23,6 @@ const Sidebar = ({
   isMobileSidebarOpen = false,
   onCloseMobileSidebar
 }) => {
-  const { theme, toggleTheme } = useTheme();
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
@@ -364,20 +362,8 @@ const Sidebar = ({
 
         {/* Profile Footer */}
         <div className="mt-8 flex-shrink-0">
-          {/* Theme Toggle + Notification Row */}
-          <div className="flex items-center gap-1 mb-2">
-            <button
-              onClick={toggleTheme}
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg text-sm
-                text-white/60 hover:text-white hover:bg-white/10
-                transition-colors"
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-              {isSidebarOpen && (
-                <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-              )}
-            </button>
+          {/* Notification */}
+          <div className="flex items-center justify-end mb-2">
             <NotificationDropdown />
           </div>
           <div className="flex justify-center">
@@ -564,18 +550,8 @@ const Sidebar = ({
 
             {/* Profile Footer */}
             <div className="mt-4 flex-shrink-0">
-              {/* Theme Toggle Button + Notification (Mobile) */}
-              <div className="flex items-center gap-1 mb-2">
-                <button
-                  onClick={toggleTheme}
-                  title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                  className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg text-sm
-                    text-white/60 hover:text-white hover:bg-white/10
-                    transition-colors"
-                >
-                  {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                  <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-                </button>
+              {/* Notification (Mobile) */}
+              <div className="flex items-center justify-end mb-2">
                 <NotificationDropdown />
               </div>
               <button
