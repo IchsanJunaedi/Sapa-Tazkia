@@ -1082,7 +1082,7 @@ const LandingPage = () => {
               <Menu size={24} />
             </button>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => window.location.reload()}
               className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
             >
               <img
