@@ -13,7 +13,7 @@ const getPublicPrompts = async (req, res) => {
     if (cached) return res.json({ success: true, data: JSON.parse(cached), fromCache: true });
 
     const manual = await prisma.suggestedPrompt.findMany({
-      where: { isActive: true, source: 'manual' },
+      where: { isActive: true },
       orderBy: { order: 'asc' },
       take: 3,
     });
@@ -26,8 +26,8 @@ const getPublicPrompts = async (req, res) => {
     await redisService.set(CACHE_KEY_PUBLIC, JSON.stringify(data), CACHE_TTL_PUBLIC).catch(() => {});
     res.json({ success: true, data });
   } catch (error) {
-    logger.error('getPublicPrompts error:', error.message);
-    res.status(500).json({ success: false, message: 'Gagal mengambil suggested prompts' });
+    logger.error('getPublicPrompts error:', error?.message || error);
+    res.json({ success: true, data: [] });
   }
 };
 
