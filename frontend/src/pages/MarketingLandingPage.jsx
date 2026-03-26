@@ -154,7 +154,7 @@ const Navbar = ({ activeSection }) => {
       className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4"
     >
       <div className="w-full max-w-7xl flex items-center justify-between">
-        <button onClick={() => navigate('/')} className="flex items-center gap-2 focus:outline-none">
+        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex items-center gap-2 focus:outline-none">
           <img src="/a2.png" className="w-7 h-7 object-contain" alt="Sapa Tazkia" />
           <span className="font-display font-semibold text-white text-lg tracking-tighter">Sapa Tazkia</span>
         </button>
@@ -178,7 +178,7 @@ const Navbar = ({ activeSection }) => {
               </button>
             )
           ))}
-          <Link to="/chat"
+          <Link to="/login"
             className="font-display text-sm font-medium bg-white text-black rounded-full px-5 py-2 hover:bg-white/90 transition-colors flex items-center gap-1 ml-1">
             Login <ArrowUpRight size={13} />
           </Link>
@@ -217,7 +217,7 @@ const Navbar = ({ activeSection }) => {
               )
             ))}
             <div className="pt-2 border-t border-white/8">
-              <Link to="/chat" onClick={() => setMenuOpen(false)}
+              <Link to="/login" onClick={() => setMenuOpen(false)}
                 className="flex items-center justify-center gap-1 w-full px-4 py-2.5 bg-white text-black rounded-full font-display text-sm font-medium hover:bg-white/90 transition-colors">
                 Login <ArrowUpRight size={13} />
               </Link>
@@ -307,7 +307,7 @@ const HeroSection = () => {
                         )
                       ))}
                       <div className="pt-1 border-t border-white/8 mt-1">
-                        <Link to="/chat" onClick={() => setMenuDropOpen(false)}
+                        <Link to="/login" onClick={() => setMenuDropOpen(false)}
                           className="flex items-center justify-center gap-1 w-full px-4 py-2.5 bg-white text-black rounded-xl font-display text-sm font-medium hover:bg-white/90 transition-colors">
                           Login <ArrowUpRight size={12} />
                         </Link>
@@ -449,7 +449,7 @@ const HeroSection = () => {
             <span className="font-display font-semibold text-white text-sm tracking-tighter">Sapa Tazkia</span>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/chat"
+            <Link to="/login"
               className="liquid-glass rounded-full px-5 py-2 font-display text-sm text-white/80 hover:text-white transition-colors flex items-center gap-1.5">
               Masuk <ArrowRight size={13} />
             </Link>
@@ -556,7 +556,7 @@ const steps = [
 ];
 
 const HowItWorksSection = () => (
-  <section id="how-it-works" className="relative py-28 px-6 md:px-16 overflow-hidden" style={{ background: '#000', minHeight: 600 }}>
+  <section id="how-it-works" className="relative py-16 md:py-28 px-6 md:px-16 overflow-hidden" style={{ background: '#000' }}>
     <div
       className="absolute inset-0 z-0"
       style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(255,255,255,0.025) 0%, transparent 70%)' }}
@@ -644,7 +644,7 @@ const featuresChess = [
 ];
 
 const ChessSection = () => (
-  <section id="features" className="py-24 px-6 md:px-16 bg-black">
+  <section id="features" className="py-14 md:py-24 px-6 md:px-16 bg-black">
     <div className="max-w-5xl mx-auto">
       <div className="text-center mb-16">
         <div className="liquid-glass rounded-full px-3.5 py-1 inline-block mb-4">
@@ -693,7 +693,7 @@ const gridFeatures = [
 ];
 
 const GridSection = () => (
-  <section className="py-20 px-6 md:px-16 bg-black">
+  <section className="py-14 md:py-20 px-6 md:px-16 bg-black">
     <div className="max-w-5xl mx-auto">
       <div className="text-center mb-12">
         <div className="liquid-glass rounded-full px-3.5 py-1 inline-block mb-4">
@@ -739,7 +739,7 @@ const stats = [
 ];
 
 const StatsSection = () => (
-  <section className="relative py-20 px-6 md:px-16 overflow-hidden" style={{ background: '#000' }}>
+  <section className="relative py-14 md:py-20 px-6 md:px-16 overflow-hidden" style={{ background: '#000' }}>
     <div className="absolute inset-0 z-0" style={{ background: 'radial-gradient(ellipse 80% 50% at 50% 50%, rgba(255,255,255,0.03) 0%, transparent 70%)' }} />
     <div className="relative z-10 max-w-4xl mx-auto">
       <motion.div
@@ -747,7 +747,7 @@ const StatsSection = () => (
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.6 }}
-        className="liquid-glass rounded-3xl p-10 md:p-14 grid grid-cols-2 lg:grid-cols-4 gap-8 text-center"
+        className="liquid-glass rounded-3xl p-6 sm:p-10 md:p-14 grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 text-center"
       >
         {stats.map(({ value, label }, i) => (
           <div key={i}>
@@ -784,7 +784,7 @@ const testimonials = [
 ];
 
 const TestimonialsSection = () => (
-  <section className="py-24 px-6 md:px-16 bg-black">
+  <section className="py-14 md:py-24 px-6 md:px-16 bg-black">
     <div className="max-w-5xl mx-auto">
       <div className="text-center mb-12">
         <div className="liquid-glass rounded-full px-3.5 py-1 inline-block mb-4">
@@ -867,7 +867,7 @@ const ContactSection = () => {
   };
 
   return (
-    <section id="contact" className="py-24 px-6 md:px-16 bg-black">
+    <section id="contact" className="py-14 md:py-24 px-6 md:px-16 bg-black">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-12">
           <div className="liquid-glass rounded-full px-3.5 py-1 inline-block mb-4">
@@ -957,12 +957,219 @@ const ContactSection = () => {
   );
 };
 
+// ─── Footer Modal ─────────────────────────────────────────────────────────────
+
+const FooterModal = ({ isOpen, onClose, title, children }) => {
+  useEffect(() => {
+    if (isOpen) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        className="relative w-full sm:max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col rounded-t-3xl sm:rounded-3xl overflow-hidden"
+        style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        {/* drag handle mobile */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full bg-white/15" />
+        </div>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/8 flex-shrink-0">
+          <h2 className="font-display font-medium text-white text-base">{title}</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/6 hover:bg-white/12 flex items-center justify-center text-white/50 hover:text-white transition-all">
+            <X size={15} />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-6 py-5 space-y-5 text-sm font-display font-light text-white/60 leading-relaxed">
+          {children}
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+const PrivasiContent = () => (
+  <>
+    <p className="text-white/35 text-xs uppercase tracking-widest">Terakhir diperbarui: 24 Desember 2025</p>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">1. Siapa Kami</h3>
+      <p>SAPA TAZKIA AI adalah layanan asisten akademik berbasis kecerdasan buatan yang dikembangkan oleh tim pengembang STMIK Tazkia. Layanan ini dioperasikan di bawah naungan STMIK Tazkia, Bogor, Jawa Barat.</p>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">2. Data yang Kami Kumpulkan</h3>
+      <p>Dalam menjalankan layanan, kami mengumpulkan data berikut:</p>
+      <ul className="mt-2 space-y-1 pl-4 list-disc text-white/50">
+        <li>NIM (Nomor Induk Mahasiswa) dan email institusi</li>
+        <li>Riwayat percakapan dengan AI</li>
+        <li>Alamat IP dan informasi perangkat dasar</li>
+        <li>Data nilai dan transkrip akademik (dari sistem institusi)</li>
+      </ul>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">3. Penggunaan Data</h3>
+      <p>Data digunakan semata-mata untuk menyediakan layanan, meningkatkan akurasi jawaban AI, dan memastikan keamanan sistem. Kami tidak menjual atau membagikan data pengguna ke pihak ketiga untuk keperluan komersial.</p>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">4. Pengiriman ke Pihak Ketiga</h3>
+      <p>Pertanyaan yang kamu kirimkan diproses melalui <span className="text-white/80">OpenAI API</span> untuk menghasilkan jawaban. Data yang dikirim hanya berisi teks pertanyaan dan konteks percakapan — tidak termasuk data identitas lengkap. Penggunaan OpenAI tunduk pada <span className="text-white/80">kebijakan privasi OpenAI</span>.</p>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">5. Retensi Data</h3>
+      <p>Riwayat percakapan disimpan selama <span className="text-white/80">7 hari</span> sejak sesi dibuat. Setelah periode tersebut, data percakapan dihapus otomatis dari sistem kami. Data akun dan akademik dikelola sesuai kebijakan institusi.</p>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">6. Keamanan Data</h3>
+      <p>Kami menggunakan HTTPS, enkripsi JWT, Redis session management, dan password hashing untuk melindungi datamu. Data sensitif tidak pernah disimpan dalam plaintext.</p>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">7. Hak Pengguna</h3>
+      <p>Kamu berhak meminta penghapusan akun dan data percakapanmu kapan saja dengan menghubungi tim kami di <span className="text-white/80">sapa@stmik.tazkia.ac.id</span>.</p>
+    </div>
+
+    <div className="p-4 rounded-2xl bg-white/4 border border-white/8 space-y-1">
+      <p className="text-white/45 text-xs">Pertanyaan seputar privasi?</p>
+      <p className="text-white/80 text-xs font-medium">Muhammad Ichsan Junaedi — sapa@stmik.tazkia.ac.id</p>
+    </div>
+  </>
+);
+
+const SyaratContent = () => (
+  <>
+    <p className="text-white/35 text-xs uppercase tracking-widest">Berlaku sejak: 24 Desember 2025</p>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">1. Penerimaan Syarat</h3>
+      <p>Dengan mengakses atau menggunakan SAPA TAZKIA AI, kamu menyatakan telah membaca, memahami, dan menyetujui seluruh syarat penggunaan ini. Jika tidak setuju, harap hentikan penggunaan layanan.</p>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">2. Pengguna yang Diizinkan</h3>
+      <p>Layanan ini diperuntukkan eksklusif bagi <span className="text-white/80">mahasiswa aktif Universitas Tazkia dan STMIK Tazkia</span>. Penggunaan oleh pihak di luar institusi tidak diizinkan kecuali dalam mode tamu yang telah disediakan.</p>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">3. Penggunaan yang Dilarang</h3>
+      <p>Dengan menggunakan layanan ini, kamu setuju untuk <span className="text-white/80">tidak</span>:</p>
+      <ul className="mt-2 space-y-1.5 pl-4 list-disc text-white/50">
+        <li>Menggunakan layanan untuk tujuan kecurangan akademik (plagiarisme, pembuatan tugas atas nama orang lain)</li>
+        <li>Mencoba meretas, mengeksploitasi, atau mengganggu sistem</li>
+        <li>Menggunakan bot, skrip otomatis, atau alat scraping tanpa izin tertulis</li>
+        <li>Menyamar sebagai pengguna lain atau memberikan informasi identitas palsu</li>
+        <li>Menyebarkan konten yang melanggar hukum, bersifat SARA, atau merugikan pihak lain</li>
+        <li>Mencoba mengakses data akademik milik pengguna lain</li>
+        <li>Membebani sistem secara berlebihan melebihi batas kuota yang ditetapkan</li>
+      </ul>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">4. Akun dan Keamanan</h3>
+      <p>Kamu bertanggung jawab penuh atas keamanan kredensial login dan seluruh aktivitas yang terjadi di bawah akunmu. Segera laporkan jika terdapat akses tidak sah ke akunmu.</p>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">5. Konten Hasil AI</h3>
+      <p>Jawaban yang dihasilkan oleh AI bersifat informatif dan bukan merupakan nasihat akademik resmi. Pengguna tetap bertanggung jawab atas cara penggunaan informasi yang diperoleh.</p>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">6. Sanksi Pelanggaran</h3>
+      <p>Pelanggaran terhadap syarat ini dapat mengakibatkan <span className="text-white/80">penangguhan atau penghapusan akun</span> tanpa pemberitahuan sebelumnya. Pelanggaran serius dapat dilaporkan kepada pihak akademik institusi.</p>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">7. Batasan Tanggung Jawab</h3>
+      <p>Layanan disediakan "sebagaimana adanya". Tim SAPA tidak bertanggung jawab atas kerugian yang timbul dari penggunaan atau ketidakmampuan menggunakan layanan akibat gangguan teknis, ketidakakuratan AI, atau kejadian di luar kendali kami.</p>
+    </div>
+
+    <div className="space-y-1">
+      <h3 className="font-medium text-white/90 text-sm">8. Perubahan Syarat</h3>
+      <p>Kami berhak memperbarui syarat ini kapan saja. Perubahan signifikan akan diumumkan melalui platform. Penggunaan berkelanjutan setelah perubahan dianggap sebagai penerimaan syarat baru.</p>
+    </div>
+  </>
+);
+
+const KontakContent = ({ onClose }) => (
+  <>
+    <p className="text-white/50">Ada pertanyaan, masukan, atau kendala teknis? Hubungi tim SAPA TAZKIA AI melalui saluran berikut.</p>
+
+    <div className="space-y-3">
+      {[
+        {
+          icon: <Mail size={16} />,
+          label: 'Email Resmi',
+          value: 'sapa@stmik.tazkia.ac.id',
+          sub: 'Respon dalam 1–2 hari kerja',
+          href: 'mailto:sapa@stmik.tazkia.ac.id',
+        },
+        {
+          icon: <MessageCircle size={16} />,
+          label: 'WhatsApp',
+          value: '085890179268',
+          sub: 'Muhammad Ichsan Junaedi',
+          href: 'https://wa.me/6285890179268',
+        },
+        {
+          icon: <MapPin size={16} />,
+          label: 'Kampus',
+          value: 'STMIK Tazkia',
+          sub: 'Bogor, Jawa Barat',
+          href: null,
+        },
+      ].map((item, i) => (
+        <div key={i} className="flex items-start gap-3 p-4 rounded-2xl bg-white/4 border border-white/8">
+          <div className="w-8 h-8 rounded-xl bg-white/6 flex items-center justify-center text-white/45 shrink-0 mt-0.5">
+            {item.icon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white/35 text-xs uppercase tracking-widest mb-0.5">{item.label}</p>
+            {item.href ? (
+              <a href={item.href} target="_blank" rel="noopener noreferrer"
+                className="text-white/85 text-sm font-medium hover:text-white transition-colors block">{item.value}</a>
+            ) : (
+              <p className="text-white/85 text-sm font-medium">{item.value}</p>
+            )}
+            <p className="text-white/35 text-xs mt-0.5">{item.sub}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <div className="p-4 rounded-2xl bg-white/4 border border-white/8">
+      <p className="text-white/50 text-xs mb-1">Jam Layanan</p>
+      <p className="text-white/85 text-sm font-medium">Senin – Jumat, 08.00 – 16.00 WIB</p>
+      <p className="text-white/35 text-xs mt-1">Di luar jam layanan, gunakan formulir laporan di bawah.</p>
+    </div>
+
+    <Link to="/report-bug" onClick={onClose}
+      className="flex items-center justify-center gap-2 w-full py-3 rounded-full bg-white/8 border border-white/10 text-white/70 hover:bg-white/12 hover:text-white transition-all text-sm font-medium">
+      <ArrowUpRight size={14} /> Laporkan Bug / Masalah Teknis
+    </Link>
+  </>
+);
+
 // ─── CTA + Footer ─────────────────────────────────────────────────────────────
 
 const CtaFooter = () => {
   const navigate = useNavigate();
+  const [modal, setModal] = useState(null); // 'privasi' | 'syarat' | 'kontak'
+
   return (
-    <section className="relative py-32 px-6 overflow-hidden" style={{ background: '#000' }}>
+    <section className="relative py-20 md:py-32 px-6 overflow-hidden" style={{ background: '#000' }}>
       <div className="absolute inset-0 z-0" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 60%, rgba(255,255,255,0.04) 0%, transparent 70%)' }} />
       <div className="relative z-10 max-w-3xl mx-auto text-center">
         <h2 className="font-display font-medium text-white tracking-tight leading-tight mb-5"
@@ -993,14 +1200,33 @@ const CtaFooter = () => {
             <span className="font-display font-semibold text-white text-base tracking-tighter">Sapa Tazkia</span>
             <span className="font-display font-light text-white/30 text-xs ml-2">AI Chatbot Akademik Universitas Tazkia</span>
           </div>
-          <p className="font-display font-light text-white/30 text-xs">2025 Sapa Tazkia · STMIK Tazkia · Bogor, Indonesia</p>
+          <p className="font-display font-light text-white/30 text-xs">© 2025 Sapa Tazkia · STMIK Tazkia · Bogor, Indonesia</p>
           <div className="flex gap-5">
-            {['Privasi', 'Syarat', 'Kontak'].map(link => (
-              <a key={link} href="#" className="font-display font-light text-white/30 text-xs hover:text-white/60 transition-colors">{link}</a>
-            ))}
+            <button onClick={() => setModal('privasi')} className="font-display font-light text-white/30 text-xs hover:text-white/60 transition-colors">Privasi</button>
+            <button onClick={() => setModal('syarat')} className="font-display font-light text-white/30 text-xs hover:text-white/60 transition-colors">Syarat</button>
+            <button onClick={() => setModal('kontak')} className="font-display font-light text-white/30 text-xs hover:text-white/60 transition-colors">Kontak</button>
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <AnimatePresence>
+        {modal === 'privasi' && (
+          <FooterModal isOpen title="Kebijakan Privasi" onClose={() => setModal(null)}>
+            <PrivasiContent />
+          </FooterModal>
+        )}
+        {modal === 'syarat' && (
+          <FooterModal isOpen title="Syarat Penggunaan" onClose={() => setModal(null)}>
+            <SyaratContent />
+          </FooterModal>
+        )}
+        {modal === 'kontak' && (
+          <FooterModal isOpen title="Hubungi Kami" onClose={() => setModal(null)}>
+            <KontakContent onClose={() => setModal(null)} />
+          </FooterModal>
+        )}
+      </AnimatePresence>
     </section>
   );
 };
