@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowUpRight, ArrowRight, Menu, X,
-  Zap, Calendar, FileText, ShieldCheck, BarChart3, Bell,
-  Wand2, BookOpen, Twitter, Linkedin, Instagram,
+  ArrowUpRight, ArrowRight, Menu, X, LogOut, MessageSquare,
+  Zap, Calendar, FileText, ShieldCheck, BarChart3,
+  Wand2, BookOpen,
   Mail, MapPin, MessageCircle,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 // ─── BlurText Animation ─────────────────────────────────────────────────────
 
@@ -118,6 +119,69 @@ const TypingPreview = () => {
   );
 };
 
+// ─── User Avatar Menu ─────────────────────────────────────────────────────────
+
+const getInitials = (fullName) => {
+  if (!fullName) return '?';
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+};
+
+const UserAvatarMenu = ({ user, logout, size = 'sm' }) => {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const initials = getInitials(user?.fullName || user?.name);
+  const dim = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-9 h-9 text-sm';
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className={`${dim} rounded-full bg-white text-black font-display font-semibold flex items-center justify-center hover:scale-105 active:scale-95 transition-transform`}
+      >
+        {initials}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-2 liquid-glass-strong rounded-2xl p-2 min-w-[160px] z-50"
+          >
+            <div className="px-3 py-2 mb-1 border-b border-white/8">
+              <p className="font-display text-xs font-medium text-white/90 truncate">{user?.fullName || user?.name || 'Pengguna'}</p>
+              <p className="font-display text-[10px] text-white/40 truncate">{user?.nim || user?.email || ''}</p>
+            </div>
+            <button
+              onClick={() => { setOpen(false); navigate('/chat'); }}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl font-display text-sm text-white/70 hover:text-white hover:bg-white/8 transition-colors"
+            >
+              <MessageSquare size={13} /> Buka Chat
+            </button>
+            <button
+              onClick={() => { setOpen(false); logout(); navigate('/'); }}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl font-display text-sm text-red-400 hover:text-red-300 hover:bg-white/5 transition-colors"
+            >
+              <LogOut size={13} /> Keluar
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 // ─── Floating Navbar (scrolled state) ────────────────────────────────────────
 
 const navLinks = [
@@ -127,7 +191,7 @@ const navLinks = [
   { label: 'Docs', href: '/docs', internal: true },
 ];
 
-const Navbar = ({ activeSection }) => {
+const Navbar = ({ activeSection, user, logout }) => {
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -178,10 +242,12 @@ const Navbar = ({ activeSection }) => {
               </button>
             )
           ))}
-          <Link to="/login"
-            className="font-display text-sm font-medium bg-white text-black rounded-full px-5 py-2 hover:bg-white/90 transition-colors flex items-center gap-1 ml-1">
-            Login <ArrowUpRight size={13} />
-          </Link>
+          {user
+            ? <UserAvatarMenu user={user} logout={logout} size="sm" />
+            : <Link to="/login" className="font-display text-sm font-medium bg-white text-black rounded-full px-5 py-2 hover:bg-white/90 transition-colors flex items-center gap-1 ml-1">
+                Login <ArrowUpRight size={13} />
+              </Link>
+          }
         </nav>
 
         <button onClick={() => setMenuOpen(p => !p)} className="md:hidden p-2 rounded-full liquid-glass text-white/70 hover:text-white transition-colors">
@@ -216,12 +282,14 @@ const Navbar = ({ activeSection }) => {
                 </button>
               )
             ))}
-            <div className="pt-2 border-t border-white/8">
-              <Link to="/login" onClick={() => setMenuOpen(false)}
-                className="flex items-center justify-center gap-1 w-full px-4 py-2.5 bg-white text-black rounded-full font-display text-sm font-medium hover:bg-white/90 transition-colors">
-                Login <ArrowUpRight size={13} />
-              </Link>
-            </div>
+            {!user && (
+              <div className="pt-2 border-t border-white/8">
+                <Link to="/login" onClick={() => setMenuOpen(false)}
+                  className="flex items-center justify-center gap-1 w-full px-4 py-2.5 bg-white text-black rounded-full font-display text-sm font-medium hover:bg-white/90 transition-colors">
+                  Login <ArrowUpRight size={13} />
+                </Link>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -231,7 +299,7 @@ const Navbar = ({ activeSection }) => {
 
 // ─── Hero Section — Two-Panel with Collapsible Left Glass ────────────────────
 
-const HeroSection = () => {
+const HeroSection = ({ user, logout }) => {
   const navigate = useNavigate();
   const [panelOpen, setPanelOpen] = useState(true);
   const [menuDropOpen, setMenuDropOpen] = useState(false);
@@ -306,12 +374,14 @@ const HeroSection = () => {
                           </button>
                         )
                       ))}
-                      <div className="pt-1 border-t border-white/8 mt-1">
-                        <Link to="/login" onClick={() => setMenuDropOpen(false)}
-                          className="flex items-center justify-center gap-1 w-full px-4 py-2.5 bg-white text-black rounded-xl font-display text-sm font-medium hover:bg-white/90 transition-colors">
-                          Login <ArrowUpRight size={12} />
-                        </Link>
-                      </div>
+                      {!user && (
+                        <div className="pt-1 border-t border-white/8 mt-1">
+                          <Link to="/login" onClick={() => setMenuDropOpen(false)}
+                            className="flex items-center justify-center gap-1 w-full px-4 py-2.5 bg-white text-black rounded-xl font-display text-sm font-medium hover:bg-white/90 transition-colors">
+                            Login <ArrowUpRight size={12} />
+                          </Link>
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -449,10 +519,13 @@ const HeroSection = () => {
             <span className="font-display font-semibold text-white text-sm tracking-tighter">Sapa Tazkia</span>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/login"
-              className="liquid-glass rounded-full px-5 py-2 font-display text-sm text-white/80 hover:text-white transition-colors flex items-center gap-1.5">
-              Masuk <ArrowRight size={13} />
-            </Link>
+            {user
+              ? <UserAvatarMenu user={user} logout={logout} size="sm" />
+              : <Link to="/login"
+                  className="liquid-glass rounded-full px-5 py-2 font-display text-sm text-white/80 hover:text-white transition-colors flex items-center gap-1.5">
+                  Masuk <ArrowRight size={13} />
+                </Link>
+            }
           </div>
         </motion.div>
 
@@ -1253,10 +1326,11 @@ const useActiveSection = (ids) => {
 
 const MarketingLandingPage = () => {
   const activeSection = useActiveSection(['how-it-works', 'features', 'contact']);
+  const { user, logout } = useAuth();
   return (
     <div className="bg-black overflow-x-hidden">
-      <Navbar activeSection={activeSection} />
-      <HeroSection />
+      <Navbar activeSection={activeSection} user={user} logout={logout} />
+      <HeroSection user={user} logout={logout} />
       <PartnersSection />
       <HowItWorksSection />
       <ChessSection />

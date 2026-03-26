@@ -44,8 +44,8 @@ const LoginPage = () => {
       if (user && user.userType === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       } else {
-        // ✅ JIKA MAHASISWA/UMUM, lempar ke landing page
-        navigate('/', {
+        // ✅ JIKA MAHASISWA/UMUM, lempar ke chat
+        navigate('/chat', {
           replace: true,
         });
       }
