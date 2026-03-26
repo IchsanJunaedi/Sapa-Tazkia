@@ -106,8 +106,7 @@ router.get('/google/callback',
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-// TODO: Re-enable NIM+password login when SIAKAD API is integrated
-// router.post('/login', strictLimiter, validateLogin, authController.login);
+router.post('/login', strictLimiter, validateLogin, authController.login);
 
 /**
  * @swagger
