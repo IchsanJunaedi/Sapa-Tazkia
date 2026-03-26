@@ -1,505 +1,451 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { X } from 'lucide-react';
+import Swal from 'sweetalert2';
 
-// GoogleIcon Component
+// ─── GoogleIcon ───────────────────────────────────────────────────────────────
+
 const GoogleIcon = () => (
-  <svg className="w-5 h-5" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
-    <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 23.4 172.9 61.9l-62.2 62.2C338.5 109.4 300.9 96 248 96c-106.1 0-192 85.9-192 192s85.9 192 192 192c100.9 0 181.1-73.6 188.7-169.1H248v-81.6h239.2c2.7 13.2 4.8 27.2 4.8 42.6z"></path>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-6 h-6 mr-3">
+    <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.343c-1.896,3.101-5.466,6.17-11.343,6.17 c-6.958,0-12.632-5.673-12.632-12.632c0-6.958,5.674-12.632,12.632-12.632c3.23,0,6.347,1.385,8.441,3.483l5.882-5.882 C34.004,5.946,29.351,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20 C44,22.659,43.834,21.32,43.611,20.083z" />
+    <path fill="#FF3D00" d="M6.309,16.713L11.822,20.3C13.298,16.59,17.207,14,21.723,14 c3.41,0,6.619,1.218,8.875,3.447l5.845-5.844C34.004,5.946,29.351,4,24,4C16.326,4,9.66,8.275,6.309,14.713z" />
+    <path fill="#4CAF50" d="M24,44c5.205,0,10.222-1.92,13.911-5.385l-6.736-6.495C30.297,33.024,27.265,34.08,24,34.08 c-5.877,0-9.448-3.07-11.344-6.171L6.309,33.287C9.66,39.725,16.326,44,24,44z" />
+    <path fill="#1976D2" d="M43.611,20.083L42,20h-0.29c-0.122-0.638-0.344-1.254-0.627-1.851 C41.347,17.385,38.23,16,35,16c-3.265,0-6.297,1.056-8.214,3.003L35.343,28h7.957 C42.834,26.68,44,25.045,44,24C44,22.659,43.834,21.32,43.611,20.083z" />
   </svg>
 );
 
+// ─── VerificationForm ─────────────────────────────────────────────────────────
+
+const VerificationForm = ({ email, onVerify, onResend, onBack, isLoading, error }) => {
+  const [code, setCode] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (code.trim().length >= 4) onVerify(code.trim());
+  };
+
+  const handleResend = async (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setResendLoading(true);
+    setResendSuccess(false);
+    try {
+      await onResend();
+      setResendSuccess(true);
+      setTimeout(() => setResendSuccess(false), 3000);
+    } catch (err) {
+      console.error('Resend failed:', err);
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="mb-6">
+        <p className="text-xs font-semibold tracking-[0.15em] text-indigo-400 uppercase mb-2">Verifikasi</p>
+        <h2 className="text-[26px] font-black text-white leading-tight" style={{ letterSpacing: '-0.02em' }}>
+          Cek email kamu
+        </h2>
+        <p className="text-sm text-white/40 mt-2 leading-relaxed">
+          Kode dikirim ke <span className="text-white/70 font-medium">{email}</span>
+        </p>
+      </div>
+
+      {resendSuccess && (
+        <div className="px-4 py-3 rounded-xl mb-4 text-sm text-green-300 flex items-center gap-2"
+          style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)' }}>
+          <span>✓</span> Kode verifikasi telah dikirim ulang!
+        </div>
+      )}
+
+      {error && (
+        <div className="px-4 py-3 rounded-xl mb-4 text-sm text-red-300"
+          style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
+          {error}
+        </div>
+      )}
+
+      <div className="mb-5">
+        <input
+          type="text"
+          placeholder="Masukkan kode 6 digit"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          className="auth-input w-full px-4 py-[14px] text-white rounded-xl text-[15px] transition-all duration-200 focus:outline-none text-center tracking-[0.3em] font-semibold"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+          disabled={isLoading}
+          maxLength={6}
+        />
+        <p className="text-[11px] text-white/25 mt-2 text-center">Berlaku selama 10 menit</p>
+      </div>
+
+      <button
+        type="submit"
+        disabled={code.trim().length < 4 || isLoading}
+        className={`w-full py-[14px] rounded-xl font-semibold text-white text-[15px] transition-all duration-300 ${
+          code.trim().length >= 4 && !isLoading
+            ? 'bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/30 hover:from-indigo-400 hover:to-blue-500 hover:scale-[1.02] active:scale-[0.99]'
+            : 'cursor-not-allowed'
+        }`}
+        style={code.trim().length < 4 || isLoading ? { background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.25)' } : {}}
+      >
+        {isLoading ? 'Memverifikasi...' : 'Verifikasi'}
+      </button>
+
+      <div className="flex gap-3 mt-4">
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={resendLoading}
+          className="flex-1 py-2.5 text-sm rounded-xl font-medium transition-all duration-200 text-indigo-400 hover:text-indigo-300 disabled:text-white/20"
+          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}
+        >
+          {resendLoading ? 'Mengirim...' : 'Kirim Ulang'}
+        </button>
+        <button
+          type="button"
+          onClick={onBack}
+          disabled={isLoading}
+          className="flex-1 py-2.5 text-sm rounded-xl font-medium transition-all duration-200 text-white/35 hover:text-white/60 disabled:text-white/15"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          Kembali
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// ─── LoginPage ────────────────────────────────────────────────────────────────
+
 const LoginPage = () => {
-  // State untuk form
-  const [nim, setNim] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  // ✅ BARU: State untuk email registration
-  const [showEmailRegistration, setShowEmailRegistration] = useState(false);
-  const [email, setEmail] = useState('');
-  const [registrationSuccess, setRegistrationSuccess] = useState(false);
-  const [registeredEmail, setRegisteredEmail] = useState('');
-
-  // Hooks untuk navigation dan location
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ FIXED: Ambil fungsi login yang benar dari AuthContext
-  const { loginWithCredentials, isAuthenticated, loading: authLoading, registerWithEmail, user } = useAuth();
+  const [step, setStep] = useState(0);
+  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  // ✅ FIXED: Redirect jika sudah login - dengan pengecekan role
+  const {
+    loginWithCredentials,
+    registerWithEmail,
+    verifyEmailCode,
+    resendVerificationCode,
+    pendingVerification,
+    pendingEmail,
+    clearPendingVerification,
+    isAuthenticated,
+    loading: authLoading,
+    user,
+  } = useAuth();
+
+  // Redirect if already logged in
   useEffect(() => {
-    console.log('🔍 [LOGIN PAGE] Auth status:', {
-      isAuthenticated,
-      authLoading,
-      path: location.pathname
-    });
-
     if (isAuthenticated && !authLoading) {
-      console.log('✅ [LOGIN PAGE] User already authenticated, redirecting...', user);
-
-      // ✅ JIKA ADMIN, lempar ke dashboard
-      if (user && user.userType === 'admin') {
+      if (user?.userType === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       } else {
-        // ✅ JIKA MAHASISWA/UMUM, lempar ke chat
-        navigate('/chat', {
-          replace: true,
-        });
+        navigate('/chat', { replace: true });
       }
     }
-  }, [isAuthenticated, authLoading, navigate, location, user]);
+  }, [isAuthenticated, authLoading, navigate, user]);
 
-  // ✅ FIXED: Check untuk error message dari location state
+  // If pending verification exists, jump to step 1
+  useEffect(() => {
+    if (pendingVerification && pendingEmail) {
+      setStep(1);
+      setEmail(pendingEmail);
+    }
+  }, [pendingVerification, pendingEmail]);
+
+  // Propagate location state error
   useEffect(() => {
     if (location.state?.error) {
       setError(location.state.error);
-      console.log('⚠️ [LOGIN PAGE] Error from location state:', location.state.error);
-
-      // Clear location state setelah menampilkan error
       window.history.replaceState({}, document.title);
-    }
-
-    // ✅ FIXED: Check untuk success message (misalnya dari register)
-    if (location.state?.success) {
-      console.log('✅ [LOGIN PAGE] Success message from location:', location.state.success);
-      // Bisa tambahkan toast atau pesan sukses di sini jika needed
     }
   }, [location.state]);
 
-  /**
-   * ✅ FIXED: Fungsi untuk menangani login via NIM/Password
-   */
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleBack = () => {
+    navigate(-1);
+  };
 
-    // Validasi input
-    if (!nim.trim() || !password.trim()) {
-      setError('NIM dan Password harus diisi');
-      return;
-    }
-
-    // Validasi format NIM (opsional)
-    if (nim.trim().length < 5) {
-      setError('NIM harus minimal 5 karakter');
-      return;
-    }
+  const handleContinue = async (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (!email) { setError('Email atau NIM harus diisi'); return; }
 
     setIsLoading(true);
     setError('');
+    setShowSuccess(false);
 
     try {
-      console.log('🔍 [LOGIN PAGE] Attempting login with NIM:', nim);
+      const isEmail = email.includes('@');
 
-      // ✅ FIXED: Gunakan fungsi login yang benar dari context
-      // Anggap fungsi ini melempar objek user jika berhasil atau return user (butuh adaptasi jika AuthContext tidak return user).
-      // Namun useEffect di atas sudah menangani redirect ketika isAuthenticated berubah menjadi true.
-      await loginWithCredentials(nim, password);
+      if (isEmail) {
+        const validDomains = [
+          '@student.tazkia.ac.id',
+          '@student.stmik.tazkia.ac.id',
+          '@tazkia.ac.id',
+        ];
+        const isValidDomain = validDomains.some(d => email.toLowerCase().includes(d));
+        if (!isValidDomain) {
+          throw new Error('Silakan gunakan email Tazkia (@student.tazkia.ac.id, @student.stmik.tazkia.ac.id, atau @tazkia.ac.id)');
+        }
 
-      console.log('✅ [LOGIN PAGE] Login successful, redirect should happen automatically via useEffect');
-
-    } catch (err) {
-      console.error('❌ [LOGIN PAGE] Login failed:', err);
-
-      // ✅ FIXED: Error handling yang lebih detail
-      let errorMessage = 'Login gagal. Periksa kembali NIM dan Password Anda.';
-
-      if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err.message) {
-        errorMessage = err.message;
-      } else if (err.code === 'NETWORK_ERROR') {
-        errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
+        const result = await registerWithEmail(email);
+        if (result.requiresVerification) {
+          setStep(1);
+        } else {
+          setShowSuccess(true);
+          setTimeout(() => navigate('/chat', { replace: true }), 1500);
+        }
+      } else {
+        await loginWithCredentials(email, email);
+        setShowSuccess(true);
+        setTimeout(() => navigate('/chat', { replace: true }), 1500);
       }
+    } catch (err) {
+      const msg = err.message || 'Terjadi kesalahan saat autentikasi';
+      setError(msg);
 
-      setError(errorMessage);
+      if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('sudah terdaftar')) {
+        Swal.fire({
+          title: 'Email Sudah Terdaftar!',
+          text: 'Sepertinya kamu sudah pernah mendaftar dengan email ini.',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#111827',
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'Login Saja',
+          cancelButtonText: 'Gunakan Email Lain',
+          background: '#fff',
+          customClass: { popup: 'rounded-2xl', confirmButton: 'rounded-xl px-4 py-2', cancelButton: 'rounded-xl px-4 py-2' },
+        }).then((result) => {
+          if (result.isConfirmed) { setError(''); }
+          else { setEmail(''); setError(''); }
+        });
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  /**
-   * ✅ BARU: Fungsi untuk menangani registrasi dengan email
-   */
-  const handleEmailRegistration = async (e) => {
-    e.preventDefault();
-
-    if (!email.trim()) {
-      setError('Email harus diisi');
-      return;
-    }
-
-    // Validasi format email sederhana
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Format email tidak valid');
-      return;
-    }
-
+  const handleVerification = async (code) => {
     setIsLoading(true);
     setError('');
-
     try {
-      console.log('🔍 [LOGIN PAGE] Attempting email registration:', email);
-
-      const result = await registerWithEmail(email);
-
-      console.log('✅ [LOGIN PAGE] Email registration successful:', result);
-
-      // Tampilkan pesan sukses dan arahkan ke halaman verifikasi
-      setRegistrationSuccess(true);
-      setRegisteredEmail(email);
-
-      // Reset form
-      setEmail('');
-
-    } catch (err) {
-      console.error('❌ [LOGIN PAGE] Email registration failed:', err);
-
-      let errorMessage = 'Registrasi gagal. Silakan coba lagi.';
-
-      if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err.message) {
-        errorMessage = err.message;
+      const result = await verifyEmailCode(email, code);
+      if (result.success) {
+        setShowSuccess(true);
+        setTimeout(() => navigate('/chat', { replace: true }), 1500);
+      } else {
+        throw new Error(result.error || 'Verifikasi gagal');
       }
-
-      setError(errorMessage);
+    } catch (err) {
+      setError(err.message || 'Kode verifikasi salah atau telah kedaluwarsa');
     } finally {
       setIsLoading(false);
     }
   };
 
-  /**
-   * ✅ BARU: Navigasi ke halaman verifikasi
-   */
-  const handleGoToVerification = () => {
-    navigate('/verify-email', {
-      state: {
-        email: registeredEmail,
-        from: 'email-registration'
-      }
-    });
+  const handleResendCode = async () => {
+    const result = await resendVerificationCode(email);
+    if (!result.success) throw new Error(result.error || 'Gagal mengirim ulang kode');
+    return result;
   };
 
-  /**
-   * ✅ BARU: Kembali ke form login
-   */
-  const handleBackToLogin = () => {
-    setShowEmailRegistration(false);
-    setRegistrationSuccess(false);
-    setEmail('');
+  const handleBackToEmail = () => {
+    setStep(0);
     setError('');
+    clearPendingVerification();
   };
 
-  /**
-   * ✅ FIXED: Fungsi untuk menangani login via Google
-   */
-  const handleGoogleLogin = () => {
-    setError('');
+  const handleGoogleLogin = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     setIsLoading(true);
-
-    console.log('🔍 [LOGIN PAGE] Redirecting to Google OAuth...');
-
-    try {
-      // Redirect ke backend Google OAuth endpoint
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      const redirectUrl = `${apiUrl}/auth/google`;
-
-      console.log('📍 [LOGIN PAGE] Redirect URL:', redirectUrl);
-      window.location.href = redirectUrl;
-
-    } catch (err) {
-      console.error('❌ [LOGIN PAGE] Google login redirect failed:', err);
-      setError('Gagal mengarahkan ke Google Login. Silakan coba lagi.');
-      setIsLoading(false);
-    }
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    window.location.href = `${API_URL}/auth/google`;
   };
 
-  /**
-   * ✅ FIXED: Fungsi untuk navigasi ke guest mode
-   */
-  const handleGuestMode = () => {
-    console.log('👤 [LOGIN PAGE] Redirecting to guest mode');
-    navigate('/chat', {
-      state: {
-        isGuest: true,
-        from: 'login-page'
-      }
-    });
-  };
-
-  // ✅ FIXED: Tampilkan loading spinner selama auth check
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6 font-sans">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
-          <div className="flex flex-col items-center justify-center">
-            <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-gray-600">Memeriksa status login...</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  // ✅ BARU: Tampilkan form registrasi email
-  if (showEmailRegistration && !registrationSuccess) {
+  const renderContent = () => {
+    if (step === 1) {
+      return (
+        <VerificationForm
+          email={email}
+          onVerify={handleVerification}
+          onResend={handleResendCode}
+          onBack={handleBackToEmail}
+          isLoading={isLoading}
+          error={error}
+        />
+      );
+    }
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6 font-sans">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-          <div className="text-center mb-6">
-            <button
-              onClick={handleBackToLogin}
-              className="flex items-center text-gray-600 hover:text-gray-800 mb-4"
-            >
-              <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Kembali ke Login
-            </button>
-
-            <h1 className="text-2xl font-bold text-gray-800">Daftar dengan Email</h1>
-            <p className="text-gray-600 mt-2">Masukkan email Anda untuk memulai</p>
-          </div>
-
-          {/* Menampilkan pesan error */}
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" role="alert">
-              <span className="block sm:inline">{error}</span>
-            </div>
-          )}
-
-          <form className="space-y-4" onSubmit={handleEmailRegistration}>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                placeholder="contoh@email.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
-                required
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Gunakan email student (@student.tazkia.ac.id) untuk akses fitur lengkap
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed shadow-md"
-              disabled={isLoading || !email.trim()}
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Memproses...
-                </span>
-              ) : (
-                'Daftar dengan Email'
-              )}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Sudah punya akun?{' '}
-              <button
-                onClick={handleBackToLogin}
-                className="text-orange-500 hover:underline font-medium"
-                disabled={isLoading}
-              >
-                Login di sini
-              </button>
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ✅ BARU: Tampilkan success message setelah registrasi
-  if (registrationSuccess) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6 font-sans">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Registrasi Berhasil!</h1>
-          <p className="text-gray-600 mb-4">
-            Kode verifikasi telah dikirim ke <strong>{registeredEmail}</strong>
-          </p>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-            <p className="text-sm text-blue-800">
-              <strong>Langkah selanjutnya:</strong>
-            </p>
-            <ol className="text-sm text-blue-700 mt-2 list-decimal list-inside space-y-1">
-              <li>Cek inbox email Anda</li>
-              <li>Cari email dari "SAPA Tazkia"</li>
-              <li>Salin kode verifikasi 6 digit</li>
-              <li>Verifikasi email untuk melanjutkan</li>
-            </ol>
-          </div>
-
-          <button
-            onClick={handleGoToVerification}
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors shadow-md mb-3"
-          >
-            Verifikasi Email Sekarang
-          </button>
-
-          <button
-            onClick={handleBackToLogin}
-            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-lg font-medium transition-colors"
-          >
-            Kembali ke Login
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Tampilan utama - form login
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6 font-sans">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <div className="text-center mb-2">
-          <h1 className="text-3xl font-bold text-gray-800">Login Mahasiswa</h1>
-          <p className="text-gray-600 mt-2">Sapa Tazkia Chatbot</p>
-        </div>
-
-        {/* ✅ FIXED: Guest mode option */}
-        <div className="mb-6">
-          <button
-            onClick={handleGuestMode}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-medium transition-colors shadow-md mb-2"
-          >
-            Coba Sebagai Tamu
-          </button>
-          <p className="text-xs text-gray-500 text-center">
-            Coba fitur chat tanpa login
+      <form onSubmit={handleContinue}>
+        {/* Header */}
+        <div className="mb-7">
+          <p className="text-xs font-semibold tracking-[0.15em] text-indigo-400 uppercase mb-2">Selamat datang</p>
+          <h2 className="text-[26px] font-black text-white leading-tight" style={{ letterSpacing: '-0.02em' }}>
+            Log in or sign up
+          </h2>
+          <p className="text-[13px] text-white/40 mt-2 leading-relaxed">
+            Panduan akademik lebih cerdas dengan Sapa Tazkia.
           </p>
         </div>
 
-        <div className="relative mb-6">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-gray-300"></span>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="bg-white px-2 text-gray-500">ATAU</span>
-          </div>
-        </div>
-
-        {/* Menampilkan pesan error */}
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" role="alert">
-            <span className="block sm:inline">{error}</span>
+        {showSuccess && (
+          <div className="px-4 py-3 rounded-xl mb-5 text-sm text-green-300 flex items-center gap-2"
+            style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)' }}>
+            <span>✓</span> Autentikasi berhasil! Mengarahkan...
           </div>
         )}
 
-        {/* Form dengan handler dan state */}
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              NIM
-            </label>
-            <input
-              type="text"
-              placeholder="Masukkan NIM Anda"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
-              value={nim}
-              onChange={(e) => setNim(e.target.value)}
-              disabled={isLoading}
-              required
-            />
+        {error && (
+          <div className="px-4 py-3 rounded-xl mb-5 text-sm text-red-300 relative"
+            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
+            {error}
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="absolute top-2.5 right-2.5 text-red-400/60 hover:text-red-300 transition-colors"
+            >
+              <X size={14} />
+            </button>
           </div>
+        )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder="Masukkan Password"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed shadow-md"
-            disabled={isLoading || !nim.trim() || !password.trim()}
-          >
-            {isLoading ? (
-              <span className="flex items-center justify-center">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                Memproses...
-              </span>
-            ) : (
-              'Login'
-            )}
-          </button>
-        </form>
-
-        {/* Separator */}
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-gray-300"></span>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="bg-white px-2 text-gray-500">ATAU LOGIN DENGAN</span>
-          </div>
-        </div>
-
-        {/* Google Login Button */}
+        {/* Google */}
         <button
           type="button"
           onClick={handleGoogleLogin}
           disabled={isLoading}
-          className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed shadow-sm mb-4"
+          className="w-full py-[13px] flex items-center justify-center rounded-xl font-medium text-white text-[14px] transition-all duration-200 hover:bg-white/10 mb-5"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
         >
           <GoogleIcon />
-          <span className="ml-3 font-medium">
-            {isLoading ? 'Mengarahkan...' : 'Google'}
-          </span>
+          Lanjutkan dengan Google
         </button>
 
-        {/* ✅ BARU: Email Registration Option */}
-        <div className="text-center border-t pt-4">
-          <p className="text-sm text-gray-600 mb-3">
-            Tidak punya akun? Daftar dengan email
-          </p>
-          <button
-            onClick={() => setShowEmailRegistration(true)}
-            className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-medium transition-colors shadow-md"
-            disabled={isLoading}
-          >
-            Daftar dengan Email
-          </button>
+        {/* Divider */}
+        <div className="flex items-center mb-5">
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
+          <span className="mx-4 text-[11px] font-semibold text-white/25 tracking-[0.12em]">ATAU</span>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
         </div>
 
-        {/* Footer */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
-            Lupa password? Hubungi administrator.
+        {/* Email / NIM input */}
+        <div className="mb-1">
+          <input
+            type="text"
+            placeholder="Email atau NIM"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="auth-input w-full px-4 py-[14px] text-white rounded-xl text-[15px] transition-all duration-200 focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+            disabled={isLoading}
+          />
+          <p className="text-[11px] text-white/25 mt-2 leading-relaxed">
+            Gunakan email kampus Tazkia atau NIM Anda
+          </p>
+        </div>
+
+        <button
+          type="submit"
+          disabled={!email || isLoading}
+          className={`w-full py-[14px] rounded-xl font-semibold text-[15px] text-white transition-all duration-300 mt-5 ${
+            email && !isLoading
+              ? 'bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/30 hover:from-indigo-400 hover:to-blue-500 hover:shadow-indigo-400/50 hover:scale-[1.02] active:scale-[0.99]'
+              : 'cursor-not-allowed'
+          }`}
+          style={!email || isLoading ? { background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.25)' } : {}}
+        >
+          {isLoading ? 'Memproses...' : 'Lanjutkan'}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleBack}
+          disabled={isLoading}
+          className="w-full mt-4 text-[13px] text-white/25 hover:text-white/50 transition-colors py-1"
+        >
+          Kembali
+        </button>
+      </form>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <div
+        className="auth-modal-card w-full relative overflow-hidden"
+        style={{
+          maxWidth: '400px',
+          background: 'rgba(10, 18, 70, 0.65)',
+          backdropFilter: 'blur(40px)',
+          WebkitBackdropFilter: 'blur(40px)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: '20px',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(255,255,255,0.06)',
+        }}
+      >
+        {/* Top accent stripe */}
+        <div className="h-[3px] w-full bg-gradient-to-r from-indigo-500 via-blue-500 to-indigo-400" />
+
+        {/* Close / back button */}
+        <button
+          type="button"
+          onClick={handleBack}
+          disabled={isLoading}
+          className="absolute top-5 right-5 p-1.5 rounded-full transition-all duration-200 text-white/30 hover:text-white/70"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <X size={16} />
+        </button>
+
+        {/* Form content */}
+        <div className="px-8 py-7">
+          {renderContent()}
+        </div>
+
+        {/* Footer brand */}
+        <div className="px-8 pb-6 pt-0">
+          <p className="text-[11px] text-white/15 text-center tracking-wide">
+            STMIK TAZKIA · Sapa AI © 2025
           </p>
         </div>
       </div>
+
+      <style>{`
+        .auth-modal-card {
+          animation: authModalIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        @keyframes authModalIn {
+          from { opacity: 0; transform: scale(0.94) translateY(12px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0); }
+        }
+        .auth-input::placeholder { color: rgba(255,255,255,0.28); }
+        .auth-input:focus {
+          border-color: rgba(99,102,241,0.6) !important;
+          background: rgba(255,255,255,0.09) !important;
+          box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+        }
+        .auth-input:disabled { opacity: 0.4; }
+      `}</style>
     </div>
   );
 };
