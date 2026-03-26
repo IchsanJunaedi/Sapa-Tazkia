@@ -96,7 +96,7 @@ const NAV_GROUPS = [
 const AccordionItem = ({ question, answer }) => {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border-b border-white/8 last:border-0">
+    <div className="border-b border-zinc-800 last:border-0">
       <button
         onClick={() => setOpen(v => !v)}
         className="w-full flex items-center justify-between py-4 text-left gap-4 hover:text-white transition-colors"
@@ -127,7 +127,7 @@ const HomeContent = ({ onNavigate }) => (
   <div className="space-y-12">
     {/* Hero */}
     <div className="space-y-4">
-      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-display text-white/50">
+      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-zinc-800 text-xs font-display text-white/50">
         <Hash size={11} /> Dokumentasi v1.0
       </div>
       <h1 className="text-3xl md:text-4xl font-display font-medium text-white leading-tight">
@@ -145,11 +145,11 @@ const HomeContent = ({ onNavigate }) => (
       <input
         type="text"
         placeholder="Cari dokumentasi..."
-        className="w-full bg-white/5 border border-white/10 rounded-xl pl-11 pr-20 py-3.5 text-sm font-display text-white placeholder-white/25 outline-none focus:border-white/25 focus:bg-white/8 transition-all"
+        className="w-full bg-white/5 border border-zinc-800 rounded-xl pl-11 pr-20 py-3.5 text-sm font-display text-white placeholder-white/25 outline-none focus:border-zinc-600 focus:bg-white/8 transition-all"
         readOnly
         onClick={() => {}}
       />
-      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-display text-white/25 border border-white/15 rounded-md px-1.5 py-0.5 pointer-events-none">
+      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-display text-white/25 border border-zinc-800 rounded-md px-1.5 py-0.5 pointer-events-none">
         ⌘K
       </span>
     </div>
@@ -158,13 +158,13 @@ const HomeContent = ({ onNavigate }) => (
     <div className="flex flex-wrap gap-3">
       <button
         onClick={() => onNavigate('cara-kerja')}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm font-display font-medium text-white/80 hover:bg-white/10 hover:text-white transition-all"
+        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-zinc-800 text-sm font-display font-medium text-white/80 hover:bg-white/10 hover:text-white transition-all"
       >
         <Zap size={14} className="text-white/50" /> Mulai Chatbot
       </button>
       <button
         onClick={() => onNavigate('fitur')}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm font-display font-medium text-white/80 hover:bg-white/10 hover:text-white transition-all"
+        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-zinc-800 text-sm font-display font-medium text-white/80 hover:bg-white/10 hover:text-white transition-all"
       >
         <BookOpen size={14} className="text-white/50" /> Lihat Panduan
       </button>
@@ -201,7 +201,7 @@ const HomeContent = ({ onNavigate }) => (
         <button
           key={card.id}
           onClick={() => onNavigate(card.id)}
-          className="group text-left p-5 rounded-2xl bg-white/4 border border-white/8 hover:bg-white/7 hover:border-white/15 transition-all"
+          className="group text-left p-5 rounded-2xl bg-white/4 border border-zinc-800 hover:bg-white/7 hover:border-zinc-700 transition-all"
         >
           <div className="mb-3">{card.icon}</div>
           <h3 className="text-sm font-display font-medium text-white mb-1.5 group-hover:text-white transition-colors">{card.title}</h3>
@@ -230,12 +230,12 @@ const FiturContent = () => (
       { icon: <Zap size={18} />, title: 'Rate Limiting Cerdas', desc: 'Sistem kuota pesan per pengguna dengan token bucket algorithm. Tamu mendapat kuota terbatas, pengguna terautentikasi mendapat lebih banyak.', badge: 'Tersedia' },
       { icon: <AlertTriangle size={18} />, title: 'Laporan Bug', desc: 'Temukan masalah? Kamu bisa langsung melaporkannya dari dalam aplikasi melalui halaman Report a Bug.', badge: 'Tersedia' },
     ].map((f, i) => (
-      <div key={i} className="flex gap-4 p-5 rounded-2xl bg-white/4 border border-white/8">
+      <div key={i} className="flex gap-4 p-5 rounded-2xl bg-white/4 border border-zinc-800">
         <div className="w-9 h-9 rounded-xl bg-white/8 flex items-center justify-center text-white/55 shrink-0">{f.icon}</div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
             <h3 className="text-sm font-display font-medium text-white">{f.title}</h3>
-            <span className="text-[10px] font-display px-2 py-0.5 rounded-full bg-white/8 text-white/40 border border-white/10">{f.badge}</span>
+            <span className="text-[10px] font-display px-2 py-0.5 rounded-full bg-white/8 text-white/40 border border-zinc-800">{f.badge}</span>
           </div>
           <p className="text-xs font-display font-light text-white/55 leading-relaxed">{f.desc}</p>
         </div>
@@ -265,7 +265,7 @@ const CaraKerjaContent = () => (
           { step: '03', title: 'Augmented Generation', desc: 'Chunk relevan + pertanyaan asli dikirim ke GPT-4o-mini sebagai konteks. Model menghasilkan jawaban yang grounded pada dokumen, bukan sekadar generasi bebas.' },
           { step: '04', title: 'Response ke Pengguna', desc: 'Jawaban dikembalikan ke frontend secara streaming. Riwayat percakapan disimpan di MySQL untuk sesi berikutnya.' },
         ].map(s => (
-          <div key={s.step} className="flex gap-4 p-4 rounded-xl bg-white/4 border border-white/8">
+          <div key={s.step} className="flex gap-4 p-4 rounded-xl bg-white/4 border border-zinc-800">
             <span className="text-xs font-display font-medium text-white/25 w-6 shrink-0 mt-0.5">{s.step}</span>
             <div>
               <h4 className="text-sm font-display font-medium text-white mb-1">{s.title}</h4>
@@ -279,7 +279,7 @@ const CaraKerjaContent = () => (
     {/* Auth Flow */}
     <div className="space-y-4">
       <h2 className="text-base font-display font-medium text-white/90">Alur Autentikasi</h2>
-      <div className="p-5 rounded-2xl bg-white/4 border border-white/8 space-y-3">
+      <div className="p-5 rounded-2xl bg-white/4 border border-zinc-800 space-y-3">
         {[
           'Pengguna login via NIM+password atau Google OAuth (Passport.js)',
           'Server memvalidasi kredensial dan menerbitkan JWT token',
@@ -294,25 +294,6 @@ const CaraKerjaContent = () => (
       </div>
     </div>
 
-    {/* Tech Stack */}
-    <div className="space-y-4">
-      <h2 className="text-base font-display font-medium text-white/90">Tech Stack</h2>
-      <div className="grid grid-cols-2 gap-3">
-        {[
-          { label: 'Backend', value: 'Node.js / Express' },
-          { label: 'Frontend', value: 'React 19 + Tailwind' },
-          { label: 'Database', value: 'MySQL via Prisma' },
-          { label: 'Vector DB', value: 'Qdrant' },
-          { label: 'Cache', value: 'Redis' },
-          { label: 'AI Model', value: 'GPT-4o-mini' },
-        ].map(t => (
-          <div key={t.label} className="p-3.5 rounded-xl bg-white/4 border border-white/8">
-            <p className="text-[10px] font-display text-white/30 uppercase tracking-widest mb-1">{t.label}</p>
-            <p className="text-sm font-display font-medium text-white/75">{t.value}</p>
-          </div>
-        ))}
-      </div>
-    </div>
   </div>
 );
 
@@ -330,7 +311,7 @@ const HelpContent = () => (
             <span className="text-white/35">{cat.icon}</span>
             <h2 className="text-xs font-display font-medium uppercase tracking-widest text-white/35">{cat.category}</h2>
           </div>
-          <div className="bg-white/4 border border-white/8 rounded-2xl px-5">
+          <div className="bg-white/4 border border-zinc-800 rounded-2xl px-5">
             {cat.items.map(item => (
               <AccordionItem key={item.q} question={item.q} answer={item.a} />
             ))}
@@ -338,12 +319,12 @@ const HelpContent = () => (
         </div>
       ))}
     </div>
-    <div className="p-5 rounded-2xl bg-white/4 border border-white/8 flex flex-col sm:flex-row sm:items-center gap-4">
+    <div className="p-5 rounded-2xl bg-white/4 border border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-4">
       <div className="flex-1">
         <p className="text-sm font-display font-medium text-white mb-1">Tidak menemukan jawaban?</p>
         <p className="text-xs font-display font-light text-white/45">Laporkan masalah atau hubungi tim kami langsung.</p>
       </div>
-      <Link to="/report-bug" className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/8 border border-white/10 text-sm font-display text-white/80 hover:bg-white/12 transition-colors">
+      <Link to="/report-bug" className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/8 border border-zinc-800 text-sm font-display text-white/80 hover:bg-white/12 transition-colors">
         Laporkan Masalah <ExternalLink size={13} />
       </Link>
     </div>
@@ -364,7 +345,7 @@ const ContactContent = () => (
         { icon: <Users size={20} />, title: 'Admin Kampus', value: 'Bagian Akademik STMIK Tazkia', desc: 'Untuk masalah data akademik' },
         { icon: <FileText size={20} />, title: 'Dokumentasi', value: 'docs.sapa.tazkia.ac.id', desc: 'Panduan lengkap di sini' },
       ].map(c => (
-        <div key={c.title} className="p-5 rounded-2xl bg-white/4 border border-white/8">
+        <div key={c.title} className="p-5 rounded-2xl bg-white/4 border border-zinc-800">
           <div className="w-10 h-10 rounded-xl bg-white/8 flex items-center justify-center text-white/50 mb-3">{c.icon}</div>
           <h3 className="text-sm font-display font-medium text-white mb-1">{c.title}</h3>
           <p className="text-sm font-display text-white/65 mb-1">{c.value}</p>
@@ -372,7 +353,7 @@ const ContactContent = () => (
         </div>
       ))}
     </div>
-    <div className="p-5 rounded-2xl border border-white/8 bg-white/4">
+    <div className="p-5 rounded-2xl border border-zinc-800 bg-white/4">
       <h3 className="text-sm font-display font-medium text-white mb-2">Jam Layanan</h3>
       <div className="space-y-1.5 text-sm font-display font-light text-white/55">
         <p>Senin – Jumat: 08.00 – 16.00 WIB</p>
@@ -393,7 +374,7 @@ const TermsContent = () => (
     </div>
     <div className="space-y-6">
       {TERMS_SECTIONS.map((sec, idx) => (
-        <div key={sec.title} className="p-5 rounded-2xl bg-white/4 border border-white/8">
+        <div key={sec.title} className="p-5 rounded-2xl bg-white/4 border border-zinc-800">
           <h2 className="text-sm font-display font-medium text-white mb-2">{idx + 1}. {sec.title}</h2>
           <p className="text-sm font-display font-light text-white/60 leading-relaxed">{sec.content}</p>
         </div>
@@ -411,10 +392,10 @@ const TeamContent = () => (
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {[
-        { initials: 'FZ', name: 'Fariz Zulfikar', role: 'Fullstack Engineer', desc: 'Backend architecture, RAG pipeline, API design' },
+        { initials: 'MIJ', name: 'Muhammad Ichsan Junaedi', role: 'Fullstack Engineer', desc: 'Backend architecture, RAG pipeline, API design' },
         { initials: 'ST', name: 'Tim STMIK Tazkia', role: 'Product Owner', desc: 'Requirement, academic data, stakeholder management' },
       ].map(m => (
-        <div key={m.name} className="p-5 rounded-2xl bg-white/4 border border-white/8 flex gap-4">
+        <div key={m.name} className="p-5 rounded-2xl bg-white/4 border border-zinc-800 flex gap-4">
           <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sm font-display font-medium text-white/60 shrink-0">{m.initials}</div>
           <div>
             <h3 className="text-sm font-display font-medium text-white mb-0.5">{m.name}</h3>
@@ -424,15 +405,7 @@ const TeamContent = () => (
         </div>
       ))}
     </div>
-    <div className="p-5 rounded-2xl bg-white/4 border border-white/8">
-      <h3 className="text-sm font-display font-medium text-white mb-3">Teknologi yang Digunakan</h3>
-      <div className="flex flex-wrap gap-2">
-        {['React 19', 'Node.js', 'Express', 'Prisma', 'MySQL', 'Redis', 'Qdrant', 'OpenAI API', 'Tailwind CSS', 'Framer Motion', 'Docker', 'JWT'].map(t => (
-          <span key={t} className="text-xs font-display px-2.5 py-1 rounded-full bg-white/6 border border-white/10 text-white/50">{t}</span>
-        ))}
-      </div>
-    </div>
-    <div className="p-5 rounded-2xl bg-white/4 border border-white/8">
+    <div className="p-5 rounded-2xl bg-white/4 border border-zinc-800">
       <h3 className="text-sm font-display font-medium text-white mb-2">Open Source & Kontribusi</h3>
       <p className="text-xs font-display font-light text-white/50 leading-relaxed">
         SAPA dikembangkan sebagai proyek riset akademik di STMIK Tazkia. Untuk pertanyaan teknis atau kolaborasi, silakan hubungi tim melalui halaman Contact.
@@ -477,12 +450,12 @@ export default function DocsPage() {
   const ActiveContent = CONTENT_MAP[activeId] || HomeContent;
 
   return (
-    <div className="flex min-h-screen bg-[#000] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#000] text-white overflow-hidden">
       {/* Sidebar */}
-      <aside className="fixed top-0 left-0 h-full w-64 bg-[#000] border-r border-white/8 z-40 flex flex-col">
+      <aside className="w-64 bg-[#000] border-r border-zinc-800 z-40 flex flex-col shrink-0">
         <div className="flex flex-col h-full">
           {/* Sidebar header */}
-          <div className="flex items-center px-5 py-5 border-b border-white/8">
+          <div className="flex items-center h-16 px-5 border-b border-zinc-800 shrink-0">
             <button onClick={() => navigate('/')} className="flex items-center gap-2.5 hover:opacity-70 transition-opacity">
               <img src="/a2.png" alt="Sapa Tazkia" className="w-6 h-6 object-contain" />
               <span className="text-sm font-display font-medium text-white/80">Sapa Tazkia</span>
@@ -514,22 +487,13 @@ export default function DocsPage() {
             ))}
           </nav>
 
-          {/* Sidebar footer */}
-          <div className="px-4 py-4 border-t border-white/8">
-            <Link
-              to="/chat"
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/8 border border-white/10 text-xs font-display font-medium text-white/65 hover:bg-white/12 hover:text-white/85 transition-all"
-            >
-              <MessageSquare size={13} /> Buka Chat
-            </Link>
-          </div>
         </div>
       </aside>
 
       {/* Main content area */}
-      <div className="flex-1 ml-64 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col h-screen min-w-0">
         {/* Top bar (breadcrumb) */}
-        <header className="sticky top-0 z-20 flex items-center gap-3 px-5 py-3.5 bg-[#000]/90 border-b border-white/8 backdrop-blur-md">
+        <header className="sticky top-0 z-20 flex items-center h-16 gap-3 px-5 bg-[#000]/90 border-b border-zinc-800 backdrop-blur-md shrink-0">
           <div className="flex items-center gap-1.5 text-xs font-display text-white/30">
             <button onClick={() => handleNavigate('home')} className="hover:text-white/60 transition-colors">Docs</button>
             {activeId !== 'home' && (
@@ -549,22 +513,24 @@ export default function DocsPage() {
         </header>
 
         {/* Scrollable content */}
-        <main ref={contentRef} className="flex-1 overflow-y-auto px-5 md:px-10 py-10 max-w-3xl mx-auto w-full">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeId}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-            >
-              <ActiveContent onNavigate={handleNavigate} />
-            </motion.div>
-          </AnimatePresence>
+        <main ref={contentRef} className="flex-1 overflow-y-auto w-full">
+          <div className="px-5 md:px-10 py-10 max-w-3xl mx-auto w-full">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeId}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+              >
+                <ActiveContent onNavigate={handleNavigate} />
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </main>
 
         {/* Footer */}
-        <footer className="px-5 md:px-10 py-6 border-t border-white/8 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <footer className="px-5 md:px-10 h-20 shrink-0 border-t border-zinc-800 flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-3">
           <p className="text-xs font-display text-white/25">© 2026 SAPA Tazkia — STMIK Tazkia</p>
           <div className="flex items-center gap-4">
             <button onClick={() => handleNavigate('terms')} className="text-xs font-display text-white/25 hover:text-white/50 transition-colors">Terms</button>
