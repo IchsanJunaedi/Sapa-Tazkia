@@ -8,7 +8,7 @@ const SuggestedPromptCards = () => {
   const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
-    axios.get(`${API}/api/ai/suggested-prompts`)
+    axios.get(`${API}/ai/suggested-prompts`)
       .then(res => setPrompts(res.data.data || []))
       .catch(() => {});
   }, [API]);
