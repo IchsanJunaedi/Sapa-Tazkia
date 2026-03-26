@@ -188,6 +188,7 @@ const ChatPage = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [chatToDelete, setChatToDelete] = useState(null);
     const [showMenu, setShowMenu] = useState(false);
+    const [showGuestLeaveModal, setShowGuestLeaveModal] = useState(false);
 
     const chatContainerRef = useRef(null);
     const menuButtonRef = useRef(null);
@@ -711,6 +712,10 @@ const ChatPage = () => {
     }, [currentChatId, isNewChat, isGuest, navigate, loadChatHistory]);
 
     const handleNewChat = useCallback(() => {
+        if (isGuest && messages.length > 0) {
+            setShowGuestLeaveModal(true);
+            return;
+        }
         initializationRef.current.hasUserInitiatedNewChat = true;
         initializationRef.current.hasProcessedInitialState = true;
 
@@ -730,7 +735,27 @@ const ChatPage = () => {
             }
             setIsStartingNewChat(false);
         }, 200);
-    }, [isGuest, navigate]);
+    }, [isGuest, messages.length, navigate]);
+
+    const handleConfirmGuestLeave = useCallback(() => {
+        setShowGuestLeaveModal(false);
+        initializationRef.current.hasUserInitiatedNewChat = true;
+        initializationRef.current.hasProcessedInitialState = true;
+
+        setIsStartingNewChat(true);
+        setMessages([]);
+        setCurrentChatId(null);
+        setIsNewChat(true);
+        setError(null);
+
+        navigate('/chat', { replace: true });
+
+        initializationRef.current.isProcessingInitialMessage = false;
+
+        setTimeout(() => {
+            setIsStartingNewChat(false);
+        }, 200);
+    }, [navigate]);
 
     const handleSelectChat = useCallback(async (chatId) => {
         if (isStartingNewChat) return;
@@ -918,6 +943,16 @@ const ChatPage = () => {
                 isDeleting={isDeleting}
             />
 
+            <ConfirmationModal
+                isOpen={showGuestLeaveModal}
+                onClose={() => setShowGuestLeaveModal(false)}
+                onConfirm={handleConfirmGuestLeave}
+                title="Tinggalkan Percakapan?"
+                message="Percakapan ini tidak tersimpan. Jika kamu keluar, semua riwayat chat akan hilang."
+                confirmText="Ya, Keluar"
+                cancelText="Tetap di sini"
+            />
+
             <Sidebar
                 user={user}
                 onLogin={handleLogin}
@@ -948,7 +983,7 @@ const ChatPage = () => {
                             <Menu size={24} />
                         </button>
                         <button
-                            onClick={() => navigate('/', { replace: true, state: { from: 'chat-page' } })}
+                            onClick={handleNewChat}
                             className="flex items-center focus:outline-none hover:opacity-80 transition-opacity"
                         >
                             <img
