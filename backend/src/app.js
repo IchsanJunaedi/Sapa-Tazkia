@@ -700,7 +700,10 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, async () => {
+let server;
+
+if (require.main === module) {
+  server = app.listen(PORT, async () => {
   console.log('='.repeat(80));
   console.log('🚀 SAPA TAZKIA BACKEND SERVER STARTED SUCCESSFULLY');
   console.log('='.repeat(80));
@@ -786,6 +789,7 @@ const server = app.listen(PORT, async () => {
   console.log('   ✅ Adaptive Limits under High Load');
   console.log('   ✅ Real-time Analytics & Monitoring');
   console.log('='.repeat(80));
-});
+  });
+}
 
 module.exports = app;
