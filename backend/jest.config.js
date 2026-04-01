@@ -11,5 +11,6 @@ module.exports = {
   verbose: true,
   moduleNameMapper: {
     '^pdf-parse$': '<rootDir>/tests/__mocks__/pdf-parse.js',
+    '^otplib$': '<rootDir>/tests/__mocks__/otplib.js',
   },
 };
