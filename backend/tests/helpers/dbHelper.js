@@ -56,9 +56,11 @@ async function seedAcademicSummary(userId) {
   return prisma.academicSummary.create({
     data: {
       userId,
-      ipk:            '3.75',
-      totalSks:       80,
-      semesterActive: 5,
+      ipk:                     '3.75',
+      totalSks:                80,
+      semesterActive:          5,
+      ipsLastSemester:         '0.00',
+      totalSemestersCompleted: 4,
     },
   });
 }
