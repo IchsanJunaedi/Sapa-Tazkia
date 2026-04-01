@@ -15,7 +15,6 @@ mysql_init
 backend/setup_admin.js
 backend/test_conn.js
 backend/add_token_usage_col.js
-docs/
 .claude/
 # Git worktrees
 .worktrees/
