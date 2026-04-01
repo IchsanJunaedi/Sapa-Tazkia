@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const session = require('express-session');
 const RedisStore = require('connect-redis').RedisStore;
@@ -7,7 +9,6 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpecs = require('./config/swagger');
 // ✅ BUG-02 FIX: Gunakan Prisma singleton agar koneksi DB tidak exhausted
 const prisma = require('./config/prismaClient');
-require('dotenv').config();
 
 // ✅ NEW: Centralized environment validation (fail-fast)
 const { validateEnv } = require('./config/envValidation');
