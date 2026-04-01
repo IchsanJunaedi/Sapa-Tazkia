@@ -9,6 +9,10 @@ const swaggerSpecs = require('./config/swagger');
 const prisma = require('./config/prismaClient');
 require('dotenv').config();
 
+// ✅ NEW: Centralized environment validation (fail-fast)
+const { validateEnv } = require('./config/envValidation');
+validateEnv();
+
 // Environment-based logger
 const logger = require('./utils/logger');
 
