@@ -1,6 +1,8 @@
 require('dotenv').config();
 
 const express = require('express');
+const compression = require('compression');
+const requestId = require('./middleware/requestId');
 const session = require('express-session');
 const RedisStore = require('connect-redis').RedisStore;
 const cors = require('cors');
@@ -37,6 +39,20 @@ const { rateLimitErrorHandler } = require('./utils/errorHandlers');
 const app = express();
 // ✅ REQUIRED: Trust proxy for Nginx & Rate Limiting
 app.set('trust proxy', 1);
+
+// Request ID — must be first middleware so req.id is available everywhere
+app.use(requestId);
+
+// Response compression — skip SSE streaming endpoints
+app.use(compression({
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.path === '/api/ai/chat' || req.path === '/api/guest/chat') {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
 
 // ✅ BUG-02: prisma sudah di-import sebagai singleton di atas (bukan new PrismaClient())
 
