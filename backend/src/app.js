@@ -710,13 +710,19 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2'));
 
 process.on('uncaughtException', (error) => {
-  console.error('🔴 UNCAUGHT EXCEPTION:', error);
-  process.exit(1);
+  logger.error('[UNCAUGHT EXCEPTION] Process will exit', {
+    error: error.message,
+    stack: error.stack
+  });
+  gracefulShutdown('uncaughtException');
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('🔴 UNHANDLED REJECTION at:', promise, 'reason:', reason);
-  process.exit(1);
+process.on('unhandledRejection', (reason) => {
+  logger.error('[UNHANDLED REJECTION] Process will exit', {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined
+  });
+  gracefulShutdown('unhandledRejection');
 });
 
 // ========================================================
