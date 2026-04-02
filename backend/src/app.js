@@ -47,7 +47,8 @@ app.use(requestId);
 app.use(compression({
   threshold: 1024,
   filter: (req, res) => {
-    if (req.path === '/api/ai/chat' || req.path === '/api/guest/chat') {
+    // Skip compression for SSE streaming endpoints
+    if (/\/(ai|guest|auth)\/chat/.test(req.path)) {
       return false;
     }
     return compression.filter(req, res);
@@ -156,7 +157,8 @@ app.use(cors({
     'X-RateLimit-Limit', // ✅ NEW: Allow rate limit headers
     'X-RateLimit-Remaining',
     'X-RateLimit-Reset',
-    'X-RateLimit-User-Type'
+    'X-RateLimit-User-Type',
+    'X-Request-Id'
   ],
   exposedHeaders: [
     'Content-Length',
@@ -165,7 +167,8 @@ app.use(cors({
     'X-RateLimit-Remaining',
     'X-RateLimit-Reset',
     'X-RateLimit-User-Type',
-    'Retry-After'
+    'Retry-After',
+    'X-Request-Id'
   ],
   maxAge: 86400
 }));
@@ -278,6 +281,7 @@ app.use(authService.passport.session());
 // Request logging middleware - structured via logger
 app.use((req, res, next) => {
   logger.request(req.method, req.url, '-');
+  if (req.id) logger.debug(`[REQ] id=${req.id}`);
   next();
 });
 
