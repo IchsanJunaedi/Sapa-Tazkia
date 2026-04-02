@@ -294,7 +294,7 @@ app.get('/', (req, res) => {
   res.json({
     success: true,
     message: '🚀 Sapa Tazkia Backend API',
-    version: '4.1.0', // ✅ UPDATE VERSION - Academic Routes Added
+    version: '4.2.0', // ✅ UPDATE VERSION - Backend stability upgrade complete
     status: 'running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
