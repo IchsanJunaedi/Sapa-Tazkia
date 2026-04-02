@@ -1,5 +1,6 @@
 const OpenAI = require('openai');
 require('dotenv').config();
+const logger = require('../utils/logger');
 
 // ✅ FIX 1: Cek API Key agar tidak error gaib jika .env bermasalah
 if (!process.env.OPENAI_API_KEY) {
@@ -202,7 +203,7 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
     return { content: reply, usage };
 
   } catch (error) {
-    console.error('❌ [OPENAI] Gen Answer Error:', error.message);
+    logger.error('[OPENAI] Gen Answer Error:', error.message);
     return {
       content: "Mohon maaf, koneksi Kia ke server sedang tidak stabil. Silakan coba sesaat lagi ya Kak. 🙏",
       usage: {}
@@ -327,7 +328,7 @@ async function withRetry(fn, maxAttempts = 3, baseDelayMs = 1000) {
       if (!isRetriable || attempt === maxAttempts) throw error;
 
       const delay = Math.pow(2, attempt - 1) * baseDelayMs;
-      console.warn(`⚠️ [OPENAI] Retry ${attempt}/${maxAttempts} after ${delay}ms — ${error.message}`);
+      logger.warn(`[OPENAI] Retry ${attempt}/${maxAttempts} after ${delay}ms — ${error.message}`);
       await new Promise(r => setTimeout(r, delay));
     }
   }

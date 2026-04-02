@@ -464,11 +464,6 @@ const uploadPdfDoc = async (req, res) => {
       });
     }
 
-    // 2. Validate MIME type (layer 1)
-    if (req.file.mimetype !== 'application/pdf') {
-      return res.status(400).json({ success: false, message: 'Only PDF files are allowed.' });
-    }
-
     // 4. Parse PDF text
     const pdfData = await pdfParse(req.file.buffer);
     const rawText = pdfData.text || '';

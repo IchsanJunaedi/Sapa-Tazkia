@@ -673,7 +673,10 @@ app.use((err, req, res, next) => {
 // GRACEFUL SHUTDOWN - ENHANCED WITH RATE LIMIT CLEANUP
 // ========================================================
 
+let _shutdownCalled = false;
 const gracefulShutdown = async (signal) => {
+  if (_shutdownCalled) return;
+  _shutdownCalled = true;
   console.log(`\n🔴 Received ${signal}. Shutting down gracefully...`);
 
   try {

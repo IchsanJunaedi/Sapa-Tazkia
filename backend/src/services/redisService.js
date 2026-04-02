@@ -101,8 +101,10 @@ class RedisService {
   // =================================================================
 
   async get(key) {
+    if (!this.client) {
+      return this.degradedMode ? this._memoryGet(key) : null;
+    }
     try {
-      if (!this.client) return null;
       const data = await this.client.get(key);
       return data;
     } catch (error) {
@@ -217,11 +219,21 @@ class RedisService {
   // =================================================================
 
   async expire(key, seconds) {
+    if (!this.client) {
+      if (this.degradedMode && this._memoryStore.has(key)) {
+        this._memoryExpiry.set(key, Date.now() + seconds * 1000);
+        return 1;
+      }
+      return 0;
+    }
     try {
-      if (!this.client) return 0;
       return await this.client.expire(key, seconds);
     } catch (error) {
       logger.error(`Redis expire error [${key}]:`, error.message);
+      if (this.degradedMode && this._memoryStore.has(key)) {
+        this._memoryExpiry.set(key, Date.now() + seconds * 1000);
+        return 1;
+      }
       return 0;
     }
   }
