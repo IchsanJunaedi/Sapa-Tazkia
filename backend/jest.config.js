@@ -13,4 +13,8 @@ module.exports = {
     '^pdf-parse$': '<rootDir>/tests/__mocks__/pdf-parse.js',
     '^otplib$': '<rootDir>/tests/__mocks__/otplib.js',
   },
+  transform: {
+    '^.+\\.js$': ['babel-jest', { configFile: './babel.config.js' }],
+  },
+  transformIgnorePatterns: ['/node_modules/(?!uuid/)'],
 };

@@ -1,6 +1,8 @@
 require('dotenv').config();
 
 const express = require('express');
+const compression = require('compression');
+const requestId = require('./middleware/requestId');
 const session = require('express-session');
 const RedisStore = require('connect-redis').RedisStore;
 const cors = require('cors');
@@ -37,6 +39,21 @@ const { rateLimitErrorHandler } = require('./utils/errorHandlers');
 const app = express();
 // ✅ REQUIRED: Trust proxy for Nginx & Rate Limiting
 app.set('trust proxy', 1);
+
+// Request ID — must be first middleware so req.id is available everywhere
+app.use(requestId);
+
+// Response compression — skip SSE streaming endpoints
+app.use(compression({
+  threshold: 1024,
+  filter: (req, res) => {
+    // Skip compression for SSE streaming endpoints
+    if (/\/(ai|guest|auth)\/chat/.test(req.path)) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
 
 // ✅ BUG-02: prisma sudah di-import sebagai singleton di atas (bukan new PrismaClient())
 
@@ -140,7 +157,8 @@ app.use(cors({
     'X-RateLimit-Limit', // ✅ NEW: Allow rate limit headers
     'X-RateLimit-Remaining',
     'X-RateLimit-Reset',
-    'X-RateLimit-User-Type'
+    'X-RateLimit-User-Type',
+    'X-Request-Id'
   ],
   exposedHeaders: [
     'Content-Length',
@@ -149,7 +167,8 @@ app.use(cors({
     'X-RateLimit-Remaining',
     'X-RateLimit-Reset',
     'X-RateLimit-User-Type',
-    'Retry-After'
+    'Retry-After',
+    'X-Request-Id'
   ],
   maxAge: 86400
 }));
@@ -262,6 +281,7 @@ app.use(authService.passport.session());
 // Request logging middleware - structured via logger
 app.use((req, res, next) => {
   logger.request(req.method, req.url, '-');
+  if (req.id) logger.debug(`[REQ] id=${req.id}`);
   next();
 });
 
@@ -274,7 +294,7 @@ app.get('/', (req, res) => {
   res.json({
     success: true,
     message: '🚀 Sapa Tazkia Backend API',
-    version: '4.1.0', // ✅ UPDATE VERSION - Academic Routes Added
+    version: '4.2.0', // ✅ UPDATE VERSION - Backend stability upgrade complete
     status: 'running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
@@ -653,7 +673,10 @@ app.use((err, req, res, next) => {
 // GRACEFUL SHUTDOWN - ENHANCED WITH RATE LIMIT CLEANUP
 // ========================================================
 
+let _shutdownCalled = false;
 const gracefulShutdown = async (signal) => {
+  if (_shutdownCalled) return;
+  _shutdownCalled = true;
   console.log(`\n🔴 Received ${signal}. Shutting down gracefully...`);
 
   try {
@@ -690,13 +713,19 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2'));
 
 process.on('uncaughtException', (error) => {
-  console.error('🔴 UNCAUGHT EXCEPTION:', error);
-  process.exit(1);
+  logger.error('[UNCAUGHT EXCEPTION] Process will exit', {
+    error: error.message,
+    stack: error.stack
+  });
+  gracefulShutdown('uncaughtException');
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('🔴 UNHANDLED REJECTION at:', promise, 'reason:', reason);
-  process.exit(1);
+process.on('unhandledRejection', (reason) => {
+  logger.error('[UNHANDLED REJECTION] Process will exit', {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined
+  });
+  gracefulShutdown('unhandledRejection');
 });
 
 // ========================================================

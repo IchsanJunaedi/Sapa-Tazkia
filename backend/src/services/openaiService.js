@@ -1,5 +1,6 @@
 const OpenAI = require('openai');
 require('dotenv').config();
+const logger = require('../utils/logger');
 
 // ✅ FIX 1: Cek API Key agar tidak error gaib jika .env bermasalah
 if (!process.env.OPENAI_API_KEY) {
@@ -84,17 +85,14 @@ Instruksi: Gunakan HANYA data dari [CONTEXT] di atas. Jawab akurat, terstruktur,
  * 1. EMBEDDING GENERATOR
  */
 async function createEmbedding(text) {
-  try {
-    const cleanText = text.replace(/\s+/g, " ").trim();
+  const cleanText = text.replace(/\s+/g, " ").trim();
+  return withRetry(async () => {
     const response = await openai.embeddings.create({
       model: "text-embedding-3-small",
       input: cleanText,
     });
     return response.data[0].embedding;
-  } catch (error) {
-    console.error('❌ [OPENAI] Embed Error:', error.message);
-    throw error; // Throw error agar RAG tau koneksi putus
-  }
+  });
 }
 
 /**
@@ -175,16 +173,28 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
     messages.push({ role: 'user', content: finalUserPrompt });
 
     // --- Call LLM ---
-    const completion = await openai.chat.completions.create({
-      model: MODEL_NAME,
-      messages: messages,
-      max_tokens: maxTokens,
-      temperature: temperature,
-      presence_penalty: 0.1,
-      stream: options.stream || false, // ✅ Support Streaming
-    }, { signal: options.abortSignal });
+    if (options.stream) {
+      const completion = await openai.chat.completions.create({
+        model: MODEL_NAME,
+        messages: messages,
+        max_tokens: maxTokens,
+        temperature: temperature,
+        presence_penalty: 0.1,
+        stream: true,
+      }, { signal: options.abortSignal });
+      return completion;
+    }
 
-    if (options.stream) return completion;
+    const completion = await withRetry(() =>
+      openai.chat.completions.create({
+        model: MODEL_NAME,
+        messages: messages,
+        max_tokens: maxTokens,
+        temperature: temperature,
+        presence_penalty: 0.1,
+        stream: false,
+      }, { signal: options.abortSignal })
+    );
 
     const reply = completion.choices[0].message.content.trim();
     const usage = completion.usage || { total_tokens: 0 };
@@ -193,7 +203,7 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
     return { content: reply, usage };
 
   } catch (error) {
-    console.error('❌ [OPENAI] Gen Answer Error:', error.message);
+    logger.error('[OPENAI] Gen Answer Error:', error.message);
     return {
       content: "Mohon maaf, koneksi Kia ke server sedang tidak stabil. Silakan coba sesaat lagi ya Kak. 🙏",
       usage: {}
@@ -297,6 +307,33 @@ function isBannedTopicQuestion(text) {
   return ["resep", "masak", "politik", "presiden", "partai", "judi", "slot"].some(k => t.includes(k));
 }
 
+const RETRIABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+
+/**
+ * Retry wrapper with exponential backoff.
+ * @param {Function} fn - async function to retry
+ * @param {number} maxAttempts - total attempts (default 3)
+ * @param {number} baseDelayMs - base delay in ms (default 1000, set 0 in tests)
+ */
+async function withRetry(fn, maxAttempts = 3, baseDelayMs = 1000) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const isRetriable =
+        (error.status && RETRIABLE_STATUS.has(error.status)) ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNRESET';
+
+      if (!isRetriable || attempt === maxAttempts) throw error;
+
+      const delay = Math.pow(2, attempt - 1) * baseDelayMs;
+      logger.warn(`[OPENAI] Retry ${attempt}/${maxAttempts} after ${delay}ms — ${error.message}`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
 async function testOpenAIConnection() {
   try {
     const res = await openai.chat.completions.create({
@@ -313,5 +350,6 @@ module.exports = {
   createEmbedding,
   testOpenAIConnection,
   generateTitle,
-  isGreeting
+  isGreeting,
+  withRetry,
 };

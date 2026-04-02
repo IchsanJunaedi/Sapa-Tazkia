@@ -26,3 +26,13 @@ describe('GET /', () => {
     expect(res.body).toHaveProperty('success', true);
   });
 });
+
+describe('Request ID header', () => {
+  it('returns X-Request-Id on every response', async () => {
+    const res = await agent.get('/health');
+    expect(res.headers['x-request-id']).toBeDefined();
+    expect(res.headers['x-request-id']).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
+  });
+});

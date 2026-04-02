@@ -19,6 +19,9 @@ class RedisService {
   constructor() {
     this.client = null;
     this.isConnected = false; // Status visual saja, jangan dipakai untuk blocking logika utama
+    this.degradedMode = false;
+    this._memoryStore = new Map();  // key → value string
+    this._memoryExpiry = new Map(); // key → expiry timestamp (ms)
     this.initialize();
   }
 
@@ -52,13 +55,13 @@ class RedisService {
 
     this.client.on('connect', () => {
       this.isConnected = true;
+      this.degradedMode = false;
       logger.info('✅ Redis client connected successfully');
     });
 
     this.client.on('error', (err) => {
-      // Jangan set isConnected false permanen di sini agar bisa auto-reconnect
       if (err.code === 'ECONNREFUSED') {
-        // console.warn('⚠️ [REDIS] Connection refused...'); 
+        this.degradedMode = true;
       } else {
         logger.error('Redis error:', err.message);
       }
@@ -66,8 +69,31 @@ class RedisService {
 
     this.client.on('close', () => {
       this.isConnected = false;
-      logger.warn('Redis connection closed');
+      this.degradedMode = true;
+      logger.warn('Redis connection closed — switching to degraded mode');
     });
+  }
+
+  _memoryGet(key) {
+    const expiry = this._memoryExpiry.get(key);
+    if (expiry && Date.now() > expiry) {
+      this._memoryStore.delete(key);
+      this._memoryExpiry.delete(key);
+      return null;
+    }
+    return this._memoryStore.has(key) ? this._memoryStore.get(key) : null;
+  }
+
+  _memorySet(key, value, expireSeconds = null) {
+    // Evict oldest 100 entries if store exceeds 10,000
+    if (this._memoryStore.size >= 10000) {
+      const oldest = [...this._memoryStore.keys()].slice(0, 100);
+      oldest.forEach(k => { this._memoryStore.delete(k); this._memoryExpiry.delete(k); });
+    }
+    this._memoryStore.set(key, String(value));
+    if (expireSeconds) {
+      this._memoryExpiry.set(key, Date.now() + expireSeconds * 1000);
+    }
   }
 
   // =================================================================
@@ -75,22 +101,26 @@ class RedisService {
   // =================================================================
 
   async get(key) {
-    // ❌ HAPUS check !this.isConnected agar tidak memblokir saat startup
+    if (!this.client) {
+      return this.degradedMode ? this._memoryGet(key) : null;
+    }
     try {
-      if (!this.client) return null;
       const data = await this.client.get(key);
-      return data; 
+      return data;
     } catch (error) {
       logger.error(`Redis get error [${key}]:`, error.message);
+      if (this.degradedMode) return this._memoryGet(key);
       return null;
     }
   }
 
   async set(key, value, expireSeconds = null) {
     try {
-      if (!this.client) return;
+      if (!this.client) {
+        if (this.degradedMode) this._memorySet(key, value, expireSeconds);
+        return;
+      }
       const valString = typeof value === 'object' ? JSON.stringify(value) : String(value);
-      
       if (expireSeconds) {
         await this.client.set(key, valString, 'EX', expireSeconds);
       } else {
@@ -98,6 +128,7 @@ class RedisService {
       }
     } catch (error) {
       logger.error(`Redis set error [${key}]:`, error.message);
+      if (this.degradedMode) this._memorySet(key, value, expireSeconds);
     }
   }
 
@@ -107,6 +138,11 @@ class RedisService {
       return await this.client.del(key);
     } catch (error) {
       logger.error(`Redis del error [${key}]:`, error.message);
+      if (this.degradedMode) {
+        this._memoryStore.delete(key);
+        this._memoryExpiry.delete(key);
+        return 1;
+      }
       return 0;
     }
   }
@@ -140,6 +176,12 @@ class RedisService {
       return await this.client.incr(key);
     } catch (error) {
       logger.error(`Redis incr error [${key}]:`, error.message);
+      if (this.degradedMode) {
+        const current = parseInt(this._memoryGet(key) || '0', 10);
+        const next = current + 1;
+        this._memorySet(key, next);
+        return next;
+      }
       return 1;
     }
   }
@@ -150,12 +192,16 @@ class RedisService {
       if (!this.client) return amount;
       const val = parseInt(amount);
       if (isNaN(val)) return 0;
-      
-      const result = await this.client.incrby(key, val);
-      return result;
+      return await this.client.incrby(key, val);
     } catch (error) {
       logger.error(`Redis incrBy error [${key}]:`, error.message);
-      return amount; 
+      if (this.degradedMode) {
+        const current = parseInt(this._memoryGet(key) || '0', 10);
+        const next = current + parseInt(amount, 10);
+        this._memorySet(key, next);
+        return next;
+      }
+      return amount;
     }
   }
 
@@ -173,11 +219,21 @@ class RedisService {
   // =================================================================
 
   async expire(key, seconds) {
+    if (!this.client) {
+      if (this.degradedMode && this._memoryStore.has(key)) {
+        this._memoryExpiry.set(key, Date.now() + seconds * 1000);
+        return 1;
+      }
+      return 0;
+    }
     try {
-      if (!this.client) return 0;
       return await this.client.expire(key, seconds);
     } catch (error) {
       logger.error(`Redis expire error [${key}]:`, error.message);
+      if (this.degradedMode && this._memoryStore.has(key)) {
+        this._memoryExpiry.set(key, Date.now() + seconds * 1000);
+        return 1;
+      }
       return 0;
     }
   }

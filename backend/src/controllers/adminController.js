@@ -9,7 +9,13 @@ const { chunkText } = require('../utils/textChunker');
 // Multer — memory storage (no disk writes), 10MB limit.
 const pdfUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== 'application/pdf') {
+      return cb(new Error('Hanya file PDF yang diperbolehkan'), false);
+    }
+    cb(null, true);
+  }
 });
 
 /**
@@ -449,15 +455,13 @@ const uploadPdfDoc = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file uploaded. Send a PDF as form-data field "file".' });
     }
 
-    // 2. Validate MIME type (layer 1)
-    if (req.file.mimetype !== 'application/pdf') {
-      return res.status(400).json({ success: false, message: 'Only PDF files are allowed.' });
-    }
-
-    // 3. Validate magic bytes — %PDF (layer 2, prevents spoofed MIME type)
-    const magic = req.file.buffer.slice(0, 4).toString();
-    if (magic !== '%PDF') {
-      return res.status(400).json({ success: false, message: 'File is not a valid PDF (magic bytes check failed).' });
+    // Validate PDF magic bytes — reject files with spoofed content-type
+    const PDF_MAGIC = Buffer.from('%PDF-');
+    if (req.file.buffer.length < 5 || !req.file.buffer.slice(0, 5).equals(PDF_MAGIC)) {
+      return res.status(422).json({
+        success: false,
+        message: 'File bukan PDF yang valid'
+      });
     }
 
     // 4. Parse PDF text

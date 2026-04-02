@@ -38,20 +38,20 @@ describe('uploadPdfDoc', () => {
     );
   });
 
-  it('should return 400 if file mimetype is not application/pdf', async () => {
+  it('should return 422 if file mimetype is not application/pdf', async () => {
     const req = {
       file: { originalname: 'hack.jpg', mimetype: 'image/jpeg', buffer: Buffer.from('JFIF') },
       body: {}
     };
     const res = makeRes();
     await uploadPdfDoc(req, res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.status).toHaveBeenCalledWith(422);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({ success: false, message: expect.stringContaining('PDF') })
     );
   });
 
-  it('should return 400 if magic bytes check fails (spoofed PDF mimetype)', async () => {
+  it('should return 422 if magic bytes check fails (spoofed PDF mimetype)', async () => {
     const req = {
       file: {
         originalname: 'fake.pdf',
@@ -62,7 +62,7 @@ describe('uploadPdfDoc', () => {
     };
     const res = makeRes();
     await uploadPdfDoc(req, res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.status).toHaveBeenCalledWith(422);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({ success: false })
     );
