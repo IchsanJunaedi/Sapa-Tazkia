@@ -16,5 +16,5 @@ module.exports = {
   transform: {
     '^.+\\.js$': ['babel-jest', { configFile: './babel.config.js' }],
   },
-  transformIgnorePatterns: [],
+  transformIgnorePatterns: ['/node_modules/(?!uuid/)'],
 };

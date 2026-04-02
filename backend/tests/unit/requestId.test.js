@@ -34,5 +34,6 @@ describe('requestId middleware', () => {
 
     expect(req.id).toBe(existingId);
     expect(res._headers['X-Request-Id']).toBe(existingId);
+    expect(next).toHaveBeenCalled();
   });
 });
