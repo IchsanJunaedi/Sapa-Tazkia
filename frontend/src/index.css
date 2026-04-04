@@ -111,3 +111,22 @@ body {
     overflow-x: hidden;
   }
 }
+
+/* ─── Skeleton Shimmer Animation ──────────────────────────────────────────── */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ─── Smooth Page Transitions ─────────────────────────────────────────────── */
+.page-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+}

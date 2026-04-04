@@ -1,6 +1,7 @@
 {
   "short_name": "Sapa-Tazkia",
-  "name": "Sapa-Tazkia - AI Chatbot Akademik STMIK Tazkia",
+  "name": "Sapa-Tazkia — AI Chatbot Akademik STMIK Tazkia",
+  "description": "Asisten AI akademik berbasis RAG untuk mahasiswa STMIK Tazkia. Tanya jadwal, nilai, dan materi kuliah kapan saja.",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +11,23 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#f97316",
-  "background_color": "#ffffff"
+  "orientation": "portrait-primary",
+  "theme_color": "#09090b",
+  "background_color": "#09090b",
+  "categories": ["education", "productivity"],
+  "lang": "id",
+  "dir": "ltr"
 }
