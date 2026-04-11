@@ -229,15 +229,13 @@ router.post('/refresh', strictLimiter, validateRefreshToken, authController.refr
  *       400:
  *         description: Kode tidak valid atau expired
  */
-// TODO: Re-enable email verification when SIAKAD API is integrated
-// router.post('/verify-email', strictLimiter, validateVerifyEmail, authController.verifyEmailCode);
+router.post('/verify-email', strictLimiter, validateVerifyEmail, authController.verifyEmailCode);
 
 /**
  * @route   POST /api/auth/resend-verification
  * @limit   STRICT (Mencegah Email Bombing)
  */
-// TODO: Re-enable when SIAKAD API is integrated
-// router.post('/resend-verification', strictLimiter, authController.resendVerificationCode);
+router.post('/resend-verification', strictLimiter, authController.resendVerificationCode);
 
 /**
  * @route   GET /api/auth/check-verification/:email

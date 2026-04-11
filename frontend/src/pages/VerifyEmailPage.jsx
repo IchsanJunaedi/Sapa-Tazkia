@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { X } from 'lucide-react';
 import api from '../api/axiosConfig';
 import { useAuth } from '../context/AuthContext';
 
@@ -17,12 +18,10 @@ const VerifyEmailPage = () => {
   const inputRefs = useRef([]);
   const { login } = useAuth();
 
-  // Initialize input refs
   useEffect(() => {
     inputRefs.current = inputRefs.current.slice(0, 6);
   }, []);
 
-  // ✅ PERBAIKAN: Get email from multiple sources including Google OAuth
   useEffect(() => {
     const locationEmail = location.state?.email;
     const storedEmail = localStorage.getItem('userEmail');
@@ -32,29 +31,16 @@ const VerifyEmailPage = () => {
     let finalEmail = '';
     let finalUserData = null;
 
-    console.log('🔍 [VERIFY EMAIL] Checking email sources:', {
-      locationEmail,
-      storedEmail,
-      pendingEmail,
-      oauthUserData: !!oauthUserData
-    });
-
-    // Priority order for email sources
     if (locationEmail) {
       finalEmail = locationEmail;
-      console.log('🔍 [VERIFY EMAIL] Email from location state:', locationEmail);
     } else if (pendingEmail) {
       finalEmail = pendingEmail;
-      console.log('🔍 [VERIFY EMAIL] Email from pending verification:', pendingEmail);
     } else if (storedEmail) {
       finalEmail = storedEmail;
-      console.log('🔍 [VERIFY EMAIL] Email from localStorage:', storedEmail);
     } else if (oauthUserData?.email) {
       finalEmail = oauthUserData.email;
       finalUserData = oauthUserData;
-      console.log('🔍 [VERIFY EMAIL] Email from OAuth user data:', oauthUserData.email);
     } else {
-      console.log('❌ [VERIFY EMAIL] No email found, redirecting to login');
       navigate('/login', {
         state: { error: 'Sesi verifikasi telah berakhir. Silakan daftar ulang.' }
       });
@@ -63,14 +49,11 @@ const VerifyEmailPage = () => {
 
     setEmail(finalEmail);
 
-    // ✅ PERBAIKAN: Simpan user data jika dari OAuth untuk digunakan setelah verifikasi
     if (finalUserData) {
       localStorage.setItem('verificationUserData', JSON.stringify(finalUserData));
-      console.log('✅ [VERIFY EMAIL] OAuth user data saved for post-verification');
     }
   }, [location, navigate]);
 
-  // Handle countdown timer
   useEffect(() => {
     let timer;
     if (countdown > 0) {
@@ -79,11 +62,7 @@ const VerifyEmailPage = () => {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  /**
-   * Handle input change for verification code
-   */
   const handleInputChange = (index, value) => {
-    // Only allow numbers
     if (!/^\d*$/.test(value)) return;
 
     const newCode = [...verificationCode];
@@ -91,23 +70,17 @@ const VerifyEmailPage = () => {
     setVerificationCode(newCode);
     setError('');
 
-    // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // Auto-submit when all fields are filled
     if (newCode.every(digit => digit !== '') && index === 5) {
-      handleVerification();
+      handleVerification(newCode);
     }
   };
 
-  /**
-   * Handle key events for better UX
-   */
   const handleKeyDown = (index, e) => {
     if (e.key === 'Backspace' && !verificationCode[index] && index > 0) {
-      // Move to previous input on backspace
       inputRefs.current[index - 1]?.focus();
     } else if (e.key === 'ArrowLeft' && index > 0) {
       e.preventDefault();
@@ -118,32 +91,22 @@ const VerifyEmailPage = () => {
     }
   };
 
-  /**
-   * Handle paste event
-   */
   const handlePaste = (e) => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text');
     const numbers = pastedData.replace(/\D/g, '').slice(0, 6).split('');
 
     if (numbers.length === 6) {
-      const newCode = [...verificationCode];
-      numbers.forEach((num, index) => {
-        newCode[index] = num;
-      });
-      setVerificationCode(newCode);
+      setVerificationCode(numbers);
       setError('');
-
-      // Focus last input
       inputRefs.current[5]?.focus();
+      // Trigger verification after paste
+      setTimeout(() => handleVerification(numbers), 50);
     }
   };
 
-  /**
-   * ✅ PERBAIKAN: Verify the email with the code - Handle Google OAuth case
-   */
-  const handleVerification = async () => {
-    const code = verificationCode.join('');
+  const handleVerification = async (codeArr) => {
+    const code = (codeArr || verificationCode).join('');
 
     if (code.length !== 6) {
       setError('Kode verifikasi harus 6 digit');
@@ -159,121 +122,72 @@ const VerifyEmailPage = () => {
     setError('');
 
     try {
-      console.log('🔍 [VERIFY EMAIL] Verifying code for email:', email);
-
-      const response = await api.post('/auth/verify-email', {
-        email,
-        code
-      });
-
-      console.log('✅ [VERIFY EMAIL] Verification successful:', response.data);
+      const response = await api.post('/auth/verify-email', { email, code });
 
       if (response.data.success) {
         setSuccess('Email berhasil diverifikasi!');
 
-        // ✅ PERBAIKAN: Handle both API response data AND Google OAuth stored data
         const { token, user, requiresProfileCompletion } = response.data;
 
-        // ✅ PERBAIKAN: Cek jika ada OAuth data yang tersimpan
         const oauthToken = localStorage.getItem('verificationToken');
-        const oauthUserData = localStorage.getItem('verificationUserData');
+        const oauthUserDataRaw = localStorage.getItem('verificationUserData');
 
         const finalToken = token || oauthToken;
         let finalUser = user;
 
-        // ✅ Jika dari Google OAuth, gunakan data yang disimpan
-        if (!finalUser && oauthUserData) {
+        if (!finalUser && oauthUserDataRaw) {
           try {
-            finalUser = JSON.parse(oauthUserData);
-            // Update status verifikasi untuk user OAuth
+            finalUser = JSON.parse(oauthUserDataRaw);
             finalUser.isEmailVerified = true;
-            console.log('✅ [VERIFY EMAIL] Using OAuth user data with verified status');
           } catch (e) {
-            console.error('❌ [VERIFY EMAIL] Error parsing OAuth user data:', e);
+            console.error('Error parsing OAuth user data:', e);
           }
         }
 
         if (finalToken && finalUser) {
-          // ✅ PERBAIKAN: Simpan token dan user data
           localStorage.setItem('token', finalToken);
           localStorage.setItem('user', JSON.stringify(finalUser));
 
-          // ✅ PERBAIKAN: Login ke AuthContext untuk konsistensi state
           try {
             await login(finalToken, finalUser);
-            console.log('✅ [VERIFY EMAIL] User logged in to AuthContext');
           } catch (loginError) {
-            console.error('❌ [VERIFY EMAIL] AuthContext login failed:', loginError);
-            // Continue anyway since we have localStorage
+            console.error('AuthContext login failed:', loginError);
           }
 
-          // ✅ PERBAIKAN: Clear semua temporary storage
           localStorage.removeItem('userEmail');
           localStorage.removeItem('isNewUser');
           localStorage.removeItem('pendingVerificationEmail');
           localStorage.removeItem('verificationUserData');
           localStorage.removeItem('verificationToken');
 
-          console.log('🔍 [VERIFY EMAIL] User data after verification:', {
-            user: finalUser,
-            requiresProfileCompletion,
-            isEmailVerified: finalUser.isEmailVerified,
-            isProfileComplete: finalUser.isProfileComplete
-          });
-
-          // ✅ PERBAIKAN: Redirect logic yang lebih baik
           setTimeout(() => {
-            // Prioritaskan profile completion jika diperlukan
             const needsProfileCompletion = requiresProfileCompletion ||
               !finalUser.isProfileComplete ||
               !finalUser.fullName ||
               finalUser.fullName.trim().length === 0;
 
-            console.log('🔍 [VERIFY EMAIL] Redirect decision:', {
-              needsProfileCompletion,
-              requiresProfileCompletion,
-              isProfileComplete: finalUser.isProfileComplete,
-              hasFullName: !!finalUser.fullName && finalUser.fullName.trim().length > 0
-            });
-
             if (needsProfileCompletion) {
-              console.log('🔍 [VERIFY EMAIL] Profile incomplete - Redirecting to AboutYouPage');
-              navigate('/about-you', {
-                state: {
-                  from: 'email-verification',
-                  userData: finalUser
-                }
-              });
+              navigate('/about-you', { state: { from: 'email-verification', userData: finalUser } });
             } else {
-              console.log('🔍 [VERIFY EMAIL] All complete - Redirecting to landing page');
-              navigate('/', {
-                state: {
-                  from: 'email-verification',
-                  welcome: true
-                }
-              });
+              navigate('/', { state: { from: 'email-verification', welcome: true } });
             }
           }, 1500);
         } else {
-          throw new Error('Invalid verification response: missing token or user data');
+          throw new Error('Response tidak valid: token atau data pengguna hilang');
         }
       } else {
         setError(response.data.message || 'Verifikasi gagal');
       }
-    } catch (error) {
-      console.error('❌ [VERIFY EMAIL] Verification failed:', error);
-
+    } catch (err) {
       let errorMessage = 'Verifikasi gagal. Silakan coba lagi.';
 
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-
-        // Clear code on invalid verification
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
         if (errorMessage.includes('tidak valid') || errorMessage.includes('kadaluarsa')) {
           setVerificationCode(['', '', '', '', '', '']);
           inputRefs.current[0]?.focus();
         }
-      } else if (error.request) {
+      } else if (err.request) {
         errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
       }
 
@@ -283,206 +197,230 @@ const VerifyEmailPage = () => {
     }
   };
 
-  /**
-   * Resend verification code
-   */
   const handleResendCode = async () => {
-    if (!email) {
-      setError('Email tidak ditemukan');
-      return;
-    }
-
-    if (countdown > 0) {
-      setError(`Tunggu ${countdown} detik sebelum mengirim ulang`);
-      return;
-    }
+    if (!email) { setError('Email tidak ditemukan'); return; }
+    if (countdown > 0) return;
 
     setIsResending(true);
     setError('');
 
     try {
-      console.log('🔍 [VERIFY EMAIL] Resending code to:', email);
-
       const response = await api.post('/auth/resend-verification', { email });
 
       if (response.data.success) {
-        setSuccess('Kode verifikasi baru telah dikirim ke email Anda');
-        setCountdown(60); // 60 seconds cooldown
+        setSuccess('Kode verifikasi baru telah dikirim!');
+        setCountdown(60);
         setVerificationCode(['', '', '', '', '', '']);
         inputRefs.current[0]?.focus();
+        setTimeout(() => setSuccess(''), 4000);
       } else {
         setError(response.data.message || 'Gagal mengirim ulang kode');
       }
-    } catch (error) {
-      console.error('❌ [VERIFY EMAIL] Resend failed:', error);
-
+    } catch (err) {
       let errorMessage = 'Gagal mengirim ulang kode. Silakan coba lagi.';
-
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.request) {
-        errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.request) {
+        errorMessage = 'Tidak dapat terhubung ke server.';
       }
-
       setError(errorMessage);
     } finally {
       setIsResending(false);
     }
   };
 
-  /**
-   * ✅ PERBAIKAN: Navigate back dengan handle Google OAuth case
-   */
-  const handleBackToRegistration = () => {
-    // Clear semua temporary storage
+  const handleBack = () => {
     localStorage.removeItem('userEmail');
     localStorage.removeItem('isNewUser');
     localStorage.removeItem('pendingVerificationEmail');
     localStorage.removeItem('verificationUserData');
     localStorage.removeItem('verificationToken');
 
-    // Redirect berdasarkan source
     if (location.state?.from === 'oauth-callback') {
-      navigate('/login', {
-        state: {
-          message: 'Verifikasi dibatalkan. Silakan coba login kembali.'
-        }
-      });
+      navigate('/login', { state: { message: 'Verifikasi dibatalkan. Silakan coba login kembali.' } });
     } else {
-      navigate('/login', {
-        state: { showEmailRegistration: true }
-      });
+      navigate('/login', { state: { showEmailRegistration: true } });
     }
   };
 
+  const isComplete = verificationCode.every(d => d !== '');
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-6 font-sans">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        {/* Back Button */}
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <div
+        className="verify-card w-full relative overflow-hidden"
+        style={{
+          maxWidth: '400px',
+          background: 'rgba(10, 18, 70, 0.65)',
+          backdropFilter: 'blur(40px)',
+          WebkitBackdropFilter: 'blur(40px)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: '20px',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(255,255,255,0.06)',
+        }}
+      >
+        {/* Top accent stripe */}
+        <div className="h-[3px] w-full bg-gradient-to-r from-indigo-500 via-blue-500 to-indigo-400" />
+
+        {/* Close button */}
         <button
-          onClick={handleBackToRegistration}
-          className="flex items-center text-gray-600 hover:text-gray-800 mb-6"
+          type="button"
+          onClick={handleBack}
+          className="absolute top-5 right-5 p-1.5 rounded-full transition-all duration-200 text-white/30 hover:text-white/70"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
         >
-          <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Kembali ke Pendaftaran
+          <X size={16} />
         </button>
 
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </div>
-
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Verifikasi Email</h1>
-          <p className="text-gray-600 mb-2">
-            Masukkan kode verifikasi 6 digit yang dikirim ke
-          </p>
-          <p className="text-blue-600 font-medium">{email}</p>
-
-          {/* ✅ PERBAIKAN: Tampilkan source verification */}
-          {location.state?.from === 'oauth-callback' && (
-            <p className="text-xs text-green-600 mt-2">
-              ✅ Verifikasi untuk akun Google OAuth
+        <div className="px-8 py-7">
+          {/* Header */}
+          <div className="mb-7">
+            <p className="text-xs font-semibold tracking-[0.15em] text-indigo-400 uppercase mb-2">Verifikasi Email</p>
+            <h2 className="text-[26px] font-black text-white leading-tight" style={{ letterSpacing: '-0.02em' }}>
+              Cek email kamu
+            </h2>
+            <p className="text-[13px] text-white/40 mt-2 leading-relaxed">
+              Kode 6 digit dikirim ke{' '}
+              <span className="text-white/70 font-medium">{email}</span>
             </p>
+          </div>
+
+          {/* Success */}
+          {success && (
+            <div
+              className="px-4 py-3 rounded-xl mb-5 text-sm text-green-300 flex items-center gap-2"
+              style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)' }}
+            >
+              <span>✓</span> {success}
+            </div>
           )}
-        </div>
 
-        {/* Success Message */}
-        {success && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-4" role="alert">
-            <span className="block sm:inline">{success}</span>
-          </div>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" role="alert">
-            <span className="block sm:inline">{error}</span>
-          </div>
-        )}
-
-        {/* Verification Code Inputs */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3 text-center">
-            Kode Verifikasi
-          </label>
-          <div className="flex justify-center space-x-2 mb-4">
-            {verificationCode.map((digit, index) => (
-              <input
-                key={index}
-                ref={el => inputRefs.current[index] = el}
-                type="text"
-                maxLength="1"
-                value={digit}
-                onChange={(e) => handleInputChange(index, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(index, e)}
-                onPaste={index === 0 ? handlePaste : undefined}
-                className="w-12 h-12 text-center text-xl font-semibold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-colors"
-                disabled={isLoading}
-                inputMode="numeric"
-                pattern="[0-9]*"
-              />
-            ))}
-          </div>
-
-          <p className="text-xs text-gray-500 text-center">
-            Kode akan otomatis terverifikasi ketika semua digit terisi
-          </p>
-        </div>
-
-        {/* Verify Button */}
-        <button
-          onClick={handleVerification}
-          disabled={isLoading || verificationCode.some(digit => digit === '')}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed shadow-md mb-4"
-        >
-          {isLoading ? (
-            <span className="flex items-center justify-center">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-              Memverifikasi...
-            </span>
-          ) : (
-            'Verifikasi Email'
+          {/* Error */}
+          {error && (
+            <div
+              className="px-4 py-3 rounded-xl mb-5 text-sm text-red-300 relative"
+              style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}
+            >
+              {error}
+              <button
+                type="button"
+                onClick={() => setError('')}
+                className="absolute top-2.5 right-2.5 text-red-400/60 hover:text-red-300 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
           )}
-        </button>
 
-        {/* Resend Code Section */}
-        <div className="text-center">
-          <p className="text-sm text-gray-600 mb-2">
-            Tidak menerima kode?
-          </p>
+          {/* OTP Inputs */}
+          <div className="mb-6">
+            <div className="flex justify-center gap-2.5 mb-3">
+              {verificationCode.map((digit, index) => (
+                <input
+                  key={index}
+                  ref={el => inputRefs.current[index] = el}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength="1"
+                  value={digit}
+                  onChange={(e) => handleInputChange(index, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(index, e)}
+                  onPaste={index === 0 ? handlePaste : undefined}
+                  disabled={isLoading}
+                  className="otp-input w-11 h-12 text-center text-lg font-bold text-white rounded-xl transition-all duration-200 focus:outline-none"
+                  style={{
+                    background: digit ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.06)',
+                    border: digit
+                      ? '1px solid rgba(99,102,241,0.6)'
+                      : '1px solid rgba(255,255,255,0.1)',
+                  }}
+                />
+              ))}
+            </div>
+            <p className="text-[11px] text-white/25 text-center">
+              Berlaku selama 10 menit · terisi otomatis saat lengkap
+            </p>
+          </div>
+
+          {/* Verify Button */}
           <button
-            onClick={handleResendCode}
-            disabled={isResending || countdown > 0}
-            className="text-blue-500 hover:text-blue-600 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
+            type="button"
+            onClick={() => handleVerification()}
+            disabled={isLoading || !isComplete}
+            className={`w-full py-[14px] rounded-xl font-semibold text-white text-[15px] transition-all duration-300 ${
+              isComplete && !isLoading
+                ? 'bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/30 hover:from-indigo-400 hover:to-blue-500 hover:scale-[1.02] active:scale-[0.99]'
+                : 'cursor-not-allowed'
+            }`}
+            style={!isComplete || isLoading ? { background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.25)' } : {}}
           >
-            {isResending ? (
-              <span className="flex items-center justify-center">
-                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2"></div>
-                Mengirim...
+            {isLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                Memverifikasi...
               </span>
-            ) : countdown > 0 ? (
-              `Kirim ulang (${countdown}s)`
             ) : (
-              'Kirim ulang kode verifikasi'
+              'Verifikasi Email'
             )}
           </button>
+
+          {/* Resend */}
+          <div className="flex gap-3 mt-4">
+            <button
+              type="button"
+              onClick={handleResendCode}
+              disabled={isResending || countdown > 0}
+              className="flex-1 py-2.5 text-sm rounded-xl font-medium transition-all duration-200 text-indigo-400 hover:text-indigo-300 disabled:text-white/20"
+              style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}
+            >
+              {isResending ? 'Mengirim...' : countdown > 0 ? `Kirim ulang (${countdown}s)` : 'Kirim Ulang'}
+            </button>
+            <button
+              type="button"
+              onClick={handleBack}
+              className="flex-1 py-2.5 text-sm rounded-xl font-medium transition-all duration-200 text-white/35 hover:text-white/60"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              Kembali
+            </button>
+          </div>
+
+          {/* Tips */}
+          <div
+            className="mt-5 px-4 py-3 rounded-xl"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+          >
+            <p className="text-[11px] text-white/25 leading-relaxed">
+              Tidak menerima email? Cek folder <span className="text-white/40">spam</span> atau klik kirim ulang setelah 60 detik.
+            </p>
+          </div>
         </div>
 
-        {/* Help Information */}
-        <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-yellow-800 mb-2">Tips:</h3>
-          <ul className="text-xs text-yellow-700 space-y-1">
-            <li>• Cek folder spam jika tidak menemukan email</li>
-            <li>• Kode verifikasi kadaluarsa dalam 10 menit</li>
-            <li>• Pastikan email yang dimasukkan sudah benar</li>
-            <li>• Hubungi support jika mengalami kendala</li>
-          </ul>
+        {/* Footer */}
+        <div className="px-8 pb-6 pt-0">
+          <p className="text-[11px] text-white/15 text-center tracking-wide">
+            STMIK TAZKIA · Sapa AI © 2025
+          </p>
         </div>
       </div>
+
+      <style>{`
+        .verify-card {
+          animation: cardIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        @keyframes cardIn {
+          from { opacity: 0; transform: scale(0.94) translateY(12px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0); }
+        }
+        .otp-input::placeholder { color: rgba(255,255,255,0.15); }
+        .otp-input:focus {
+          border-color: rgba(99,102,241,0.7) !important;
+          background: rgba(99,102,241,0.15) !important;
+          box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+        }
+        .otp-input:disabled { opacity: 0.4; }
+      `}</style>
     </div>
   );
 };
