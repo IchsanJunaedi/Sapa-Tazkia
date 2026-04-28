@@ -20,6 +20,7 @@ async function truncateAll() {
   await prisma.rateLimitLog.deleteMany({});
   await prisma.bugReport.deleteMany({});
   await prisma.notification.deleteMany({});
+  await prisma.announcement.deleteMany({});
   await prisma.session.deleteMany({});
   await prisma.user.deleteMany({});
 }
