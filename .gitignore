@@ -24,4 +24,5 @@ backend/coverage/
 backend/test-results/
 backend/playwright-report/
 backend/.env.test
+backend/tests/e2e/.auth/
 

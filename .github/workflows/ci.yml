@@ -62,6 +62,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Prisma client
+        run: npx prisma generate
+
       - name: Run ESLint
         run: npm run lint
 
@@ -113,3 +116,179 @@ jobs:
 
       - name: Run tests
         run: npm test -- --ci --passWithNoTests --watchAll=false
+
+  e2e-ci:
+    name: E2E — Playwright
+    runs-on: ubuntu-latest
+    # Gated: only run when a PR is labeled `run-e2e` or when the secret is set.
+    # E2E spins up MySQL + Redis + backend + frontend and needs E2E_LOGIN_* to
+    # log into the protected /chat route, so it's opt-in by default.
+    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'run-e2e') }}
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: testpassword
+          MYSQL_DATABASE: sapa_tazkia_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -ptestpassword"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: mysql://root:testpassword@127.0.0.1:3306/sapa_tazkia_test
+      REDIS_URL: redis://127.0.0.1:6379
+      JWT_SECRET: ci-test-jwt-secret-32-chars-long-x
+      SESSION_SECRET: ci-test-session-secret-32-chars-xx
+      RATE_LIMIT_ENABLED: "false"
+      PORT: "5000"
+      FRONTEND_URL: http://localhost:3000
+      # Frontend dev server config
+      REACT_APP_API_URL: http://localhost:5000
+      CI: "true"
+      # Playwright E2E env — supply test account via GitHub Secrets.
+      E2E_BASE_URL: http://localhost:3000
+      E2E_TANYA_PATH: /chat
+      E2E_REQUIRES_AUTH: "true"
+      E2E_LOGIN_NIM: ${{ secrets.E2E_LOGIN_NIM }}
+      E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+      # OpenAI is required by the RAG pipeline the /chat UI invokes.
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      QDRANT_HOST: ${{ secrets.QDRANT_HOST }}
+      QDRANT_PORT: ${{ secrets.QDRANT_PORT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Apply Prisma schema to test DB
+        working-directory: backend
+        run: npx prisma db push --skip-generate
+
+      - name: Seed test user
+        working-directory: backend
+        env:
+          SEED_E2E_NIM: ${{ secrets.E2E_LOGIN_NIM }}
+          SEED_E2E_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+        run: |
+          node -e "
+          const bcrypt = require('bcryptjs');
+          const { PrismaClient } = require('@prisma/client');
+          const prisma = new PrismaClient();
+          (async () => {
+            const nim = process.env.SEED_E2E_NIM;
+            const password = process.env.SEED_E2E_PASSWORD;
+            if (!nim || !password) { console.log('No E2E creds — skipping seed'); return; }
+            const hash = await bcrypt.hash(password, 10);
+            await prisma.user.upsert({
+              where: { nim },
+              update: { passwordHash: hash, isEmailVerified: true, status: 'active' },
+              create: {
+                nim,
+                email: nim + '@test.local',
+                passwordHash: hash,
+                fullName: 'E2E Tester',
+                authMethod: 'nim',
+                userType: 'regular',
+                isProfileComplete: true,
+                isEmailVerified: true,
+                status: 'active',
+              },
+            });
+            console.log('Seeded E2E user:', nim);
+            await prisma.\$disconnect();
+          })();
+          "
+
+      - name: Install Playwright browsers
+        working-directory: backend
+        run: npx playwright install --with-deps chromium
+
+      - name: Start backend
+        working-directory: backend
+        run: |
+          npm start &
+          echo $! > /tmp/backend.pid
+          for i in {1..30}; do
+            curl -sf http://localhost:5000/health && break
+            sleep 2
+          done
+
+      - name: Build + serve frontend
+        working-directory: frontend
+        run: |
+          npm run build
+          npx serve -s build -l 3000 &
+          echo $! > /tmp/frontend.pid
+          for i in {1..30}; do
+            curl -sf http://localhost:3000/ && break
+            sleep 2
+          done
+
+      - name: Run Playwright E2E
+        working-directory: backend
+        run: npm run test:e2e
+
+      - name: Merge coverage (Jest + E2E)
+        if: always()
+        working-directory: backend
+        run: npm run coverage:merge || true
+
+      - name: Upload merged coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          files: backend/coverage/lcov.info
+          flags: e2e
+          name: e2e-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload Playwright report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            backend/playwright-report/
+            backend/test-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Stop servers
+        if: always()
+        run: |
+          [ -f /tmp/backend.pid ]  && kill "$(cat /tmp/backend.pid)"  || true
+          [ -f /tmp/frontend.pid ] && kill "$(cat /tmp/frontend.pid)" || true

@@ -1,0 +1,101 @@
+// backend/tests/e2e/authHelper.js
+//
+// Playwright login helper for tests that need access to protected routes
+// (e.g. /chat, /academic). Caches a logged-in storage state on disk so only
+// the first test pays the login cost.
+//
+// Usage inside a spec:
+//
+//   const { ensureLoggedIn } = require('./authHelper');
+//   test.use({ storageState: ensureLoggedIn.storageStatePath });
+//   test.beforeAll(async ({ browser }) => { await ensureLoggedIn(browser); });
+//
+// Required env:
+//   E2E_BASE_URL     (default http://localhost:3000)
+//   E2E_LOGIN_PATH   (default /login)
+//   E2E_LOGIN_NIM    (your test account NIM / username / email)
+//   E2E_LOGIN_PASSWORD
+//
+// Optional env to override selectors if your login form differs:
+//   E2E_LOGIN_NIM_SELECTOR       (default [name="nim"], fallback [name="email"])
+//   E2E_LOGIN_PASSWORD_SELECTOR  (default [name="password"])
+//   E2E_LOGIN_SUBMIT_SELECTOR    (default button[type="submit"])
+//   E2E_LOGIN_SUCCESS_URL        (regex fragment, default /(chat|dashboard|academic|home)/)
+
+const fs = require('fs');
+const path = require('path');
+
+const STORAGE_DIR = path.resolve(__dirname, '.auth');
+const STORAGE_STATE_PATH = path.join(STORAGE_DIR, 'user.json');
+
+const DEFAULTS = {
+  baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
+  loginPath: process.env.E2E_LOGIN_PATH || '/login',
+  nim: process.env.E2E_LOGIN_NIM || '',
+  password: process.env.E2E_LOGIN_PASSWORD || '',
+  nimSelector: process.env.E2E_LOGIN_NIM_SELECTOR || 'input[name="nim"], input[name="email"], input[type="email"]',
+  passwordSelector: process.env.E2E_LOGIN_PASSWORD_SELECTOR || 'input[name="password"], input[type="password"]',
+  submitSelector: process.env.E2E_LOGIN_SUBMIT_SELECTOR || 'button[type="submit"]',
+  successUrlPattern: new RegExp(process.env.E2E_LOGIN_SUCCESS_URL || '(chat|dashboard|academic|home)'),
+};
+
+/**
+ * Logs into the app via the login form and persists the authenticated storage
+ * state (cookies + localStorage) to `.auth/user.json` for reuse.
+ *
+ * Idempotent: if a valid storage state already exists on disk, it is returned
+ * directly and no browser traffic occurs.
+ *
+ * @param {import('@playwright/test').Browser} browser
+ * @returns {Promise<string>} absolute path to the storage state JSON file.
+ */
+async function ensureLoggedIn(browser) {
+  if (!DEFAULTS.nim || !DEFAULTS.password) {
+    throw new Error(
+      '[authHelper] Missing E2E_LOGIN_NIM / E2E_LOGIN_PASSWORD. ' +
+      'Set them in .env.test or the CI env before running protected E2E specs.'
+    );
+  }
+
+  if (fs.existsSync(STORAGE_STATE_PATH)) {
+    // Trust the cached state. Tests that hit stale tokens can delete the file
+    // or set E2E_FORCE_RELOGIN=1.
+    if (!process.env.E2E_FORCE_RELOGIN) return STORAGE_STATE_PATH;
+    fs.unlinkSync(STORAGE_STATE_PATH);
+  }
+
+  fs.mkdirSync(STORAGE_DIR, { recursive: true });
+
+  const context = await browser.newContext({ baseURL: DEFAULTS.baseURL });
+  const page = await context.newPage();
+
+  await page.goto(DEFAULTS.loginPath);
+
+  // Fill NIM / email. Prefer the first visible match.
+  const nimField = page.locator(DEFAULTS.nimSelector).first();
+  await nimField.waitFor({ state: 'visible', timeout: 15_000 });
+  await nimField.fill(DEFAULTS.nim);
+
+  const pwField = page.locator(DEFAULTS.passwordSelector).first();
+  await pwField.waitFor({ state: 'visible' });
+  await pwField.fill(DEFAULTS.password);
+
+  await page.locator(DEFAULTS.submitSelector).first().click();
+
+  // Wait for navigation away from /login — either a URL change or a known
+  // post-login route pattern. Fallback: 15s timeout with a descriptive error.
+  await page.waitForURL(
+    (url) => !url.pathname.startsWith(DEFAULTS.loginPath) || DEFAULTS.successUrlPattern.test(url.pathname),
+    { timeout: 20_000 }
+  );
+
+  await context.storageState({ path: STORAGE_STATE_PATH });
+  await context.close();
+
+  return STORAGE_STATE_PATH;
+}
+
+ensureLoggedIn.storageStatePath = STORAGE_STATE_PATH;
+ensureLoggedIn.STORAGE_DIR = STORAGE_DIR;
+
+module.exports = { ensureLoggedIn };
