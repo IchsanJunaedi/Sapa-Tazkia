@@ -90,12 +90,31 @@ async function ensureLoggedIn(browser) {
 
   await page.locator(DEFAULTS.submitSelector).first().click();
 
-  // Wait for navigation away from /login — either a URL change or a known
-  // post-login route pattern. Fallback: 15s timeout with a descriptive error.
-  await page.waitForURL(
-    (url) => !url.pathname.startsWith(DEFAULTS.loginPath) || DEFAULTS.successUrlPattern.test(url.pathname),
-    { timeout: 20_000 }
-  );
+  // Race: either we navigate away from /login (success) OR an error message
+  // appears on the page (credentials rejected). Detecting the error early
+  // avoids a cryptic 20-second timeout and surfaces the real problem.
+  await Promise.race([
+    page.waitForURL(
+      (url) => !url.pathname.startsWith(DEFAULTS.loginPath) || DEFAULTS.successUrlPattern.test(url.pathname),
+      { timeout: 20_000 }
+    ),
+    page
+      .locator('[class*="text-red"], [class*="error"], [role="alert"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .then(async () => {
+        const errText = await page
+          .locator('[class*="text-red"], [class*="error"], [role="alert"]')
+          .first()
+          .textContent()
+          .catch(() => '(unknown error)');
+        throw new Error(
+          `[authHelper] Login failed — the page showed an error: "${errText.trim()}"\n` +
+          `Check that E2E_LOGIN_NIM (${DEFAULTS.nim}) exists in the test database ` +
+          `and that the seed hashes the NIM itself as the password.`
+        );
+      }),
+  ]);
 
   await context.storageState({ path: STORAGE_STATE_PATH });
   await context.close();

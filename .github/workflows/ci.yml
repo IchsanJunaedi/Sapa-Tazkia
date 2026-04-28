@@ -227,7 +227,6 @@ jobs:
         working-directory: backend
         env:
           SEED_E2E_NIM: ${{ secrets.E2E_LOGIN_NIM }}
-          SEED_E2E_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
         run: |
           node -e "
           const bcrypt = require('bcryptjs');
@@ -235,9 +234,10 @@ jobs:
           const prisma = new PrismaClient();
           (async () => {
             const nim = process.env.SEED_E2E_NIM;
-            const password = process.env.SEED_E2E_PASSWORD;
-            if (!nim || !password) { console.log('No E2E creds — skipping seed'); return; }
-            const hash = await bcrypt.hash(password, 10);
+            if (!nim) { console.log('No E2E_NIM — skipping seed'); return; }
+            // LoginPage sends NIM as password (loginWithCredentials(nim, nim)),
+            // so we must hash the NIM itself as the password.
+            const hash = await bcrypt.hash(nim, 10);
             await prisma.user.upsert({
               where: { nim },
               update: { passwordHash: hash, isEmailVerified: true, status: 'active' },

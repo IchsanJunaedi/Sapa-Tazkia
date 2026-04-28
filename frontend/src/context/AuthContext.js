@@ -263,7 +263,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔍 [AUTH CONTEXT] loginWithCredentials called with NIM:', nim);
 
-      const response = await api.post('/auth/login', { nim, password });
+      const response = await api.post('/auth/login', { identifier: nim, password });
 
       console.log('🔍 [AUTH CONTEXT] Login API Response:', {
         status: response.status,
