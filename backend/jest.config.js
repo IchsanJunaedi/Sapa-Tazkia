@@ -10,6 +10,11 @@ module.exports = {
   setupFiles: ['./tests/setup.js'],
   testTimeout: 30000,
   verbose: true,
+  // Integration tests share a single MySQL DB with unique constraints on
+  // emails/NIMs. Running suites in parallel causes seed conflicts. Force
+  // sequential execution for stability — coverage workload is small enough
+  // that wall-clock impact is negligible.
+  maxWorkers: 1,
 
   // ---------------------------------------------------------------
   // Reporters
