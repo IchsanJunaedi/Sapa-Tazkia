@@ -10,6 +10,26 @@ module.exports = {
   setupFiles: ['./tests/setup.js'],
   testTimeout: 30000,
   verbose: true,
+
+  // ---------------------------------------------------------------
+  // Reporters
+  //  - default: pretty console output for humans.
+  //  - jest-junit: JUnit XML for Codecov Test Analytics (flaky/failed
+  //    test tracking). Output at tests-report/junit.xml — uploaded by
+  //    codecov/test-results-action@v1 in the CI workflow.
+  // Override locally with: JEST_REPORTERS=default
+  // ---------------------------------------------------------------
+  reporters: [
+    'default',
+    ['jest-junit', {
+      outputDirectory: 'tests-report',
+      outputName: 'junit.xml',
+      classNameTemplate: '{filepath}',
+      titleTemplate: '{classname} > {title}',
+      ancestorSeparator: ' > ',
+      usePathForSuiteName: 'true',
+    }],
+  ],
   moduleNameMapper: {
     '^pdf-parse$': '<rootDir>/tests/__mocks__/pdf-parse.js',
     '^otplib$': '<rootDir>/tests/__mocks__/otplib.js',

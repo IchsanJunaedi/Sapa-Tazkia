@@ -22,6 +22,7 @@ backend/add_token_usage_col.js
 # Test / coverage outputs
 backend/coverage/
 backend/test-results/
+backend/tests-report/
 backend/playwright-report/
 backend/.env.test
 backend/tests/e2e/.auth/
