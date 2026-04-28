@@ -20,6 +20,7 @@ async function truncateAll() {
   await prisma.rateLimitLog.deleteMany({});
   await prisma.bugReport.deleteMany({});
   await prisma.notification.deleteMany({});
+  await prisma.announcement.deleteMany({});
   await prisma.session.deleteMany({});
   await prisma.user.deleteMany({});
 }
@@ -38,11 +39,11 @@ async function seedTestUser(overrides = {}) {
       nim:               overrides.nim       || '2021001001',
       email:             overrides.email     || 'test@student.tazkia.ac.id',
       passwordHash,
-      authMethod:        'nim',
-      userType:          'student',
-      status:            'active',
-      isEmailVerified:   true,
-      isProfileComplete: true,
+      authMethod:        overrides.authMethod        || 'nim',
+      userType:          overrides.userType          || 'student',
+      status:            overrides.status            || 'active',
+      isEmailVerified:   overrides.isEmailVerified   ?? true,
+      isProfileComplete: overrides.isProfileComplete ?? true,
     },
   });
 
