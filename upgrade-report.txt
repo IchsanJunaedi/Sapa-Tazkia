@@ -1,0 +1,165 @@
+================================================================================
+  SAPA TAZKIA — PRODUCTION UPGRADE REPORT
+  Tanggal   : 5 April 2026
+  Kategori  : Frontend Performance, UI Polish, PWA, SEO, Backend
+================================================================================
+
+RINGKASAN EKSEKUTIF
+-------------------
+Upgrade ini bertujuan memastikan aplikasi Sapa Tazkia siap untuk environment
+Production dengan performa optimal, UI yang premium & profesional, serta
+backend yang tahan banting. Total 10 file diubah/ditambah.
+
+================================================================================
+1. FRONTEND PERFORMANCE — CODE SPLITTING & ERROR HANDLING
+================================================================================
+
+[MODIFIED] frontend/src/App.js
+  - Semua 15 halaman (page) kini menggunakan React.lazy() untuk code splitting.
+  - Setiap page di-load on-demand (lazy) sehingga initial bundle size JAUH
+    lebih kecil. User tidak perlu menunggu seluruh aplikasi ter-download
+    untuk bisa menggunakan halaman pertama.
+  - Ditambahkan <Suspense> wrapper dengan LoadingFallback premium.
+  - Ditambahkan <ErrorBoundary> wrapper untuk mencegah blank white screen
+    jika terjadi error di salah satu komponen React.
+  - Pages yang di-lazy-load:
+      MarketingLandingPage, LandingPage, LoginPage, ChatPage, AboutYouPage,
+      AuthCallback, VerifyEmailPage, AcademicPage, AdminDashboard, AdminLogin,
+      HelpCenterPage, TermsPoliciesPage, ReportBugPage, TentangPage, DocsPage
+
+[NEW] frontend/src/components/common/ErrorBoundary.jsx
+  - Komponen ErrorBoundary class-based (React best practice).
+  - Menampilkan UI premium jika terjadi crash (ikon, pesan, tombol reload/home).
+  - Menampilkan error details di mode development saja.
+
+[NEW] frontend/src/components/common/LoadingFallback.jsx
+  - Komponen loading premium untuk Suspense boundaries.
+  - Animasi pulse dan bounce dots dengan branding Sapa Tazkia.
+  - Ditampilkan saat page sedang di-download pertama kali.
+
+================================================================================
+2. FRONTEND UI POLISH — SKELETON LOADING
+================================================================================
+
+[NEW] frontend/src/components/common/SkeletonLoader.jsx
+  - Suite lengkap komponen skeleton loading yang reusable:
+      SkeletonBlock     : Blok dasar dengan animasi shimmer
+      SkeletonCard      : Untuk KPI card di admin dashboard
+      SkeletonTableRow  : Untuk baris tabel (knowledge base, users, dll)
+      SkeletonTable     : Untuk tabel penuh
+      SkeletonChatMessage : Untuk bubble chat saat loading
+      SkeletonDashboardGrid : Grid 6 card untuk admin dashboard
+      SkeletonChart     : Untuk area chart/bar chart
+      SkeletonPage      : Full page skeleton
+  - Bisa langsung digunakan di AdminDashboard, ChatPage, dll menggantikan
+    teks "Loading..." atau spinner sederhana.
+
+[MODIFIED] frontend/src/index.css
+  - Ditambahkan @keyframes shimmer untuk animasi skeleton loader.
+  - Ditambahkan class .page-enter dan .page-enter-active untuk transisi
+    halaman yang smooth.
+
+================================================================================
+3. PWA (PROGRESSIVE WEB APP) ENHANCEMENT
+================================================================================
+
+[MODIFIED] frontend/public/manifest.json
+  - Ditambahkan field 'description' untuk metadata PWA.
+  - Ikon 192x192 dan 512x512 kini memiliki purpose: "any maskable" agar
+    bisa tampil adaptif di Android (rounded, squircle, dsb).
+  - start_url diubah ke "/" (dari ".").
+  - Ditambahkan scope, orientation, categories, lang, dir.
+  - theme_color dan background_color disesuaikan ke #09090b (dark theme).
+
+================================================================================
+4. SEO & PERFORMANCE OPTIMIZATION
+================================================================================
+
+[MODIFIED] frontend/public/sitemap.xml
+  - Diperluas dari 2 halaman menjadi 7 halaman publik:
+      /, /chat, /login, /help, /terms, /tentang, /docs
+  - Setiap URL memiliki changefreq dan priority yang sesuai.
+
+[MODIFIED] frontend/public/index.html
+  - theme-color kini responsif (gelap/terang via media query).
+  - Ditambahkan DNS prefetch untuk fonts.googleapis.com, fonts.gstatic.com,
+    dan api.fontshare.com untuk mengurangi latency koneksi font.
+
+================================================================================
+5. BACKEND — PROCESS MANAGEMENT & DATABASE INDEXING
+================================================================================
+
+[MODIFIED] backend/ecosystem.config.js (PM2 Config)
+  - Ditambahkan node_args: '--max-old-space-size=512' untuk optimalisasi memori.
+  - ignore_watch: menghindari restart tidak perlu dari node_modules, logs, dll.
+  - kill_timeout: 10 detik untuk graceful shutdown.
+  - listen_timeout: 8 detik batas tunggu koneksi.
+  - exp_backoff_restart_delay: exponential backoff saat restart berulang.
+  - min_uptime: 10 detik minimum uptime sebelum dianggap stabil.
+  - log_type: 'json' untuk structured logging yang mudah di-parse.
+  - log_date_format: ditambahkan timezone.
+
+[MODIFIED] backend/prisma/schema.prisma (Database Indexes)
+  - User model:
+      @@index([email])            — pencarian user by email
+      @@index([status])           — filter user by status
+      @@index([lastLogin])        — sorting by last login
+      @@index([programStudiId])   — filter by program studi
+  - Session model:
+      @@index([userId])           — lookup session by user
+      @@index([expiresAt])        — cleanup expired sessions
+      @@index([isActive])         — filter active sessions
+  - Conversation model:
+      @@index([userId])           — lookup conversations by user
+      @@index([updatedAt])        — sorting by recent activity
+  - Message model:
+      @@index([conversationId])   — lookup messages by conversation
+      @@index([createdAt])        — sorting messages chronologically
+  TOTAL: 11 index baru ditambahkan.
+
+  CATATAN: Setelah deploy, jalankan:
+    npx prisma db push
+  untuk menerapkan index baru ke database production.
+
+================================================================================
+DAFTAR FILE YANG BERUBAH
+================================================================================
+
+  [NEW]      frontend/src/components/common/ErrorBoundary.jsx
+  [NEW]      frontend/src/components/common/LoadingFallback.jsx
+  [NEW]      frontend/src/components/common/SkeletonLoader.jsx
+  [MODIFIED] frontend/src/App.js
+  [MODIFIED] frontend/src/index.css
+  [MODIFIED] frontend/public/manifest.json
+  [MODIFIED] frontend/public/sitemap.xml
+  [MODIFIED] frontend/public/index.html
+  [MODIFIED] backend/ecosystem.config.js
+  [MODIFIED] backend/prisma/schema.prisma
+
+================================================================================
+VERIFIKASI
+================================================================================
+
+  [PASS] npm run build  — React production build berhasil (exit code 0)
+  [PASS] Code splitting — 15 halaman di-lazy-load via React.lazy()
+  [PASS] ErrorBoundary  — Wrap seluruh app tree
+  [PASS] Skeleton Suite  — 8 komponen skeleton siap pakai
+  [PASS] PWA manifest   — Valid dengan maskable icons
+  [PASS] Sitemap        — 7 URL publik tercantum
+  [PASS] DB Indexes     — 11 index baru pada 4 model Prisma
+
+================================================================================
+LANGKAH SELANJUTNYA (OPSIONAL)
+================================================================================
+
+  1. Integrasikan SkeletonLoader ke AdminDashboard.jsx dan ChatPage.jsx
+     (mengganti spinner/teks loading yang ada saat ini).
+  2. Jalankan `npx prisma db push` di server production untuk menerapkan
+     index database baru.
+  3. Pertimbangkan menambah react-helmet-async untuk dynamic meta tags
+     per halaman (jika SEO per-page dibutuhkan).
+  4. Test PWA install di Chrome mobile (Add to Home Screen).
+
+================================================================================
+  END OF REPORT
+================================================================================

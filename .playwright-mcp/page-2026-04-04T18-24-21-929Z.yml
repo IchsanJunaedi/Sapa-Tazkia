@@ -1,0 +1,99 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - button "Sapa Tazkia Sapa Tazkia" [ref=e7] [cursor=pointer]:
+        - img "Sapa Tazkia" [ref=e8]
+        - generic [ref=e9]: Sapa Tazkia
+      - navigation [ref=e10]:
+        - generic [ref=e11]:
+          - paragraph [ref=e12]: Panduan
+          - generic [ref=e13]:
+            - button "Beranda Docs" [ref=e14] [cursor=pointer]:
+              - img [ref=e16]
+              - text: Beranda Docs
+            - button "Pelajari Fitur" [ref=e18] [cursor=pointer]:
+              - img [ref=e20]
+              - text: Pelajari Fitur
+            - button "Cara Kerja" [ref=e22] [cursor=pointer]:
+              - img [ref=e24]
+              - text: Cara Kerja
+        - generic [ref=e32]:
+          - paragraph [ref=e33]: Dukungan
+          - generic [ref=e34]:
+            - button "Help Center" [ref=e35] [cursor=pointer]:
+              - img [ref=e37]
+              - text: Help Center
+            - button "Contact" [ref=e40] [cursor=pointer]:
+              - img [ref=e42]
+              - text: Contact
+        - generic [ref=e45]:
+          - paragraph [ref=e46]: Informasi
+          - generic [ref=e47]:
+            - button "Terms & Policies" [ref=e48] [cursor=pointer]:
+              - img [ref=e50]
+              - text: Terms & Policies
+            - button "Team Dev" [ref=e52] [cursor=pointer]:
+              - img [ref=e54]
+              - text: Team Dev
+  - generic [ref=e59]:
+    - banner [ref=e60]:
+      - button "Docs" [ref=e62] [cursor=pointer]
+      - link "← Beranda" [ref=e64] [cursor=pointer]:
+        - /url: /
+    - main [ref=e65]:
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - generic [ref=e70]:
+            - img [ref=e71]
+            - text: Dokumentasi v1.0
+          - heading "Pusat Bantuan & Dokumentasi Sapa Tazkia" [level=1] [ref=e74]:
+            - text: Pusat Bantuan &
+            - text: Dokumentasi Sapa Tazkia
+          - paragraph [ref=e75]: Temukan panduan lengkap, jawaban atas pertanyaan umum, informasi fitur, dan cara kerja sistem SAPA — asisten akademik berbasis AI untuk mahasiswa STMIK Tazkia.
+        - generic [ref=e76]:
+          - img [ref=e77]
+          - textbox "Cari dokumentasi..." [ref=e80]
+          - generic: ⌘K
+        - generic [ref=e81]:
+          - button "Mulai Chatbot" [ref=e82] [cursor=pointer]:
+            - img [ref=e83]
+            - text: Mulai Chatbot
+          - button "Lihat Panduan" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - text: Lihat Panduan
+        - generic [ref=e88]:
+          - button "Pelajari Fitur Eksplorasi semua kemampuan SAPA — dari chat AI, manajemen nilai, hingga analitik akademik. Baca selengkapnya" [ref=e89] [cursor=pointer]:
+            - img [ref=e91]
+            - heading "Pelajari Fitur" [level=3] [ref=e93]
+            - paragraph [ref=e94]: Eksplorasi semua kemampuan SAPA — dari chat AI, manajemen nilai, hingga analitik akademik.
+            - generic [ref=e95]:
+              - text: Baca selengkapnya
+              - img [ref=e96]
+          - button "Help Center Jawaban atas pertanyaan umum seputar akun, chat AI, transkrip, dan privasi data. Baca selengkapnya" [ref=e98] [cursor=pointer]:
+            - img [ref=e100]
+            - heading "Help Center" [level=3] [ref=e103]
+            - paragraph [ref=e104]: Jawaban atas pertanyaan umum seputar akun, chat AI, transkrip, dan privasi data.
+            - generic [ref=e105]:
+              - text: Baca selengkapnya
+              - img [ref=e106]
+          - button "Cara Kerja Pahami arsitektur RAG dan bagaimana SAPA memproses pertanyaanmu secara cerdas. Baca selengkapnya" [ref=e108] [cursor=pointer]:
+            - img [ref=e110]
+            - heading "Cara Kerja" [level=3] [ref=e118]
+            - paragraph [ref=e119]: Pahami arsitektur RAG dan bagaimana SAPA memproses pertanyaanmu secara cerdas.
+            - generic [ref=e120]:
+              - text: Baca selengkapnya
+              - img [ref=e121]
+          - button "Terms & Policies Baca syarat layanan, kebijakan privasi, dan hak serta kewajiban pengguna SAPA. Baca selengkapnya" [ref=e123] [cursor=pointer]:
+            - img [ref=e125]
+            - heading "Terms & Policies" [level=3] [ref=e127]
+            - paragraph [ref=e128]: Baca syarat layanan, kebijakan privasi, dan hak serta kewajiban pengguna SAPA.
+            - generic [ref=e129]:
+              - text: Baca selengkapnya
+              - img [ref=e130]
+    - contentinfo [ref=e132]:
+      - paragraph [ref=e133]: © 2026 SAPA Tazkia — STMIK Tazkia
+      - generic [ref=e134]:
+        - button "Terms" [ref=e135] [cursor=pointer]
+        - button "Contact" [ref=e136] [cursor=pointer]
+        - link "Report Bug" [ref=e137] [cursor=pointer]:
+          - /url: /report-bug

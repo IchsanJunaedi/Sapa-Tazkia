@@ -1,0 +1,64 @@
+- generic [ref=e4]:
+  - button "Kembali" [ref=e5] [cursor=pointer]:
+    - img [ref=e6]
+    - text: Kembali
+  - heading "Help Center" [level=1] [ref=e8]
+  - paragraph [ref=e9]: Temukan jawaban atas pertanyaan kamu di sini.
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - heading "Akun & Login" [level=2] [ref=e12]
+      - generic [ref=e13]:
+        - button "Bagaimana cara login ke SAPA?" [ref=e15] [cursor=pointer]:
+          - generic [ref=e16]: Bagaimana cara login ke SAPA?
+          - img [ref=e17]
+        - button "Apakah saya bisa login dengan Google?" [ref=e20] [cursor=pointer]:
+          - generic [ref=e21]: Apakah saya bisa login dengan Google?
+          - img [ref=e22]
+        - button "Bagaimana jika lupa password?" [ref=e25] [cursor=pointer]:
+          - generic [ref=e26]: Bagaimana jika lupa password?
+          - img [ref=e27]
+        - button "Bagaimana cara menghapus akun saya?" [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: Bagaimana cara menghapus akun saya?
+          - img [ref=e32]
+    - generic [ref=e34]:
+      - heading "Chat AI" [level=2] [ref=e35]
+      - generic [ref=e36]:
+        - button "Apa itu SAPA dan bagaimana cara kerjanya?" [ref=e38] [cursor=pointer]:
+          - generic [ref=e39]: Apa itu SAPA dan bagaimana cara kerjanya?
+          - img [ref=e40]
+        - button "Apa itu RAG (Retrieval-Augmented Generation)?" [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]: Apa itu RAG (Retrieval-Augmented Generation)?
+          - img [ref=e45]
+        - button "Berapa batas pesan yang bisa saya kirim?" [ref=e48] [cursor=pointer]:
+          - generic [ref=e49]: Berapa batas pesan yang bisa saya kirim?
+          - img [ref=e50]
+        - button "Mengapa jawaban AI kadang berbeda untuk pertanyaan yang sama?" [ref=e53] [cursor=pointer]:
+          - generic [ref=e54]: Mengapa jawaban AI kadang berbeda untuk pertanyaan yang sama?
+          - img [ref=e55]
+    - generic [ref=e57]:
+      - heading "Nilai & Transkrip" [level=2] [ref=e58]
+      - generic [ref=e59]:
+        - button "Bagaimana cara melihat nilai saya?" [ref=e61] [cursor=pointer]:
+          - generic [ref=e62]: Bagaimana cara melihat nilai saya?
+          - img [ref=e63]
+        - button "Apakah data nilai saya aman?" [ref=e66] [cursor=pointer]:
+          - generic [ref=e67]: Apakah data nilai saya aman?
+          - img [ref=e68]
+        - button "Bagaimana cara memperbarui data akademik?" [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]: Bagaimana cara memperbarui data akademik?
+          - img [ref=e73]
+    - generic [ref=e75]:
+      - heading "Privasi & Keamanan" [level=2] [ref=e76]
+      - generic [ref=e77]:
+        - button "Di mana data saya disimpan?" [ref=e79] [cursor=pointer]:
+          - generic [ref=e80]: Di mana data saya disimpan?
+          - img [ref=e81]
+        - button "Apakah percakapan saya dengan AI disimpan?" [ref=e84] [cursor=pointer]:
+          - generic [ref=e85]: Apakah percakapan saya dengan AI disimpan?
+          - img [ref=e86]
+        - button "Bagaimana SAPA melindungi data pengguna?" [ref=e89] [cursor=pointer]:
+          - generic [ref=e90]: Bagaimana SAPA melindungi data pengguna?
+          - img [ref=e91]
+  - generic [ref=e93]:
+    - paragraph [ref=e94]: Tidak menemukan jawaban yang kamu cari?
+    - button "Laporkan masalah" [ref=e95] [cursor=pointer]

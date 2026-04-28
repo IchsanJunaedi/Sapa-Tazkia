@@ -1,0 +1,18 @@
+- generic [ref=e4]:
+  - button [ref=e6] [cursor=pointer]:
+    - img [ref=e7]
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - paragraph [ref=e13]: Selamat datang
+      - heading "Log in or sign up" [level=2] [ref=e14]
+      - paragraph [ref=e15]: Panduan akademik lebih cerdas dengan Sapa Tazkia.
+    - button "Lanjutkan dengan Google" [ref=e16] [cursor=pointer]:
+      - img [ref=e17]
+      - text: Lanjutkan dengan Google
+    - generic [ref=e24]: ATAU
+    - generic [ref=e26]:
+      - textbox "Email atau NIM" [ref=e27]
+      - paragraph [ref=e28]: Gunakan email kampus Tazkia atau NIM Anda
+    - button "Lanjutkan" [disabled] [ref=e29]
+    - button "Kembali" [ref=e30] [cursor=pointer]
+  - paragraph [ref=e32]: STMIK TAZKIA · Sapa AI © 2025

@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "E:\\sapa-tazkia\\backend\\logs\\.4027f7e311178677cfe5bac20a55b52c873da313-audit.json",
+    "files": [
+        {
+            "date": 1773904509328,
+            "name": "E:\\sapa-tazkia\\backend\\logs\\error-2026-03-19.log",
+            "hash": "121f0eb1f38fed4d158a919a7c004a07972d04155f4879a110a4c85547188928"
+        }
+    ],
+    "hashType": "sha256"
+}

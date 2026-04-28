@@ -76,7 +76,7 @@ jobs:
 
       - name: Upload backend coverage to Codecov
         if: always()
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: backend/coverage/jest/lcov.info
           flags: backend
@@ -169,6 +169,11 @@ jobs:
           --health-interval=5s
           --health-timeout=3s
           --health-retries=5
+
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports:
+          - 6333:6333
 
     env:
       NODE_ENV: test
@@ -294,7 +299,7 @@ jobs:
 
       - name: Upload merged coverage to Codecov
         if: ${{ always() && hashFiles('backend/coverage/lcov.info') != '' }}
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: backend/coverage/lcov.info
           flags: e2e

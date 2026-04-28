@@ -1,0 +1,59 @@
+- generic [ref=e3]:
+  - button "Kembali" [ref=e5] [cursor=pointer]:
+    - img [ref=e6]
+    - text: Kembali
+  - generic [ref=e8]:
+    - heading "Sapa Tazkia" [level=1] [ref=e9]
+    - paragraph [ref=e10]: AI Chatbot Akademik — Universitas Tazkia
+    - paragraph [ref=e11]:
+      - strong [ref=e12]: Sapa Tazkia
+      - text: adalah asisten kecerdasan buatan (AI) berbasis
+      - emphasis [ref=e13]: Retrieval-Augmented Generation (RAG)
+      - text: yang dirancang khusus untuk mendukung kegiatan akademik mahasiswa
+      - strong [ref=e14]: Universitas Tazkia
+      - text: . Platform chatbot ini memungkinkan kamu mendapatkan informasi tentang jadwal kuliah, nilai akademik, dan materi perkuliahan secara instan dan akurat.
+    - paragraph [ref=e15]:
+      - text: Dengan memanfaatkan teknologi AI terkini dan basis data pengetahuan kampus, Sapa Tazkia hadir sebagai solusi digitalisasi layanan pendidikan yang cerdas. Chatbot ini memahami konteks pertanyaan dalam bahasa Indonesia dan memberikan jawaban yang relevan sesuai kurikulum dan regulasi
+      - strong [ref=e16]: Universitas Tazkia
+      - text: .
+    - paragraph [ref=e17]:
+      - text: Sapa Tazkia merupakan wujud nyata penerapan
+      - strong [ref=e18]: teknologi AI
+      - text: dalam dunia pendidikan tinggi Indonesia — menggabungkan inovasi, aksesibilitas, dan kualitas layanan akademik dalam satu platform terintegrasi.
+    - heading "Fitur Utama" [level=2] [ref=e19]
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - heading "Tanya Jawab Akademik" [level=3] [ref=e22]
+        - paragraph [ref=e23]: Jawab pertanyaan seputar jadwal, nilai, dan mata kuliah menggunakan basis pengetahuan kampus secara real-time.
+      - generic [ref=e24]:
+        - heading "Berbasis RAG & AI" [level=3] [ref=e25]
+        - paragraph [ref=e26]: Menggunakan Retrieval-Augmented Generation untuk jawaban yang akurat dan relevan, bukan sekadar template.
+      - generic [ref=e27]:
+        - heading "Akses Multi-Platform" [level=3] [ref=e28]
+        - paragraph [ref=e29]: Tersedia di browser desktop maupun mobile. Login dengan NIM atau akun Google kampus kamu.
+    - generic [ref=e30]:
+      - heading "Tentang Pengembang" [level=2] [ref=e31]
+      - paragraph [ref=e32]:
+        - text: Sapa Tazkia dikembangkan oleh tim mahasiswa Program Studi Sistem Informasi
+        - strong [ref=e33]: STMIK Tazkia
+        - text: sebagai proyek riset terapan di bidang kecerdasan buatan dan sistem informasi akademik. Proyek ini dibimbing oleh dosen dan staf IT STMIK Tazkia untuk memastikan kualitas, keamanan, dan relevansi terhadap kebutuhan civitas akademika.
+      - paragraph [ref=e34]: Kami berkomitmen untuk terus meningkatkan kemampuan AI ini berdasarkan feedback dari mahasiswa dan kebutuhan nyata lingkungan kampus.
+    - generic [ref=e36]:
+      - generic [ref=e37]:
+        - paragraph [ref=e38]: Sapa Tazkia
+        - paragraph [ref=e39]: AI Chatbot Akademik — STMIK Tazkia
+        - paragraph [ref=e40]: Bogor, Jawa Barat, Indonesia
+      - generic [ref=e41]:
+        - paragraph [ref=e42]: Kontak
+        - paragraph [ref=e43]:
+          - text: "Email:"
+          - link "sapa@stmik.tazkia.ac.id" [ref=e44] [cursor=pointer]:
+            - /url: mailto:sapa@stmik.tazkia.ac.id
+        - paragraph [ref=e45]:
+          - text: "Website:"
+          - link "stmik-tazkia.ac.id" [ref=e46] [cursor=pointer]:
+            - /url: https://sapa.tazkia.ac.id
+      - generic [ref=e47]:
+        - paragraph [ref=e48]: Legal
+        - paragraph [ref=e49]: © 2026 STMIK Tazkia.
+        - paragraph [ref=e50]: Hak cipta dilindungi undang-undang.
