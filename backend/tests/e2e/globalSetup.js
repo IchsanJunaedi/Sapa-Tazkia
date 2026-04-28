@@ -7,10 +7,13 @@ function loadE2EEnv() {
   const backendRoot = path.resolve(__dirname, '../..');
   const envTestPath = path.join(backendRoot, '.env.test');
   const envPath = path.join(backendRoot, '.env');
-  const selectedEnvPath = fs.existsSync(envTestPath) ? envTestPath : envPath;
 
-  if (fs.existsSync(selectedEnvPath)) {
-    dotenv.config({ path: selectedEnvPath });
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+  }
+
+  if (fs.existsSync(envTestPath)) {
+    dotenv.config({ path: envTestPath, override: true });
   }
 }
 

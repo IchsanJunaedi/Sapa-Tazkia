@@ -15,7 +15,7 @@ const { test, expect } = require('./fixtures');
 // -----------------------------------------------------------------------------
 // Config — override via env.
 // -----------------------------------------------------------------------------
-const TANYA_PAGE_PATH = process.env.E2E_TANYA_PATH || '/chat';
+const TANYA_PAGE_PATH = process.env.E2E_TANYA_PATH || '/chat/new';
 
 // Protected routes (default /chat) need an authenticated session. When auth is
 // required, Playwright loads a pre-generated storage state from globalSetup

@@ -6,8 +6,9 @@
 
 const { defineConfig, devices } = require('@playwright/test');
 
-const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:3000';
+const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:3100';
 const REQUIRES_AUTH = (process.env.E2E_REQUIRES_AUTH || 'true').toLowerCase() !== 'false';
+const FRONTEND_PORT = new URL(BASE_URL).port || '3100';
 
 module.exports = defineConfig({
   testDir: './tests/e2e',
@@ -36,11 +37,30 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // Uncomment to auto-start the frontend dev server before E2E runs.
-  // webServer: {
-  //   command: 'npm --prefix ../frontend start',
-  //   url: BASE_URL,
-  //   reuseExistingServer: !process.env.CI,
-  //   timeout: 120_000,
-  // },
+  webServer: [
+    {
+      command: 'npm start',
+      cwd: '.',
+      url: 'http://localhost:5000/health',
+      reuseExistingServer: true,
+      timeout: 180_000,
+      env: {
+        ...process.env,
+        FRONTEND_URL: BASE_URL,
+      },
+    },
+    {
+      command: 'npm start',
+      cwd: '../frontend',
+      url: BASE_URL,
+      reuseExistingServer: true,
+      timeout: 180_000,
+      env: {
+        ...process.env,
+        BROWSER: 'none',
+        PORT: FRONTEND_PORT,
+        REACT_APP_API_URL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
+      },
+    },
+  ],
 });

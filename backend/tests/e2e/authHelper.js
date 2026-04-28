@@ -17,8 +17,8 @@
 //   E2E_LOGIN_PASSWORD
 //
 // Optional env to override selectors if your login form differs:
-//   E2E_LOGIN_NIM_SELECTOR       (default [name="nim"], fallback [name="email"])
-//   E2E_LOGIN_PASSWORD_SELECTOR  (default [name="password"])
+//   E2E_LOGIN_NIM_SELECTOR       (default supports "Email atau NIM" single-field login)
+//   E2E_LOGIN_PASSWORD_SELECTOR  (default [name="password"], optional)
 //   E2E_LOGIN_SUBMIT_SELECTOR    (default button[type="submit"])
 //   E2E_LOGIN_SUCCESS_URL        (regex fragment, default /(chat|dashboard|academic|home)/)
 
@@ -29,11 +29,13 @@ const STORAGE_DIR = path.resolve(__dirname, '.auth');
 const STORAGE_STATE_PATH = path.join(STORAGE_DIR, 'user.json');
 
 const DEFAULTS = {
-  baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
+  baseURL: process.env.E2E_BASE_URL || 'http://localhost:3100',
   loginPath: process.env.E2E_LOGIN_PATH || '/login',
   nim: process.env.E2E_LOGIN_NIM || '',
   password: process.env.E2E_LOGIN_PASSWORD || '',
-  nimSelector: process.env.E2E_LOGIN_NIM_SELECTOR || 'input[name="nim"], input[name="email"], input[type="email"]',
+  nimSelector:
+    process.env.E2E_LOGIN_NIM_SELECTOR ||
+    'input[name="nim"], input[name="email"], input[type="email"], input[placeholder="Email atau NIM"], input[type="text"]',
   passwordSelector: process.env.E2E_LOGIN_PASSWORD_SELECTOR || 'input[name="password"], input[type="password"]',
   submitSelector: process.env.E2E_LOGIN_SUBMIT_SELECTOR || 'button[type="submit"]',
   successUrlPattern: new RegExp(process.env.E2E_LOGIN_SUCCESS_URL || '(chat|dashboard|academic|home)'),
@@ -77,8 +79,14 @@ async function ensureLoggedIn(browser) {
   await nimField.fill(DEFAULTS.nim);
 
   const pwField = page.locator(DEFAULTS.passwordSelector).first();
-  await pwField.waitFor({ state: 'visible' });
-  await pwField.fill(DEFAULTS.password);
+  const hasVisiblePasswordField = await pwField
+    .waitFor({ state: 'visible', timeout: 2_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (hasVisiblePasswordField) {
+    await pwField.fill(DEFAULTS.password);
+  }
 
   await page.locator(DEFAULTS.submitSelector).first().click();
 

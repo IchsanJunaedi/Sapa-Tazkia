@@ -189,7 +189,7 @@ jobs:
       CI: "true"
       # Playwright E2E env — supply test account via GitHub Secrets.
       E2E_BASE_URL: http://localhost:3000
-      E2E_TANYA_PATH: /chat
+      E2E_TANYA_PATH: /chat/new
       E2E_REQUIRES_AUTH: "true"
       E2E_LOGIN_NIM: ${{ secrets.E2E_LOGIN_NIM }}
       E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
