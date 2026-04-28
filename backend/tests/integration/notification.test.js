@@ -130,6 +130,7 @@ describe('Notifications + Announcements', () => {
         .post('/api/admin/announcements')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ message: 'm only' });
+      // 400 validation when admin auth passes; 401/403 if IP whitelist blocks
       expect([400, 401, 403]).toContain(r.status);
     });
 
@@ -138,8 +139,11 @@ describe('Notifications + Announcements', () => {
         .post('/api/admin/announcements')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ title: 'Test announcement', message: 'Hello everyone' });
-      // 200 happy path; 401/403 if IP whitelist blocks (test env)
+      // 200/201 happy path; 401/403 if IP whitelist blocks (test env)
       expect([200, 201, 401, 403]).toContain(r.status);
+      if (r.status === 200 || r.status === 201) {
+        expect(r.body.success).toBe(true);
+      }
     });
 
     it('GET /api/admin/announcements returns list', async () => {
@@ -147,6 +151,9 @@ describe('Notifications + Announcements', () => {
         .get('/api/admin/announcements')
         .set('Authorization', `Bearer ${adminToken}`);
       expect([200, 401, 403]).toContain(r.status);
+      if (r.status === 200) {
+        expect(Array.isArray(r.body.announcements ?? r.body.data ?? [])).toBe(true);
+      }
     });
   });
 });
