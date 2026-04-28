@@ -1,0 +1,80 @@
+#
+# Codecov configuration — target 75% total coverage.
+# Docs: https://docs.codecov.com/docs/codecov-yaml
+#
+codecov:
+  require_ci_to_pass: true
+  notify:
+    wait_for_ci: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "60...90"
+
+  status:
+    project:
+      default:
+        target: 75%
+        threshold: 2%
+        base: auto
+        if_ci_failed: error
+        informational: false
+      backend:
+        target: 75%
+        threshold: 2%
+        flags:
+          - backend
+      frontend:
+        target: 70%
+        threshold: 2%
+        flags:
+          - frontend
+        informational: true
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+        base: auto
+
+flags:
+  backend:
+    paths:
+      - backend/src/
+    carryforward: true
+  frontend:
+    paths:
+      - frontend/src/
+    carryforward: true
+  e2e:
+    paths:
+      - frontend/src/
+      - backend/src/
+    carryforward: true
+
+comment:
+  layout: "header, diff, flags, components, files, footer"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  show_carryforward_flags: true
+
+ignore:
+  - "**/node_modules/**"
+  - "**/tests/**"
+  - "**/__tests__/**"
+  - "**/__mocks__/**"
+  - "**/*.test.js"
+  - "**/*.spec.js"
+  - "backend/prisma/migrations/**"
+  - "backend/coverage/**"
+  - "backend/scripts/**"
+  - "backend/jest.config.js"
+  - "backend/babel.config.js"
+  - "backend/playwright.config.js"
+  - "backend/src/app.js"
+  - "backend/src/config/swagger.js"
+  - "frontend/build/**"
+  - "frontend/public/**"
+  - "docs/**"

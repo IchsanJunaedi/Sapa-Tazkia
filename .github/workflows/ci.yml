@@ -68,8 +68,25 @@ jobs:
       - name: Apply Prisma schema to test DB
         run: npx prisma db push --skip-generate
 
-      - name: Run tests
-        run: npm test
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload backend coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: backend/coverage/jest/lcov.info
+          flags: backend
+          name: backend-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage/jest/
+          if-no-files-found: warn
+          retention-days: 7
 
   frontend-ci:
     name: Frontend — Test

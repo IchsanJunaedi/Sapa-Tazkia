@@ -52,18 +52,14 @@ npm run test:e2e:install
 
 ### 2.2 Environment Variables
 
-Buat file `backend/.env.test` yang menunjuk ke **database test** (bukan dev /
-production). Kerangka minimum:
+Copy template dan edit sesuai kebutuhan:
 
-```env
-NODE_ENV=test
-DATABASE_URL="mysql://root:testpassword@127.0.0.1:3306/sapa_tazkia_test"
-REDIS_URL=redis://127.0.0.1:6379
-JWT_SECRET=ci-test-jwt-secret-32-chars-long-x
-SESSION_SECRET=ci-test-session-secret-32-chars-xx
-OPENAI_API_KEY=sk-test-dummy-not-used-in-unit-tests
-RATE_LIMIT_ENABLED=false
+```bash
+cp backend/.env.test.example backend/.env.test
 ```
+
+File `.env.test` harus menunjuk ke **database test** (bukan dev / production).
+File sudah di-gitignore.
 
 Apply schema ke DB test:
 
@@ -155,13 +151,22 @@ npx lcov-result-merger 'coverage/*/lcov.info' coverage/lcov.info
 
 ### 4.3 Upload ke Codecov di CI
 
-Tambahkan step berikut di `.github/workflows/ci.yml` setelah `Run tests`:
+CI sudah di-wire: `.github/workflows/ci.yml` meng-upload `backend/coverage/jest/lcov.info`
+ke Codecov pada setiap PR ke `main` dan push ke `main`/`develop`.
+
+**Yang perlu disetup sekali**:
+
+1. Tambahkan repository ini di [app.codecov.io](https://app.codecov.io/) dan
+   dapatkan `CODECOV_TOKEN`.
+2. Tambahkan token ke GitHub Secrets:
+   `Settings → Secrets and variables → Actions → New repository secret`
+   dengan nama `CODECOV_TOKEN`.
+3. Target coverage (75%) dikonfigurasi di `codecov.yml` di root repo.
+
+**Opsional — menambahkan E2E ke CI** (butuh MySQL + Redis + frontend dev server
+running di job yang sama). Snippet contoh untuk CI job terpisah:
 
 ```yaml
-- name: Run coverage (Jest)
-  working-directory: backend
-  run: npm run test:coverage
-
 - name: Install Playwright browsers
   working-directory: backend
   run: npm run test:e2e:install
@@ -176,11 +181,11 @@ Tambahkan step berikut di `.github/workflows/ci.yml` setelah `Run tests`:
   working-directory: backend
   run: npm run coverage:merge
 
-- name: Upload to Codecov
+- name: Upload merged coverage to Codecov
   uses: codecov/codecov-action@v4
   with:
     files: backend/coverage/lcov.info
-    fail_ci_if_error: true
+    flags: e2e
     token: ${{ secrets.CODECOV_TOKEN }}
 ```
 
