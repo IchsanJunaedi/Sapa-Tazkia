@@ -23,10 +23,14 @@ jest.mock('../../src/services/ragService', () => ({
 
 jest.mock('openai', () => {
   return jest.fn().mockImplementation(() => ({
-    chat: { completions: { create: jest.fn().mockResolvedValue({
-      choices: [{ message: { content: 'mock' } }],
-      usage: { total_tokens: 10 },
-    }) } },
+    chat: {
+      completions: {
+        create: jest.fn().mockResolvedValue({
+          choices: [{ message: { content: 'mock' } }],
+          usage: { total_tokens: 10 },
+        })
+      }
+    },
     embeddings: { create: jest.fn().mockResolvedValue({ data: [{ embedding: new Array(1536).fill(0.01) }] }) },
   }));
 });
@@ -44,7 +48,7 @@ describe('Guest endpoints — Extended', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
+  // ------------------------------------------------------------------------
   describe('POST /api/guest/chat — validation', () => {
     it('returns 400 when message is missing', async () => {
       const r = await agent.post('/api/guest/chat').send({});
