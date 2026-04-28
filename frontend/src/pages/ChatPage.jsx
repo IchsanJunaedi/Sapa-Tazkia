@@ -59,6 +59,7 @@ const ChatInput = ({ onSend, disabled, isGenerating, onCancel }) => {
             <form
                 ref={formRef}
                 onSubmit={handleSubmit}
+                data-testid="tanya-form"
                 className="w-full max-w-3xl flex items-end p-2 bg-white/10 backdrop-blur-lg border border-white/20 transition-all duration-200 ease-out relative"
                 style={{ borderRadius: '9999px' }}
             >
@@ -75,6 +76,7 @@ const ChatInput = ({ onSend, disabled, isGenerating, onCancel }) => {
                 {/* Textarea */}
                 <textarea
                     ref={textareaRef}
+                    data-testid="pertanyaan-input"
                     placeholder="Message Sapa Tazkia"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -100,6 +102,7 @@ const ChatInput = ({ onSend, disabled, isGenerating, onCancel }) => {
                     ) : (
                         <button
                             type="submit"
+                            data-testid="submit-tanya"
                             disabled={!canSend}
                             className={`h-10 w-10 flex items-center justify-center rounded-full transition-all duration-300 ${
                                 canSend

@@ -181,7 +181,11 @@ const SingleChatMessage = ({ message, onDownloadPDF, onRetry }) => {
   };
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6 group w-full`}>
+    <div
+      data-testid={isUser ? 'pesan-user' : 'jawaban-text'}
+      data-role={isUser ? 'user' : 'assistant'}
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6 group w-full`}
+    >
       <div className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'}`} style={{ maxWidth: isUser ? '70%' : '85%' }}>
 
         {/* Avatar */}
