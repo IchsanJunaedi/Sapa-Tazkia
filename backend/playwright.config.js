@@ -7,6 +7,7 @@
 const { defineConfig, devices } = require('@playwright/test');
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:3000';
+const REQUIRES_AUTH = (process.env.E2E_REQUIRES_AUTH || 'true').toLowerCase() !== 'false';
 
 module.exports = defineConfig({
   testDir: './tests/e2e',
@@ -23,10 +24,12 @@ module.exports = defineConfig({
   ],
   use: {
     baseURL: BASE_URL,
+    ...(REQUIRES_AUTH ? { storageState: './tests/e2e/.auth/user.json' } : {}),
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
+  ...(REQUIRES_AUTH ? { globalSetup: './tests/e2e/globalSetup.js' } : {}),
   projects: [
     {
       name: 'chromium',

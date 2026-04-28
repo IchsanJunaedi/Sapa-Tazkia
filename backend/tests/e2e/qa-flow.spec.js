@@ -11,24 +11,16 @@
 // that uniquely targets the element, ideally `data-testid`).
 
 const { test, expect } = require('./fixtures');
-const { ensureLoggedIn } = require('./authHelper');
 
 // -----------------------------------------------------------------------------
 // Config — override via env.
 // -----------------------------------------------------------------------------
 const TANYA_PAGE_PATH = process.env.E2E_TANYA_PATH || '/chat';
 
-// Protected routes (default /chat) need an authenticated session. When this
-// flag is truthy the spec signs in once via authHelper and reuses storage
-// state for all tests. Set E2E_REQUIRES_AUTH=false for public pages.
-const REQUIRES_AUTH = (process.env.E2E_REQUIRES_AUTH || 'true').toLowerCase() !== 'false';
-
-if (REQUIRES_AUTH) {
-  test.use({ storageState: ensureLoggedIn.storageStatePath });
-  test.beforeAll(async ({ browser }) => {
-    await ensureLoggedIn(browser);
-  });
-}
+// Protected routes (default /chat) need an authenticated session. When auth is
+// required, Playwright loads a pre-generated storage state from globalSetup
+// before worker contexts are created. Set E2E_REQUIRES_AUTH=false for public
+// pages.
 
 // Prefer `data-testid` attributes for stability. Fallback to role-based
 // queries if you don't want to add testids.
