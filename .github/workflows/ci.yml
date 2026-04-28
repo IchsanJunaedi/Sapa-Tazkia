@@ -72,6 +72,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload backend coverage to Codecov
+        if: always()
         uses: codecov/codecov-action@v4
         with:
           files: backend/coverage/jest/lcov.info

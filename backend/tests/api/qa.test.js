@@ -20,11 +20,11 @@ const { prisma, truncateAll, disconnect } = require('../helpers/dbHelper');
 // -----------------------------------------------------------------------------
 // DUMMY CONFIG — replace with real values when the endpoint/model are ready.
 // -----------------------------------------------------------------------------
-const TANYA_ENDPOINT = process.env.TANYA_ENDPOINT || '/api/tanya';
+const TANYA_ENDPOINT = process.env.TANYA_ENDPOINT || '/api/guest/chat';
 
 // Name of the Prisma model (must match `model <Name> { ... }` in schema.prisma).
 // Lower-cased first letter is the key on the PrismaClient instance.
-const TANYA_MODEL_KEY = process.env.TANYA_MODEL_KEY || 'tanya';
+const TANYA_MODEL_KEY = process.env.TANYA_MODEL_KEY || 'conversation';
 
 // Unique field used for findUnique() lookup (commonly an auto-generated id or
 // a human-readable slug / external id).
