@@ -93,13 +93,15 @@ describe('POST ' + TANYA_ENDPOINT + ' — QA endpoint (API + Integration)', () =
       expect.objectContaining({ success: true })
     );
 
-    // Try to capture a record id from either { data: { id } } or { id } or
-    // { answer, sessionId } (guest-chat shape).
+    // Capture a record id from { data: { id } } or { id }. We deliberately
+    // do NOT fall back to `sessionId` — that's a string and would break
+    // findUnique() when the target model uses an integer id (e.g.
+    // Conversation.id). If the endpoint doesn't return a DB id, the
+    // integration step below will skip gracefully.
     const payload = res.body.data || res.body;
     createdRecordId =
       payload[TANYA_UNIQUE_FIELD]
       ?? payload.id
-      ?? payload.sessionId
       ?? null;
   });
 
