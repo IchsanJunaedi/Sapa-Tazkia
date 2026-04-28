@@ -12,6 +12,13 @@
     "reset:redis": "node reset-redis.js",
     "test": "jest --forceExit --detectOpenHandles",
     "test:watch": "jest --watch",
+    "test:api": "jest --forceExit --detectOpenHandles --testPathPattern=tests/(api|integration)",
+    "test:unit": "jest --forceExit --detectOpenHandles --testPathPattern=tests/unit",
+    "test:coverage": "jest --coverage --forceExit --detectOpenHandles",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "coverage:merge": "node scripts/merge-coverage.js",
+    "coverage:all": "npm run test:coverage && npm run test:e2e && npm run coverage:merge",
     "lint": "eslint src/ --ext .js",
     "lint:fix": "eslint src/ --ext .js --fix"
   },
@@ -58,8 +65,10 @@
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@babel/preset-env": "^7.29.2",
+    "@playwright/test": "^1.48.0",
     "babel-jest": "^30.3.0",
     "jest": "^30.3.0",
+    "monocart-coverage-reports": "^2.12.0",
     "nodemon": "^3.1.10",
     "prisma": "^6.19.0",
     "supertest": "^7.2.2"

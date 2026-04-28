@@ -18,3 +18,10 @@ backend/add_token_usage_col.js
 .claude/
 # Git worktrees
 .worktrees/
+
+# Test / coverage outputs
+backend/coverage/
+backend/test-results/
+backend/playwright-report/
+backend/.env.test
+
