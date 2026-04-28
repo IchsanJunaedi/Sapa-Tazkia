@@ -32,6 +32,14 @@ module.exports = {
         'no-eval': 'error',
         'no-implied-eval': 'error',
 
+        // Demoted from the default 'error' severity in eslint:recommended so
+        // pre-existing occurrences don't block CI. Fix them incrementally —
+        // duplicate object keys silently shadow earlier entries, and empty
+        // blocks (often empty catch {}) usually want an explicit
+        // /* intentionally empty */ comment or a logger.debug call.
+        'no-dupe-keys': 'warn',
+        'no-empty': ['warn', { allowEmptyCatch: true }],
+
         // Style (non-blocking, just warnings)
         'semi': ['warn', 'always'],
         'quotes': ['warn', 'single', { avoidEscape: true }]
