@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../api/axiosConfig';
 
 const SuggestedPromptCards = () => {
   const [prompts, setPrompts] = useState([]);
@@ -8,10 +8,10 @@ const SuggestedPromptCards = () => {
   const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
-    axios.get(`${API}/ai/suggested-prompts`)
-      .then(res => setPrompts(res.data.data || []))
-      .catch(() => {});
-  }, [API]);
+    api.get('/ai/suggested-prompts')
+      ?.then(res => setPrompts(res?.data?.data || []))
+      ?.catch(() => {});
+  }, []);
 
   if (prompts.length === 0) return null;
 

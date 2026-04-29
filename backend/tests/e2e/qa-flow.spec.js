@@ -15,7 +15,7 @@ const { test, expect } = require('./fixtures');
 // -----------------------------------------------------------------------------
 // Config — override via env.
 // -----------------------------------------------------------------------------
-const TANYA_PAGE_PATH = process.env.E2E_TANYA_PATH || '/chat/new';
+const TANYA_PAGE_PATH = process.env.E2E_TANYA_PATH || '/chat';
 
 // Protected routes (default /chat) need an authenticated session. When auth is
 // required, Playwright loads a pre-generated storage state from globalSetup
@@ -65,6 +65,8 @@ test.describe('QA Flow — form tanya-jawab', () => {
     await page.goto(TANYA_PAGE_PATH);
 
     const submit = page.locator(SELECTORS.submitButton);
+    await expect(submit).toBeVisible();
+    
     // The submit button is either disabled (preferred) or shows a validation
     // message after being clicked — either behaviour is acceptable.
     const disabled = await submit.isDisabled().catch(() => false);

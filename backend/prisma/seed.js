@@ -6,7 +6,9 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting seed...\n');
 
-  const hashedPassword = await bcrypt.hash('tazkia123', 10);
+  // Hash individual NIMs – frontend sends NIM as the password for NIM-based logins.
+  const hashedNim1 = await bcrypt.hash('241572010024', 10);
+  const hashedNim2 = await bcrypt.hash('20210120070', 10);
 
   // ==========================================
   // 1. Program Studi
@@ -32,12 +34,12 @@ async function main() {
 
   const user1 = await prisma.user.upsert({
     where: { email: '241572010024.ichsan@student.stmik.tazkia.ac.id' },
-    update: { isEmailVerified: true, status: 'active' },
+    update: { isEmailVerified: true, status: 'active', passwordHash: hashedNim1 },
     create: {
       nim: '241572010024',
       fullName: 'Muhammad Ichsan',
       email: '241572010024.ichsan@student.stmik.tazkia.ac.id',
-      passwordHash: hashedPassword,
+      passwordHash: hashedNim1,
       phone: '081234567890',
       programStudiId: si.id,
       angkatan: 2024,
@@ -51,12 +53,12 @@ async function main() {
 
   await prisma.user.upsert({
     where: { nim: '20210120070' },
-    update: { isEmailVerified: true },
+    update: { isEmailVerified: true, passwordHash: hashedNim2 },
     create: {
       nim: '20210120070',
       fullName: 'Siti Aisyah',
       email: 'aisyah@student.tazkia.ac.id',
-      passwordHash: hashedPassword,
+      passwordHash: hashedNim2,
       phone: '081234567891',
       programStudiId: si.id,
       angkatan: 2021,
@@ -209,7 +211,7 @@ async function main() {
   console.log('📝 Test Login Credentials:');
   console.log(`   NIM  : ${user1.nim}`);
   console.log(`   Email: ${user1.email}`);
-  console.log('   Password: tazkia123\n');
+  console.log('   Password: <NIM>\n');
 }
 
 main()

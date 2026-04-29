@@ -6,7 +6,7 @@
 
 const { defineConfig, devices } = require('@playwright/test');
 
-const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:3100';
+const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
 const REQUIRES_AUTH = (process.env.E2E_REQUIRES_AUTH || 'true').toLowerCase() !== 'false';
 const FRONTEND_PORT = new URL(BASE_URL).port || '3100';
 
@@ -41,7 +41,7 @@ module.exports = defineConfig({
     {
       command: 'npm start',
       cwd: '.',
-      url: 'http://localhost:5000/health',
+      url: 'http://127.0.0.1:5000/health',
       reuseExistingServer: true,
       timeout: 180_000,
       env: {
@@ -59,7 +59,7 @@ module.exports = defineConfig({
         ...process.env,
         BROWSER: 'none',
         PORT: FRONTEND_PORT,
-        REACT_APP_API_URL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
+        REACT_APP_API_URL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000',
       },
     },
   ],

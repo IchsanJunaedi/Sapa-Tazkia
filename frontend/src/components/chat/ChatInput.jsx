@@ -66,6 +66,7 @@ const ChatInput = ({ onSend, disabled }) => {
                 {/* Textarea */}
                 <textarea
                     ref={textareaRef}
+                    data-testid="pertanyaan-input"
                     placeholder="Message Sapa Tazkia"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -80,6 +81,7 @@ const ChatInput = ({ onSend, disabled }) => {
                 <div className="relative group mb-1 ml-2 flex-shrink-0">
                     <button
                         type="submit"
+                        data-testid="submit-tanya"
                         disabled={!isButtonEnabled}
                         className={`h-10 w-10 flex items-center justify-center rounded-full transition-all duration-300 ${
                             isButtonEnabled

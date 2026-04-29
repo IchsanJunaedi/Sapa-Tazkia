@@ -1132,6 +1132,7 @@ const LandingPage = () => {
               </button>
               <input
                 type="text"
+                data-testid="pertanyaan-input"
                 placeholder="Message Sapa Tazkia"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
@@ -1139,6 +1140,7 @@ const LandingPage = () => {
                 className="flex-1 px-2 py-2 text-lg text-white placeholder-white/50 focus:outline-none bg-transparent"
               />
               <button
+                data-testid="submit-tanya"
                 className={`p-3 rounded-full transition-all duration-300 ml-2 flex items-center justify-center text-white ${
                   message.trim()
                     ? 'bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/50 hover:from-indigo-400 hover:to-blue-500 hover:shadow-indigo-400/70 hover:scale-105 active:scale-95'

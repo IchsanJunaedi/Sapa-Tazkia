@@ -3,31 +3,26 @@ import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import LandingPage from './LandingPage';
 import api from '../api/axiosConfig';
+beforeAll(() => {
+  window.IntersectionObserver = jest.fn().mockImplementation(() => ({
+    observe: () => null,
+    unobserve: () => null,
+    disconnect: () => null,
+  }));
+});
 
-import axios from 'axios';
-
-jest.mock('axios', () => {
-  const mockAxios = {
-    get: jest.fn(() => Promise.resolve({ data: { data: [] } })),
+jest.mock('../api/axiosConfig', () => ({
+  __esModule: true,
+  default: {
+    get: jest.fn(() => Promise.resolve({ data: { data: [], conversations: [] } })),
     post: jest.fn(() => Promise.resolve({ data: {} })),
-  };
-  return {
-    __esModule: true,
-    default: mockAxios,
-    ...mockAxios
-  };
-});
-
-jest.mock('../api/axiosConfig', () => {
-  const mockApi = {
-    get: jest.fn().mockResolvedValue({ data: { conversations: [] } }),
-  };
-  return {
-    __esModule: true,
-    default: mockApi,
-    ...mockApi
-  };
-});
+    put: jest.fn(() => Promise.resolve({ data: {} })),
+    delete: jest.fn(() => Promise.resolve({ data: {} })),
+  },
+  clearAuthHeaders: jest.fn(),
+  setAuthHeaders: jest.fn(),
+  testConnection: jest.fn(() => Promise.resolve(true)),
+}));
 
 jest.mock('../context/AuthContext', () => ({
   useAuth: () => ({
@@ -42,13 +37,7 @@ jest.mock('../context/AuthContext', () => ({
   }),
 }));
 
-beforeAll(() => {
-  window.IntersectionObserver = jest.fn().mockImplementation(() => ({
-    observe: () => null,
-    unobserve: () => null,
-    disconnect: () => null,
-  }));
-});
+
 
 jest.mock('../components/common/NotificationDropdown', () => () => <div data-testid="notification-dropdown" />);
 
