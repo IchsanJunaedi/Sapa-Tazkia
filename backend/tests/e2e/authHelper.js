@@ -1,128 +1,187 @@
 // backend/tests/e2e/authHelper.js
 //
 // Playwright login helper for tests that need access to protected routes
-// (e.g. /chat, /academic). Caches a logged-in storage state on disk so only
-// the first test pays the login cost.
+// (e.g. /chat, /academic). Performs an API-based login (not UI) and persists
+// a Playwright storageState file with the JWT injected into localStorage.
 //
-// Usage inside a spec:
-//
-//   const { ensureLoggedIn } = require('./authHelper');
-//   test.use({ storageState: ensureLoggedIn.storageStatePath });
-//   test.beforeAll(async ({ browser }) => { await ensureLoggedIn(browser); });
+// Why API login instead of submitting the login form?
+//   * Faster + deterministic — no race with React hydration, no 1.5s
+//     setTimeout in LoginPage, no fragile selector matching.
+//   * Survives backend rate limiters and frontend redesigns.
+//   * Standard Playwright pattern for auth setup.
 //
 // Required env:
-//   E2E_BASE_URL     (default http://localhost:3000)
-//   E2E_LOGIN_PATH   (default /login)
-//   E2E_LOGIN_NIM    (your test account NIM / username / email)
-//   E2E_LOGIN_PASSWORD
+//   E2E_BASE_URL          (default http://localhost:3000)
+//   E2E_API_BASE_URL      (default http://localhost:5000) — backend root, no /api suffix
+//   E2E_LOGIN_NIM         (test account NIM/email)
+//   E2E_LOGIN_PASSWORD    (test account password)
 //
-// Optional env to override selectors if your login form differs:
-//   E2E_LOGIN_NIM_SELECTOR       (default supports "Email atau NIM" single-field login)
-//   E2E_LOGIN_PASSWORD_SELECTOR  (default [name="password"], optional)
-//   E2E_LOGIN_SUBMIT_SELECTOR    (default button[type="submit"])
-//   E2E_LOGIN_SUCCESS_URL        (regex fragment, default /(chat|dashboard|academic|home)/)
+// Optional env:
+//   E2E_LOGIN_PATH        (default /api/auth/login) — appended to E2E_API_BASE_URL
+//   E2E_FORCE_RELOGIN=1   force a fresh login even if a cached storage state exists
 
 const fs = require('fs');
 const path = require('path');
+const { request: playwrightRequest } = require('@playwright/test');
 
 const STORAGE_DIR = path.resolve(__dirname, '.auth');
 const STORAGE_STATE_PATH = path.join(STORAGE_DIR, 'user.json');
+const FAILURE_DIR = path.resolve(__dirname, '../../coverage/e2e');
+const FAILURE_LOG_PATH = path.join(FAILURE_DIR, 'globalSetup-failure.json');
 
-const DEFAULTS = {
-  baseURL: process.env.E2E_BASE_URL || 'http://localhost:3100',
-  loginPath: process.env.E2E_LOGIN_PATH || '/login',
-  nim: process.env.E2E_LOGIN_NIM || '',
-  password: process.env.E2E_LOGIN_PASSWORD || '',
-  nimSelector:
-    process.env.E2E_LOGIN_NIM_SELECTOR ||
-    'input[name="nim"], input[name="email"], input[type="email"], input[placeholder="Email atau NIM"], input[type="text"]',
-  passwordSelector: process.env.E2E_LOGIN_PASSWORD_SELECTOR || 'input[name="password"], input[type="password"]',
-  submitSelector: process.env.E2E_LOGIN_SUBMIT_SELECTOR || 'button[type="submit"]',
-  successUrlPattern: new RegExp(process.env.E2E_LOGIN_SUCCESS_URL || '(chat|dashboard|academic|home)'),
-};
+function getConfig() {
+  return {
+    // Default must match `playwright.config.js` BASE_URL so storageState
+    // localStorage entries are injected into the same origin Playwright will
+    // navigate to. CI sets `E2E_BASE_URL` explicitly; this default only
+    // matters for `npm run test:e2e` against the local Playwright webServer.
+    baseURL: process.env.E2E_BASE_URL || 'http://127.0.0.1:3100',
+    apiBaseURL: (process.env.E2E_API_BASE_URL || 'http://127.0.0.1:5000').replace(/\/$/, ''),
+    loginPath: process.env.E2E_LOGIN_PATH || '/api/auth/login',
+    nim: process.env.E2E_LOGIN_NIM || '',
+    password: process.env.E2E_LOGIN_PASSWORD || '',
+  };
+}
 
 /**
- * Logs into the app via the login form and persists the authenticated storage
- * state (cookies + localStorage) to `.auth/user.json` for reuse.
- *
- * Idempotent: if a valid storage state already exists on disk, it is returned
- * directly and no browser traffic occurs.
- *
- * @param {import('@playwright/test').Browser} browser
- * @returns {Promise<string>} absolute path to the storage state JSON file.
+ * POSTs to the backend login endpoint and returns the issued JWT + user object.
+ * Throws a descriptive error if the credentials are invalid or the backend
+ * is unreachable / returns an unexpected payload.
  */
-async function ensureLoggedIn(browser) {
-  if (!DEFAULTS.nim || !DEFAULTS.password) {
+async function loginViaApi() {
+  const cfg = getConfig();
+
+  if (!cfg.nim || !cfg.password) {
     throw new Error(
       '[authHelper] Missing E2E_LOGIN_NIM / E2E_LOGIN_PASSWORD. ' +
       'Set them in .env.test or the CI env before running protected E2E specs.'
     );
   }
 
-  if (fs.existsSync(STORAGE_STATE_PATH)) {
-    // Trust the cached state. Tests that hit stale tokens can delete the file
-    // or set E2E_FORCE_RELOGIN=1.
-    if (!process.env.E2E_FORCE_RELOGIN) return STORAGE_STATE_PATH;
-    fs.unlinkSync(STORAGE_STATE_PATH);
+  const ctx = await playwrightRequest.newContext({
+    baseURL: cfg.apiBaseURL,
+    extraHTTPHeaders: {
+      'Content-Type': 'application/json',
+      // Origin is required by some CORS-sensitive servers; mirrors the SPA.
+      Origin: cfg.baseURL,
+    },
+  });
+
+  let response;
+  try {
+    response = await ctx.post(cfg.loginPath, {
+      data: { identifier: cfg.nim, password: cfg.password },
+      timeout: 30_000,
+    });
+  } catch (err) {
+    await ctx.dispose();
+    throw new Error(
+      `[authHelper] Login request failed: ${err.message}. ` +
+      `Is the backend reachable at ${cfg.apiBaseURL}${cfg.loginPath}?`
+    );
+  }
+
+  const status = response.status();
+  let body;
+  try {
+    body = await response.json();
+  } catch (_err) {
+    body = { raw: await response.text() };
+  }
+
+  await ctx.dispose();
+
+  if (status !== 200 || !body.success || !body.token || !body.user) {
+    throw new Error(
+      `[authHelper] Login failed (HTTP ${status}). ` +
+      `Body: ${JSON.stringify(body).slice(0, 500)}. ` +
+      `Check that E2E_LOGIN_NIM (${cfg.nim}) exists in the test database, ` +
+      'that the seed hashes the configured E2E_LOGIN_PASSWORD as the password, ' +
+      'and that the user has status="active" + isEmailVerified=true.'
+    );
+  }
+
+  return { token: body.token, user: body.user };
+}
+
+/**
+ * Builds a Playwright storage state object that injects the JWT + user into
+ * localStorage for the SPA origin. AuthContext picks up these keys on first
+ * render so subsequent navigations are already authenticated.
+ */
+function buildStorageState({ token, user, baseURL }) {
+  return {
+    cookies: [],
+    origins: [
+      {
+        origin: baseURL,
+        localStorage: [
+          { name: 'token', value: token },
+          { name: 'user', value: JSON.stringify(user) },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * Logs into the backend via the API and writes a Playwright storage state
+ * file containing the JWT in localStorage. Returns the absolute path to the
+ * storage state JSON file so callers can pass it to `test.use({ storageState })`.
+ *
+ * Idempotent: if a cached storage state already exists on disk, it is reused
+ * unless `E2E_FORCE_RELOGIN=1` is set.
+ *
+ * @param {import('@playwright/test').Browser} [_browser] (unused; kept for backwards
+ *   compatibility with previous UI-based signature)
+ * @returns {Promise<string>} absolute path to the storage state JSON file.
+ */
+async function ensureLoggedIn(_browser) {
+  const cfg = getConfig();
+
+  if (fs.existsSync(STORAGE_STATE_PATH) && !process.env.E2E_FORCE_RELOGIN) {
+    return STORAGE_STATE_PATH;
   }
 
   fs.mkdirSync(STORAGE_DIR, { recursive: true });
+  fs.mkdirSync(FAILURE_DIR, { recursive: true });
 
-  const context = await browser.newContext({ baseURL: DEFAULTS.baseURL });
-  const page = await context.newPage();
-
-  await page.goto(DEFAULTS.loginPath);
-
-  // Fill NIM / email. Prefer the first visible match.
-  const nimField = page.locator(DEFAULTS.nimSelector).first();
-  await nimField.waitFor({ state: 'visible', timeout: 15_000 });
-  await nimField.fill(DEFAULTS.nim);
-
-  const pwField = page.locator(DEFAULTS.passwordSelector).first();
-  const hasVisiblePasswordField = await pwField
-    .waitFor({ state: 'visible', timeout: 2_000 })
-    .then(() => true)
-    .catch(() => false);
-
-  if (hasVisiblePasswordField) {
-    await pwField.fill(DEFAULTS.password);
+  try {
+    const { token, user } = await loginViaApi();
+    const state = buildStorageState({ token, user, baseURL: cfg.baseURL });
+    fs.writeFileSync(STORAGE_STATE_PATH, JSON.stringify(state, null, 2));
+    return STORAGE_STATE_PATH;
+  } catch (err) {
+    // Persist a small JSON breadcrumb so CI artifacts surface why login failed
+    // without dumping secrets into stdout.
+    try {
+      fs.writeFileSync(
+        FAILURE_LOG_PATH,
+        JSON.stringify(
+          {
+            stage: 'authHelper.ensureLoggedIn',
+            message: err.message,
+            apiBaseURL: cfg.apiBaseURL,
+            loginPath: cfg.loginPath,
+            baseURL: cfg.baseURL,
+            hasNim: !!cfg.nim,
+            hasPassword: !!cfg.password,
+            timestamp: new Date().toISOString(),
+          },
+          null,
+          2
+        )
+      );
+    } catch (_writeErr) {
+      // Best-effort; ignore if the directory isn't writable.
+    }
+    throw err;
   }
-
-  await page.locator(DEFAULTS.submitSelector).first().click();
-
-  // Race: either we navigate away from /login (success) OR an error message
-  // appears on the page (credentials rejected). Detecting the error early
-  // avoids a cryptic 20-second timeout and surfaces the real problem.
-  await Promise.race([
-    page.waitForURL(
-      (url) => !url.pathname.startsWith(DEFAULTS.loginPath) || DEFAULTS.successUrlPattern.test(url.pathname),
-      { timeout: 20_000 }
-    ),
-    page
-      .locator('[class*="text-red"], [class*="error"], [role="alert"]')
-      .first()
-      .waitFor({ state: 'visible', timeout: 20_000 })
-      .then(async () => {
-        const errText = await page
-          .locator('[class*="text-red"], [class*="error"], [role="alert"]')
-          .first()
-          .textContent()
-          .catch(() => '(unknown error)');
-        throw new Error(
-          `[authHelper] Login failed — the page showed an error: "${errText.trim()}"\n` +
-          `Check that E2E_LOGIN_NIM (${DEFAULTS.nim}) exists in the test database ` +
-          `and that the seed hashes the NIM itself as the password.`
-        );
-      }),
-  ]);
-
-  await context.storageState({ path: STORAGE_STATE_PATH });
-  await context.close();
-
-  return STORAGE_STATE_PATH;
 }
 
 ensureLoggedIn.storageStatePath = STORAGE_STATE_PATH;
 ensureLoggedIn.STORAGE_DIR = STORAGE_DIR;
+ensureLoggedIn.FAILURE_LOG_PATH = FAILURE_LOG_PATH;
+ensureLoggedIn.loginViaApi = loginViaApi;
 
 module.exports = { ensureLoggedIn };

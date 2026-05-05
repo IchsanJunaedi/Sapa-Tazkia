@@ -5,6 +5,11 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+    # Include `labeled` so re-runs are triggered when the `run-e2e` label is
+    # added to a PR (gates the E2E job below). Other types are the GitHub
+    # defaults; we restate them here because specifying `types` overrides
+    # the default list.
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
   backend-ci:
@@ -205,12 +210,17 @@ jobs:
       RATE_LIMIT_ENABLED: "false"
       PORT: "5000"
       FRONTEND_URL: http://localhost:3000
-      # Frontend dev server config
-      REACT_APP_API_URL: http://localhost:5000
+      # Frontend dev server config. The frontend's axios layer calls
+      # endpoints like `/ai/conversations`, expecting `REACT_APP_API_URL` to
+      # already include the `/api` prefix (matches frontend/.env.example).
+      REACT_APP_API_URL: http://localhost:5000/api
+      # The API base for Playwright's API-login helper (no `/api` suffix —
+      # `E2E_LOGIN_PATH` already starts with `/api`).
+      E2E_API_BASE_URL: http://localhost:5000
       CI: "true"
       # Playwright E2E env — supply test account via GitHub Secrets.
       E2E_BASE_URL: http://localhost:3000
-      E2E_TANYA_PATH: /chat/new
+      E2E_TANYA_PATH: /chat
       E2E_REQUIRES_AUTH: "true"
       E2E_LOGIN_NIM: ${{ secrets.E2E_LOGIN_NIM }}
       E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
@@ -248,6 +258,7 @@ jobs:
         working-directory: backend
         env:
           SEED_E2E_NIM: ${{ secrets.E2E_LOGIN_NIM }}
+          SEED_E2E_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
         run: |
           node -e "
           const bcrypt = require('bcryptjs');
@@ -256,9 +267,12 @@ jobs:
           (async () => {
             const nim = process.env.SEED_E2E_NIM;
             if (!nim) { console.log('No E2E_NIM — skipping seed'); return; }
-            // LoginPage sends NIM as password (loginWithCredentials(nim, nim)),
-            // so we must hash the NIM itself as the password.
-            const hash = await bcrypt.hash(nim, 10);
+            // Seed the password from E2E_LOGIN_PASSWORD when supplied so the
+            // API-based Playwright login (see backend/tests/e2e/authHelper.js)
+            // can authenticate. Fall back to NIM-as-password for backward
+            // compat with environments that only set E2E_LOGIN_NIM.
+            const plain = process.env.SEED_E2E_PASSWORD || nim;
+            const hash = await bcrypt.hash(plain, 10);
             await prisma.user.upsert({
               where: { nim },
               update: { passwordHash: hash, isEmailVerified: true, status: 'active' },
@@ -274,7 +288,7 @@ jobs:
                 status: 'active',
               },
             });
-            console.log('Seeded E2E user:', nim);
+            console.log('Seeded E2E user:', nim, '(password source:', process.env.SEED_E2E_PASSWORD ? 'E2E_LOGIN_PASSWORD' : 'NIM', ')');
             await prisma.\$disconnect();
           })();
           "

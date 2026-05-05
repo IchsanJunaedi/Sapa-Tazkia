@@ -12,12 +12,20 @@ const FRONTEND_PORT = new URL(BASE_URL).port || '3100';
 
 module.exports = defineConfig({
   testDir: './tests/e2e',
-  timeout: 60_000,
-  expect: { timeout: 10_000 },
+  // Allow individual tests up to 2 minutes so cold-start CI runs that wait on
+  // OpenAI + Qdrant can complete the QA-flow round trip within a single test
+  // body. The expect-level timeout stays tight so per-assertion failures
+  // surface quickly.
+  timeout: 120_000,
+  expect: { timeout: 15_000 },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // 1 retry in CI is enough now that auth runs via API instead of UI; more
+  // retries just compound rate-limit/state issues without surfacing real bugs.
+  retries: process.env.CI ? 1 : 0,
+  // Single worker on CI keeps globalSetup deterministic and avoids two
+  // browsers fighting over the same `.auth/user.json` storage state file.
+  workers: process.env.CI ? 1 : undefined,
   reporter: [
     ['list'],
     ['html', { outputFolder: 'coverage/e2e/html-report', open: 'never' }],
@@ -59,7 +67,11 @@ module.exports = defineConfig({
         ...process.env,
         BROWSER: 'none',
         PORT: FRONTEND_PORT,
-        REACT_APP_API_URL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000',
+        // The frontend axios layer requests endpoints relative to this base
+        // and assumes the `/api` prefix is already included (see
+        // frontend/.env.example). Without it, every request 404s on the
+        // backend's /api-prefixed routes.
+        REACT_APP_API_URL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000/api',
       },
     },
   ],
