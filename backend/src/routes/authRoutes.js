@@ -26,45 +26,42 @@ const {
 // these endpoints faster than the production envelope allows, so the limiters
 // quickly start returning 429 and break otherwise-valid flows. Disable them
 // when NODE_ENV=test or when the operator opts out via DISABLE_AUTH_RATE_LIMIT.
-const rateLimitersDisabled =
-  process.env.NODE_ENV === 'test' ||
-  process.env.DISABLE_AUTH_RATE_LIMIT === 'true';
-
 const noopLimiter = (_req, _res, next) => next();
+
+const buildLimiter = (opts) => {
+  if (process.env.NODE_ENV === 'test' || process.env.DISABLE_AUTH_RATE_LIMIT === 'true') {
+    return noopLimiter;
+  }
+  return rateLimit(opts);
+};
 
 // 1. Strict Limiter (Untuk Login/Register/OTP)
 // Sangat ketat: Maksimal 5x percobaan per 1 menit.
 // Jika dilanggar, blokir IP tersebut sementara.
-const strictLimiter = rateLimitersDisabled
-  ? noopLimiter
-  : rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 menit
-    max: 5,
-    message: { success: false, message: 'Terlalu banyak percobaan. Silakan coba lagi dalam 1 menit.' },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
+const strictLimiter = buildLimiter({
+  windowMs: 1 * 60 * 1000, // 1 menit
+  max: 5,
+  message: { success: false, message: 'Terlalu banyak percobaan. Silakan coba lagi dalam 1 menit.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // 2. Auth Provider Limiter (Google)
 // Sedikit lebih longgar karena melibatkan redirect browser.
-const providerLimiter = rateLimitersDisabled
-  ? noopLimiter
-  : rateLimit({
-    windowMs: 1 * 60 * 1000,
-    max: 10,
-    message: { success: false, message: 'Terlalu banyak request auth.' }
-  });
+const providerLimiter = buildLimiter({
+  windowMs: 1 * 60 * 1000,
+  max: 10,
+  message: { success: false, message: 'Terlalu banyak request auth.' }
+});
 
 // 3. General Limiter (Navigasi Biasa)
 // Untuk cek sesi, cek profil, logout, DAN CHAT.
 // Cukup longgar (30x/menit) agar user experience tetap nyaman.
-const generalLimiter = rateLimitersDisabled
-  ? noopLimiter
-  : rateLimit({
-    windowMs: 1 * 60 * 1000,
-    max: 30,
-    message: { success: false, message: 'Terlalu banyak request. Santai sedikit.' }
-  });
+const generalLimiter = buildLimiter({
+  windowMs: 1 * 60 * 1000,
+  max: 30,
+  message: { success: false, message: 'Terlalu banyak request. Santai sedikit.' }
+});
 
 // ========================================================
 // PUBLIC ROUTES
