@@ -61,19 +61,25 @@ test.describe('QA Flow — form tanya-jawab', () => {
     expect(answerText).toMatch(EXPECTED_ANSWER_PATTERN);
   });
 
-  test('empty submission is prevented or surfaces a validation error', async ({ page }) => {
+  test('empty submission is prevented (submit button stays disabled)', async ({ page }) => {
     await page.goto(TANYA_PAGE_PATH);
+
+    const input = page.locator(SELECTORS.questionInput);
+    await expect(input).toBeVisible();
 
     const submit = page.locator(SELECTORS.submitButton);
     await expect(submit).toBeVisible();
-    
-    // The submit button is either disabled (preferred) or shows a validation
-    // message after being clicked — either behaviour is acceptable.
-    const disabled = await submit.isDisabled().catch(() => false);
-    if (!disabled) {
-      await submit.click();
-      const errorMsg = page.locator('[role="alert"], .error, [data-testid="form-error"]');
-      await expect(errorMsg.first()).toBeVisible({ timeout: 5_000 });
-    }
+
+    // ChatInput renders the submit button with `disabled={!canSend}` whenever
+    // the trimmed input is empty. The empty state is the canonical "prevent
+    // submission" UX in this app, so we just assert the button is disabled
+    // and that filling-then-clearing the input restores that disabled state.
+    await expect(submit).toBeDisabled();
+
+    await input.fill('hi');
+    await expect(submit).toBeEnabled();
+
+    await input.fill('');
+    await expect(submit).toBeDisabled();
   });
 });
