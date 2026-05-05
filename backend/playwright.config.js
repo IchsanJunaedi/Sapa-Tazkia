@@ -67,7 +67,11 @@ module.exports = defineConfig({
         ...process.env,
         BROWSER: 'none',
         PORT: FRONTEND_PORT,
-        REACT_APP_API_URL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000',
+        // The frontend axios layer requests endpoints relative to this base
+        // and assumes the `/api` prefix is already included (see
+        // frontend/.env.example). Without it, every request 404s on the
+        // backend's /api-prefixed routes.
+        REACT_APP_API_URL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000/api',
       },
     },
   ],

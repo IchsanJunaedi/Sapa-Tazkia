@@ -31,8 +31,12 @@ const FAILURE_LOG_PATH = path.join(FAILURE_DIR, 'globalSetup-failure.json');
 
 function getConfig() {
   return {
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
-    apiBaseURL: (process.env.E2E_API_BASE_URL || 'http://localhost:5000').replace(/\/$/, ''),
+    // Default must match `playwright.config.js` BASE_URL so storageState
+    // localStorage entries are injected into the same origin Playwright will
+    // navigate to. CI sets `E2E_BASE_URL` explicitly; this default only
+    // matters for `npm run test:e2e` against the local Playwright webServer.
+    baseURL: process.env.E2E_BASE_URL || 'http://127.0.0.1:3100',
+    apiBaseURL: (process.env.E2E_API_BASE_URL || 'http://127.0.0.1:5000').replace(/\/$/, ''),
     loginPath: process.env.E2E_LOGIN_PATH || '/api/auth/login',
     nim: process.env.E2E_LOGIN_NIM || '',
     password: process.env.E2E_LOGIN_PASSWORD || '',

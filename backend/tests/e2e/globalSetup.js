@@ -97,8 +97,11 @@ async function globalSetup() {
 
   const requiresAuth = (process.env.E2E_REQUIRES_AUTH || 'true').toLowerCase() !== 'false';
 
-  const baseURL = process.env.E2E_BASE_URL || 'http://localhost:3000';
-  const apiBaseURL = (process.env.E2E_API_BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
+  // Defaults match `playwright.config.js` so `npm run test:e2e` works
+  // out-of-the-box without env vars. CI sets `E2E_BASE_URL` /
+  // `E2E_API_BASE_URL` explicitly.
+  const baseURL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
+  const apiBaseURL = (process.env.E2E_API_BASE_URL || 'http://127.0.0.1:5000').replace(/\/$/, '');
   const backendHealthURL = `${apiBaseURL}/health`;
 
   try {

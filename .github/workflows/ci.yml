@@ -210,12 +210,17 @@ jobs:
       RATE_LIMIT_ENABLED: "false"
       PORT: "5000"
       FRONTEND_URL: http://localhost:3000
-      # Frontend dev server config
-      REACT_APP_API_URL: http://localhost:5000
+      # Frontend dev server config. The frontend's axios layer calls
+      # endpoints like `/ai/conversations`, expecting `REACT_APP_API_URL` to
+      # already include the `/api` prefix (matches frontend/.env.example).
+      REACT_APP_API_URL: http://localhost:5000/api
+      # The API base for Playwright's API-login helper (no `/api` suffix —
+      # `E2E_LOGIN_PATH` already starts with `/api`).
+      E2E_API_BASE_URL: http://localhost:5000
       CI: "true"
       # Playwright E2E env — supply test account via GitHub Secrets.
       E2E_BASE_URL: http://localhost:3000
-      E2E_TANYA_PATH: /chat/new
+      E2E_TANYA_PATH: /chat
       E2E_REQUIRES_AUTH: "true"
       E2E_LOGIN_NIM: ${{ secrets.E2E_LOGIN_NIM }}
       E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
