@@ -12,7 +12,11 @@ const FRONTEND_PORT = new URL(BASE_URL).port || '3100';
 
 module.exports = defineConfig({
   testDir: './tests/e2e',
-  timeout: 60_000,
+  // Allow individual tests up to 2 minutes so cold-start CI runs that wait on
+  // OpenAI + Qdrant can complete the QA-flow round trip within a single test
+  // body. The expect-level timeout stays tight so per-assertion failures
+  // surface quickly.
+  timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
