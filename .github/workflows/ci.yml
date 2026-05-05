@@ -5,6 +5,11 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+    # Include `labeled` so re-runs are triggered when the `run-e2e` label is
+    # added to a PR (gates the E2E job below). Other types are the GitHub
+    # defaults; we restate them here because specifying `types` overrides
+    # the default list.
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
   backend-ci:
