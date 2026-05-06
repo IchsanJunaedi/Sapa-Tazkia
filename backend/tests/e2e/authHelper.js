@@ -139,7 +139,9 @@ function buildStorageState({ token, user, baseURL }) {
 async function ensureLoggedIn(_browser) {
   const cfg = getConfig();
 
-  if (fs.existsSync(STORAGE_STATE_PATH) && !process.env.E2E_FORCE_RELOGIN) {
+  // Selalu force relogin agar token tidak expired saat menjalankan test secara lokal berulang kali.
+  // Jika token expired, frontend akan fallback ke Guest Mode dan gagal mencari percakapan di database.
+  if (fs.existsSync(STORAGE_STATE_PATH) && !process.env.E2E_FORCE_RELOGIN && false) {
     return STORAGE_STATE_PATH;
   }
 
