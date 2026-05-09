@@ -10,6 +10,7 @@ import {
 import ChatPage from './pages/ChatPage';
 import LandingPage from './pages/LandingPage';
 import MarketingLandingPage from './pages/MarketingLandingPage';
+import LoginPage from './pages/LoginPage';
 import api, { setAuthHeaders, clearAuthHeaders } from './api/axiosConfig';
 
 // --- AuthContext ---
@@ -160,83 +161,7 @@ const AuthCallback = () => {
   );
 };
 
-// --- LoginPage (legacy, di /login) ---
-const LoginPage = () => {
-  const [nim, setNim] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const { login, user, logout } = useAuth();
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    try {
-      await login(nim, password);
-      window.location.href = '/chat';
-    } catch (err) {
-      setError(err.message || 'Terjadi kesalahan. Coba lagi nanti.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = () => {
-    setIsLoading(true);
-    window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/auth/google`;
-  };
-
-  if (user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
-          <h1 className="text-2xl font-bold mb-4">Anda Sudah Login</h1>
-          <p className="text-gray-700 mb-6">Selamat datang, {user.name || user.nim}!</p>
-          <button onClick={() => window.location.href = '/chat'} className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors mb-3">
-            Lanjut ke Chat
-          </button>
-          <button onClick={() => logout()} className="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-medium transition-colors">
-            Logout
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-2">Login Mahasiswa</h1>
-        <p className="text-gray-600 text-center mb-8">Sapa Tazkia Chatbot</p>
-        {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4">{error}</div>}
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">NIM</label>
-            <input type="text" placeholder="Masukkan NIM Anda" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none" value={nim} onChange={(e) => setNim(e.target.value)} disabled={isLoading} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-            <input type="password" placeholder="Masukkan Password" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none" value={password} onChange={(e) => setPassword(e.target.value)} disabled={isLoading} />
-          </div>
-          <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium transition-colors disabled:bg-gray-400" disabled={isLoading}>
-            {isLoading ? 'Memproses...' : 'Login'}
-          </button>
-        </form>
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-300" /></div>
-          <div className="relative flex justify-center text-sm"><span className="bg-white px-2 text-gray-500">ATAU</span></div>
-        </div>
-        <button type="button" onClick={handleGoogleLogin} disabled={isLoading} className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:bg-gray-100">
-          <GoogleIcon /><span className="ml-3 font-medium">Lanjutkan dengan Google</span>
-        </button>
-        <button type="button" onClick={() => window.location.href = '/chat?guest=true'} className="w-full flex items-center justify-center px-4 py-3 border border-blue-300 rounded-lg text-blue-700 hover:bg-blue-50 transition-colors mt-4">
-          <span className="font-medium">Coba sebagai Tamu</span>
-        </button>
-      </div>
-    </div>
-  );
-};
+// LoginPage legacy removed, using pages/LoginPage.jsx instead
 
 // --- Main App ---
 export default function App() {

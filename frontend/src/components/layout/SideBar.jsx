@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PenSquare, User, Trash2, MoreHorizontal, LogOut, ChevronDown, ChevronRight, Loader2, Menu, X, Search } from 'lucide-react';
+import Swal from 'sweetalert2';
 import ProfilePopover from './ProfilePopover';
 import api from '../../api/axiosConfig';
 import NotificationDropdown from '../common/NotificationDropdown';
@@ -136,6 +137,38 @@ const Sidebar = ({
       onDeleteChat(selectedChatId);
       handleCloseAllPopups();
     }
+  };
+
+  const handleRenameFromPopup = async () => {
+    if (!selectedChatId) return;
+    
+    const chat = chatHistory.find(c => c.id === selectedChatId);
+    if (!chat) return;
+
+    const { value: newTitle } = await Swal.fire({
+      title: 'Ubah Nama Percakapan',
+      input: 'text',
+      inputValue: chat.title,
+      showCancelButton: true,
+      confirmButtonText: 'Simpan',
+      cancelButtonText: 'Batal',
+      confirmButtonColor: '#3085d6',
+      inputValidator: (value) => {
+        if (!value) return 'Nama tidak boleh kosong!';
+      }
+    });
+
+    if (newTitle && newTitle !== chat.title) {
+      try {
+        await api.patch(`/ai/conversations/${selectedChatId}`, { title: newTitle });
+        // Refresh chat history (parent should handle this, or we can force reload)
+        // For E2E testing, we just need the API to work and UI to potentially reflect it
+        window.location.reload(); 
+      } catch (error) {
+        Swal.fire('Error', 'Gagal mengubah nama', 'error');
+      }
+    }
+    handleCloseAllPopups();
   };
 
   const handleLogout = () => {
@@ -371,6 +404,7 @@ const Sidebar = ({
               className={`${isSidebarOpen ? 'w-full justify-start p-3' : 'w-12 h-12 justify-center'} h-12 text-white rounded-xl shadow-lg transition-all flex items-center backdrop-blur-md border border-white/30 ${user ? 'bg-white/15 hover:bg-white/25' : 'bg-white/15 hover:bg-white/25'
                 } ${(isStartingNewChat || isDeleting) ? 'opacity-70 cursor-not-allowed' : ''
                 }`}
+              data-testid="profile-button"
               title={user ? `Logged in as ${getUserName()}` : 'Login as Mahasiswa'}
               onClick={handleProfileClick}
               disabled={isStartingNewChat || isDeleting}
@@ -409,16 +443,31 @@ const Sidebar = ({
           <div className="fixed inset-0 z-40" onClick={handleCloseAllPopups} />
           <div className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 p-4 w-48" style={{ left: `${popupPosition.x}px`, top: `${popupPosition.y}px` }}>
             <div className="flex items-center gap-3 mb-3 pb-2 border-b border-gray-100">
-              <div className="p-2 bg-red-50 rounded-lg"><Trash2 size={18} className="text-red-500" /></div>
+              <div className="p-2 bg-blue-50 rounded-lg"><PenSquare size={18} className="text-blue-500" /></div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-800">Hapus Chat</h3>
-                <p className="text-xs text-gray-500">Tak bisa dibatalkan</p>
+                <h3 className="text-sm font-semibold text-gray-800">Opsi Chat</h3>
+                <p className="text-xs text-gray-500">Kelola percakapan</p>
               </div>
             </div>
-            <button onClick={handleDeleteFromPopup} disabled={isDeleting || isStartingNewChat} className="w-full py-2 px-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
-              {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-              {isDeleting ? 'Menghapus...' : 'Hapus Chat'}
-            </button>
+            <div className="space-y-2">
+              <button 
+                onClick={handleRenameFromPopup} 
+                data-testid="rename-chat-btn"
+                className="w-full py-2 px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <PenSquare size={14} />
+                Ubah Nama
+              </button>
+              <button 
+                onClick={handleDeleteFromPopup} 
+                disabled={isDeleting || isStartingNewChat} 
+                data-testid="delete-chat-btn"
+                className="w-full py-2 px-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {isDeleting ? 'Menghapus...' : 'Hapus Chat'}
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -616,6 +665,7 @@ const ChatItem = ({
     // Container utama (Parent) yang memiliki background abu-abu saat aktif
     <div
       onClick={handleChatClick}
+      data-testid="chat-item"
       className={`
         flex items-center group rounded-lg p-2 transition-colors cursor-pointer relative
         ${isActive
@@ -628,6 +678,7 @@ const ChatItem = ({
       <div
         className="flex-1 text-left truncate text-sm"
         title={chat.title}
+        data-testid="chat-item-title"
       >
         {chat.title}
       </div>
@@ -635,6 +686,7 @@ const ChatItem = ({
       {onDeleteChat && isSidebarOpen && (
         <button
           onClick={handleMoreButtonClick}
+          data-testid="chat-item-more"
           className={`
             p-1 rounded-md transition-all ml-1
             ${isActive ? 'opacity-100 text-white/60' : 'opacity-0 group-hover:opacity-100 text-white/40'}
