@@ -327,7 +327,7 @@ router.post('/ingest-now',
       const errorResponse = { 
         success: false, 
         error: result?.error || 'Ingestion failed without error message',
-        message: result?.message || "Gagal memproses data pengetahuan",
+        message: result?.message || 'Gagal memproses data pengetahuan',
         details: result,
         data_validation: dataCheck
       };
@@ -389,7 +389,7 @@ router.post('/ingest',
       res.status(500).json({ 
         success: false, 
         error: result?.error || 'Unknown error',
-        message: result?.message || "Gagal memproses data pengetahuan",
+        message: result?.message || 'Gagal memproses data pengetahuan',
         data_validation: dataCheck
       });
     }
@@ -402,6 +402,7 @@ router.get('/conversations', authMiddleware.requireAuth, aiController.getConvers
 
 // ✅ FIX: Ganti :chatId menjadi :id agar sesuai dengan Controller
 router.get('/history/:id', authMiddleware.requireAuth, aiController.getChatHistory);
+router.patch('/conversations/:id', authMiddleware.requireAuth, aiController.renameConversation);
 router.delete('/conversations/:id', authMiddleware.requireAuth, aiController.deleteConversation);
 
 // ✅ FITUR AKADEMIK (PROTECTED) - ENHANCED RATE LIMITING
@@ -492,7 +493,7 @@ router.get('/test-embedding',
   asyncHandler(async (req, res) => {
     console.log('🧬 [TEST-EMBEDDING] Testing embedding function...');
     
-    const testText = "Lokasi kampus Tazkia di Sentul City Bogor";
+    const testText = 'Lokasi kampus Tazkia di Sentul City Bogor';
     const embedding = await openaiService.createEmbedding(testText);
     
     res.json({

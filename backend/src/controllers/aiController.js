@@ -15,7 +15,7 @@ const prisma = require('../config/prismaClient');
 
 const sendChat = async (req, res) => {
     const abortController = new AbortController();
-    let currentConversationId = null;
+    const currentConversationId = null;
 
     // 🛑 Listener untuk pembatalan
     req.on('close', () => {
@@ -28,8 +28,8 @@ const sendChat = async (req, res) => {
         const { message, conversationId, isNewChat, stream = true } = req.body;
         const userId = req.user?.id || null;
 
-        if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
-        if (!message || message.trim() === '') return res.status(400).json({ success: false, message: "Pesan tidak boleh kosong" });
+        if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+        if (!message || message.trim() === '') return res.status(400).json({ success: false, message: 'Pesan tidak boleh kosong' });
 
         const cleanMessage = message.trim();
 
@@ -57,7 +57,7 @@ const sendChat = async (req, res) => {
         const isAcademicQuery = academicKeywords.some(keyword => cleanMessage.toLowerCase().includes(keyword));
 
         let aiStream = null;
-        let finalAnswer = "";
+        let finalAnswer = '';
         let realTokenUsage = 0;
         let docsDetail = [];
 
@@ -69,11 +69,11 @@ const sendChat = async (req, res) => {
             ]);
 
             if (userSummary) {
-                const ipk = userSummary.academicSummary?.ipk || "0.00";
+                const ipk = userSummary.academicSummary?.ipk || '0.00';
                 const sks = userSummary.academicSummary?.totalSks || 0;
-                const prodi = userSummary.programStudi?.name || "Tidak diketahui";
+                const prodi = userSummary.programStudi?.name || 'Tidak diketahui';
                 const hasGrades = userGrades.length > 0;
-                const gradeList = hasGrades ? userGrades.map(g => `- Sem ${g.semester}: ${g.course.name} (${g.grade})`).join('\n') : "Belum ada data nilai.";
+                const gradeList = hasGrades ? userGrades.map(g => `- Sem ${g.semester}: ${g.course.name} (${g.grade})`).join('\n') : 'Belum ada data nilai.';
 
                 let academicContext = `
              [DATA AKADEMIK VALID]
@@ -110,7 +110,7 @@ const sendChat = async (req, res) => {
                 else finalAnswer = response.content;
                 realTokenUsage = 1500; // Est
             } else {
-                finalAnswer = "Maaf, data akademik Anda tidak ditemukan di database.";
+                finalAnswer = 'Maaf, data akademik Anda tidak ditemukan di database.';
             }
 
         } else {
@@ -150,11 +150,11 @@ const sendChat = async (req, res) => {
 
                 if (docsDetail.length > 0) res.write(`data: ${JSON.stringify({ type: 'meta', docs: docsDetail })}\n\n`);
 
-                let streamedText = "";
+                let streamedText = '';
                 let streamUsage = 0;
 
                 for await (const chunk of aiStream) {
-                    const content = chunk.choices[0]?.delta?.content || "";
+                    const content = chunk.choices[0]?.delta?.content || '';
                     if (content) {
                         streamedText += content;
                         res.write(`data: ${JSON.stringify({ type: 'content', chunk: content })}\n\n`);
@@ -213,20 +213,20 @@ const sendChat = async (req, res) => {
 
     } catch (error) {
         console.error('❌ [AI] Error:', error);
-        if (!res.headersSent) res.status(500).json({ success: false, message: "Error sistem." });
+        if (!res.headersSent) res.status(500).json({ success: false, message: 'Error sistem.' });
     }
 };
 
 // Helper internal untuk saving DB (karena dipakai Stream & JSON)
 async function handleSaveAndTrack(userId, currentId, reqConvId, isNewChat, userMsg, botMsg, usageToTrack, ip, alreadyTracked = false) {
     // 1. Track if needed
-    let remaining = null;
+    const remaining = null;
     if (!alreadyTracked && usageToTrack > 0) {
         await rateLimitService.trackTokenUsage(userId, ip, usageToTrack);
     }
 
     // 2. Save DB
-    let convId = reqConvId ? parseInt(reqConvId) : null;
+    const convId = reqConvId ? parseInt(reqConvId) : null;
     try {
         if (isNewChat || !convId) {
             const title = await generateTitle(userMsg, botMsg);
@@ -271,13 +271,13 @@ async function handleSaveAndTrack(userId, currentId, reqConvId, isNewChat, userM
                     }
                 }
             } catch (err) {
-                console.error("⚠️ [TITLE UPDATE] Error (Non-fatal):", err.message);
+                console.error('⚠️ [TITLE UPDATE] Error (Non-fatal):', err.message);
             }
 
             await prisma.conversation.update({ where: { id: convId }, data: { updatedAt: new Date() } });
             return convId;
         }
-    } catch (e) { console.error("DB Save Fail", e); return null; }
+    } catch (e) { console.error('DB Save Fail', e); return null; }
 }
 
 /**
@@ -288,7 +288,7 @@ async function handleSaveAndTrack(userId, currentId, reqConvId, isNewChat, userM
 
 const triggerIngestion = async (req, res) => {
     // Fungsi dummy atau implementasi asli jika ada
-    return res.json({ success: true, message: "Ingestion triggered (dummy)" });
+    return res.json({ success: true, message: 'Ingestion triggered (dummy)' });
 };
 
 const getConversations = async (req, res) => {
@@ -313,8 +313,8 @@ const getConversations = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("❌ [GET CONVERSATIONS ERROR]", error);
-        res.status(500).json({ success: false, message: "Failed to load conversations" });
+        console.error('❌ [GET CONVERSATIONS ERROR]', error);
+        res.status(500).json({ success: false, message: 'Failed to load conversations' });
     }
 };
 
@@ -323,16 +323,16 @@ const getChatHistory = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
 
-        if (!id) return res.status(400).json({ success: false, message: "ID Conversation diperlukan" });
+        if (!id) return res.status(400).json({ success: false, message: 'ID Conversation diperlukan' });
 
         const conversationId = parseInt(id);
-        if (isNaN(conversationId)) return res.status(400).json({ success: false, message: "ID Conversation harus berupa angka valid" });
+        if (isNaN(conversationId)) return res.status(400).json({ success: false, message: 'ID Conversation harus berupa angka valid' });
 
         const chatCheck = await prisma.conversation.findFirst({
             where: { id: conversationId, userId }
         });
 
-        if (!chatCheck) return res.status(404).json({ success: false, message: "Chat not found" });
+        if (!chatCheck) return res.status(404).json({ success: false, message: 'Chat not found' });
 
         const messages = await prisma.message.findMany({
             where: { conversationId: conversationId },
@@ -346,8 +346,8 @@ const getChatHistory = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("History Error:", error);
-        res.status(500).json({ success: false, message: "Failed to load history" });
+        console.error('History Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load history' });
     }
 };
 
@@ -359,7 +359,7 @@ const deleteConversation = async (req, res) => {
 
         // Validasi ID
         if (!id || isNaN(parseInt(id))) {
-            return res.status(400).json({ success: false, message: "ID Chat tidak valid" });
+            return res.status(400).json({ success: false, message: 'ID Chat tidak valid' });
         }
 
         // Gunakan deleteMany untuk keamanan (ID + userId)
@@ -373,24 +373,59 @@ const deleteConversation = async (req, res) => {
 
         // Cek apakah ada yang terhapus (jika 0 berarti tidak ditemukan atau bukan pemilik)
         if (result.count === 0) {
-            return res.status(404).json({ success: false, message: "Chat tidak ditemukan atau Anda tidak memiliki akses" });
+            return res.status(404).json({ success: false, message: 'Chat tidak ditemukan atau Anda tidak memiliki akses' });
         }
 
-        res.json({ success: true, message: "Percakapan berhasil dihapus" });
+        res.json({ success: true, message: 'Percakapan berhasil dihapus' });
     } catch (error) {
         // Log error yang sebenarnya ke console server agar bisa ditelusuri
-        console.error("❌ [DELETE ERROR]", error);
+        console.error('❌ [DELETE ERROR]', error);
         res.status(500).json({
             success: false,
-            message: "Gagal menghapus percakapan. Silakan coba lagi nanti."
+            message: 'Gagal menghapus percakapan. Silakan coba lagi nanti.'
         });
     }
 };
 
+// ✅ BARU: Rename Conversation
+const renameConversation = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { title } = req.body;
+        const userId = req.user.id;
+
+        if (!id || isNaN(parseInt(id))) {
+            return res.status(400).json({ success: false, message: 'ID Chat tidak valid' });
+        }
+        if (!title || title.trim() === '') {
+            return res.status(400).json({ success: false, message: 'Judul tidak boleh kosong' });
+        }
+
+        const result = await prisma.conversation.updateMany({
+            where: {
+                id: parseInt(id),
+                userId: userId
+            },
+            data: {
+                title: title.trim()
+            }
+        });
+
+        if (result.count === 0) {
+            return res.status(404).json({ success: false, message: 'Chat tidak ditemukan atau Anda tidak memiliki akses' });
+        }
+
+        res.json({ success: true, message: 'Judul berhasil diubah', title: title.trim() });
+    } catch (error) {
+        console.error('❌ [RENAME ERROR]', error);
+        res.status(500).json({ success: false, message: 'Gagal mengubah judul' });
+    }
+};
+
 // Fungsi Placeholder agar Router tidak error
-const analyzeAcademicPerformance = async (req, res) => { res.json({ success: true, message: "Feature coming soon" }) };
-const getStudyRecommendations = async (req, res) => { res.json({ success: true, message: "Feature coming soon" }) };
-const testAI = async (req, res) => { res.json({ success: true, message: "Test OK" }) };
+const analyzeAcademicPerformance = async (req, res) => { res.json({ success: true, message: 'Feature coming soon' }); };
+const getStudyRecommendations = async (req, res) => { res.json({ success: true, message: 'Feature coming soon' }); };
+const testAI = async (req, res) => { res.json({ success: true, message: 'Test OK' }); };
 const testOpenAIConnectionHandler = async (req, res) => {
     const result = await testOpenAIConnection();
     res.json(result);
@@ -433,5 +468,6 @@ module.exports = {
     getStudyRecommendations,
     testAI,
     testOpenAIConnection: testOpenAIConnectionHandler,
-    searchConversations
+    searchConversations,
+    renameConversation
 };
