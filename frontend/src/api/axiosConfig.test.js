@@ -1,6 +1,7 @@
 // __mocks__/axios.js auto-mocks. axios.create returns the same instance.
 
 import axios from 'axios';
+jest.mock('axios');
 import api, { clearAuthHeaders, setAuthHeaders, testConnection } from './axiosConfig';
 
 const [reqOnSuccess, reqOnError] = axios.interceptors.request.use.mock.calls[0];

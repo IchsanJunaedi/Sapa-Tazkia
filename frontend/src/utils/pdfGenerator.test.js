@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 // Mock jspdf and jspdf-autotable so the generator can run end-to-end without
 // touching the real implementations. Use mock_ prefix to satisfy babel-jest hoisting.
 

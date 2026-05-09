@@ -1,3 +1,5 @@
+const { describe, it, expect, beforeEach, jest } = require('@jest/globals');
+
 jest.mock('ioredis', () => {
   return jest.fn().mockImplementation(() => ({
     on: jest.fn(),

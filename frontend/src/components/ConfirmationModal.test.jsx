@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 // frontend/src/components/ConfirmationModal.test.jsx
 
 import React from 'react';

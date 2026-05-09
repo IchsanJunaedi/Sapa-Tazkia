@@ -3,6 +3,7 @@
 // (the mock returns `this`), so api === axios.
 
 import axios from 'axios';
+jest.mock('axios');
 import * as apiModule from './api';
 
 const { authAPI, academicAPI, chatAPI } = apiModule;
