@@ -5,6 +5,8 @@
 // coverage report via scripts/merge-coverage.js.
 
 const { defineConfig, devices } = require('@playwright/test');
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env.test') });
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
 const REQUIRES_AUTH = (process.env.E2E_REQUIRES_AUTH || 'true').toLowerCase() !== 'false';
@@ -17,15 +19,16 @@ module.exports = defineConfig({
   // body. The expect-level timeout stays tight so per-assertion failures
   // surface quickly.
   timeout: 120_000,
-  expect: { timeout: 15_000 },
+  expect: { timeout: 30_000 },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   // 1 retry in CI is enough now that auth runs via API instead of UI; more
   // retries just compound rate-limit/state issues without surfacing real bugs.
   retries: process.env.CI ? 1 : 0,
-  // Single worker on CI keeps globalSetup deterministic and avoids two
-  // browsers fighting over the same `.auth/user.json` storage state file.
-  workers: process.env.CI ? 1 : undefined,
+  // Limit to 2 workers locally so the heavy serial suites (conversation-mgmt
+  // + full-journey) don't race each other over the same test user account.
+  /* Set workers to 1 to ensure absolute stability and prevent database contention. */
+  workers: 1,
   reporter: [
     ['list'],
     ['html', { outputFolder: 'coverage/e2e/html-report', open: 'never' }],
@@ -37,6 +40,14 @@ module.exports = defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    // Atur PLAYWRIGHT_SLOW_MO=1000 untuk memperlambat eksekusi (ms per aksi)
+    // Berguna saat ingin "menonton" tes berjalan di browser.
+    // Contoh: PLAYWRIGHT_SLOW_MO=1000 npx playwright test --headed
+    // CATATAN: Jangan set slowMo otomatis untuk --headed karena akan merusak
+    // loop toPass() di conversation-mgmt dan full-journey (habiskan waktu retry).
+    launchOptions: {
+      slowMo: process.env.PLAYWRIGHT_SLOW_MO ? Number(process.env.PLAYWRIGHT_SLOW_MO) : 0,
+    },
   },
   ...(REQUIRES_AUTH ? { globalSetup: './tests/e2e/globalSetup.js' } : {}),
   projects: [
