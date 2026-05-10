@@ -1,4 +1,3 @@
-const { describe, it, expect, beforeEach, afterAll, jest } = require('@jest/globals');
 // backend/tests/unit/utils.test.js
 //
 // Unit tests for small utility modules:

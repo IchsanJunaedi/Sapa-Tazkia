@@ -1,7 +1,6 @@
 /**
  * @jest-environment jsdom
  */
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import logger from './logger';
 
 describe('logger utility', () => {

@@ -1,4 +1,3 @@
-const { describe, it, expect, jest } = require('@jest/globals');
 const requestId = require('../../src/middleware/requestId');
 
 function mockRes() {
