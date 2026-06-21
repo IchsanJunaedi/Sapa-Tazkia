@@ -215,13 +215,19 @@ test.describe('Sapa Tazkia Full Journey E2E', () => {
     });
 
     test('akses halaman terproteksi tanpa login → diredirect ke halaman utama', async ({ page }) => {
-      // Kita hapus token dulu untuk simulasi guest/logged out
+      // Simpan token dulu biar bisa direstore setelah test
+      const token = await page.evaluate(() => localStorage.getItem('token'));
+      
       await page.goto('/');
       await page.evaluate(() => localStorage.clear());
       
       await page.goto('/academic');
-      // Harusnya diredirect ke landing page (/)
       await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
+
+      // Restore token agar test berikutnya tidak kehilangan auth
+      if (token) {
+        await page.evaluate((t) => { localStorage.setItem('token', t); }, token);
+      }
     });
 
     test('search percakapan di sidebar berfungsi', async ({ page }) => {
