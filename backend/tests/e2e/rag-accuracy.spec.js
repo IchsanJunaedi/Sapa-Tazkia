@@ -1,8 +1,9 @@
 // backend/tests/e2e/rag-accuracy.spec.js
-const { test, expect } = require('@playwright/test');
+const { test, expect, request: playwrightRequest } = require('@playwright/test');
 
-// Gunakan auto-login yang sudah ada di globalSetup
-// atau bypass login jika test ini berjalan mandiri
+// Override global storage state — we handle auth ourselves via API login
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('RAG Accuracy Validation', () => {
   
   const QA_PAIRS = [
@@ -25,7 +26,27 @@ test.describe('RAG Accuracy Validation', () => {
   ];
 
   test.beforeEach(async ({ page }) => {
-    // Navigasi ke halaman chat yang sudah login
+    // 1. Login via API
+    const apiBase = process.env.E2E_API_BASE_URL || 'http://127.0.0.1:5000';
+    const nim = process.env.E2E_LOGIN_NIM || '241572010024';
+    const password = process.env.E2E_LOGIN_PASSWORD || '241572010024';
+
+    const apiCtx = await playwrightRequest.newContext({ baseURL: apiBase });
+    const res = await apiCtx.post('/api/auth/login', {
+      data: { identifier: nim, password },
+    });
+    const body = await res.json();
+    await apiCtx.dispose();
+
+    // 2. Inject token ke localStorage
+    const frontendBase = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
+    await page.goto(frontendBase);
+    await page.evaluate(({ token, user }) => {
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+    }, { token: body.token, user: body.user });
+
+    // 3. Navigasi ke halaman chat yang sudah login
     await page.goto('/chat');
     await expect(page.locator('[data-testid="pertanyaan-input"]').first()).toBeVisible({ timeout: 30_000 });
   });

@@ -11,6 +11,7 @@
 // that uniquely targets the element, ideally `data-testid`).
 
 const { test, expect } = require('./fixtures');
+const { request: playwrightRequest } = require('@playwright/test');
 
 // -----------------------------------------------------------------------------
 // Config — override via env.
@@ -42,6 +43,29 @@ const SAMPLE_QUESTION = 'Kapan jadwal KRS semester genap dibuka?';
 const ANSWER_TIMEOUT_MS = Number(process.env.E2E_ANSWER_TIMEOUT_MS || 60_000);
 const USER_BUBBLE_SELECTOR =
   process.env.E2E_USER_BUBBLE || '[data-testid="pesan-user"]';
+
+// Override global storage state — we handle auth ourselves via API login
+test.use({ storageState: { cookies: [], origins: [] } });
+
+test.beforeEach(async ({ page }) => {
+  const apiBase = process.env.E2E_API_BASE_URL || 'http://127.0.0.1:5000';
+  const nim = process.env.E2E_LOGIN_NIM || '241572010024';
+  const password = process.env.E2E_LOGIN_PASSWORD || '241572010024';
+
+  const apiCtx = await playwrightRequest.newContext({ baseURL: apiBase });
+  const res = await apiCtx.post('/api/auth/login', {
+    data: { identifier: nim, password },
+  });
+  const body = await res.json();
+  await apiCtx.dispose();
+
+  const frontendBase = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
+  await page.goto(frontendBase);
+  await page.evaluate(({ token, user }) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+  }, { token: body.token, user: body.user });
+});
 
 test.describe('QA Flow — form tanya-jawab', () => {
   test('user submits a question and sees the answer rendered', async ({ page }) => {
