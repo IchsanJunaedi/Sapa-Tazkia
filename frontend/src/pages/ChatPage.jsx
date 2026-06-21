@@ -306,44 +306,52 @@ const ChatPage = () => {
 
     // EMERGENCY BRIDGE EFFECT (RESTORE FROM URL)
     useEffect(() => {
-        if (chatId && isAuthenticated && !isGuest && !initializationRef.current.hasRestoredFromUrl) {
-            // Prevent duplicate history fetch if messages are already present for this chatId
-            if (currentChatId === chatId && messages.length > 0) {
-                console.log("🔍 [CHAT PAGE] History already present in state, skipping fetch.");
-                initializationRef.current.hasRestoredFromUrl = true;
-                return;
-            }
+        if (!chatId || !isAuthenticated || isGuest || initializationRef.current.hasRestoredFromUrl) return;
 
-            if (isFetchingHistoryRef.current) return;
-
+        // NEW: "new" berarti create chat, bukan load history
+        if (chatId === 'new') {
             initializationRef.current.hasRestoredFromUrl = true;
-            setCurrentChatId(chatId);
-            setIsNewChat(false);
-            setIsLoading(true);
-            setError(null);
-            isFetchingHistoryRef.current = true;
-
-            console.log("🔍 [CHAT PAGE] Fetching history for:", chatId);
-            api.get(`/ai/history/${chatId}`)
-                .then(response => {
-                    if (response.data && Array.isArray(response.data.messages)) {
-                        const processedMessages = response.data.messages.map(msg => processMessageContent(msg));
-                        setMessages(processedMessages);
-                    } else {
-                        setMessages([]);
-                    }
-                })
-                .catch(err => {
-                    console.error("❌ Failed to restore chat from URL:", err);
-                    if (err.response?.status === 404) {
-                        navigate('/chat', { replace: true });
-                    }
-                })
-                .finally(() => {
-                    setIsLoading(false);
-                    isFetchingHistoryRef.current = false;
-                });
+            setIsNewChat(true);
+            setCurrentChatId(null);
+            return;
         }
+
+        // Prevent duplicate history fetch if messages are already present for this chatId
+        if (currentChatId === chatId && messages.length > 0) {
+            console.log("🔍 [CHAT PAGE] History already present in state, skipping fetch.");
+            initializationRef.current.hasRestoredFromUrl = true;
+            return;
+        }
+
+        if (isFetchingHistoryRef.current) return;
+
+        initializationRef.current.hasRestoredFromUrl = true;
+        setCurrentChatId(chatId);
+        setIsNewChat(false);
+        setIsLoading(true);
+        setError(null);
+        isFetchingHistoryRef.current = true;
+
+        console.log("🔍 [CHAT PAGE] Fetching history for:", chatId);
+        api.get(`/ai/history/${chatId}`)
+            .then(response => {
+                if (response.data && Array.isArray(response.data.messages)) {
+                    const processedMessages = response.data.messages.map(msg => processMessageContent(msg));
+                    setMessages(processedMessages);
+                } else {
+                    setMessages([]);
+                }
+            })
+            .catch(err => {
+                console.error("❌ Failed to restore chat from URL:", err);
+                if (err.response?.status === 404) {
+                    navigate('/chat', { replace: true });
+                }
+            })
+            .finally(() => {
+                setIsLoading(false);
+                isFetchingHistoryRef.current = false;
+            });
     }, [chatId, isAuthenticated, isGuest, messages.length, currentChatId, navigate]);
 
 

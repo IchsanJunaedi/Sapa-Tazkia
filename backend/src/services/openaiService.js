@@ -4,12 +4,12 @@ const logger = require('../utils/logger');
 
 // ✅ FIX 1: Cek API Key agar tidak error gaib jika .env bermasalah
 if (!process.env.OPENAI_API_KEY) {
-  console.error("🚨 [FATAL] OPENAI_API_KEY tidak ditemukan di .env!");
+  console.error('🚨 [FATAL] OPENAI_API_KEY tidak ditemukan di .env!');
 }
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 30000, // 30 Detik (Lebih tahan untuk long context)
+  timeout: 60000, // 60 Detik (CI cold start needs more time)
   maxRetries: 2,
 });
 
@@ -85,10 +85,10 @@ Instruksi: Gunakan HANYA data dari [CONTEXT] di atas. Jawab akurat, terstruktur,
  * 1. EMBEDDING GENERATOR
  */
 async function createEmbedding(text) {
-  const cleanText = text.replace(/\s+/g, " ").trim();
+  const cleanText = text.replace(/\s+/g, ' ').trim();
   return withRetry(async () => {
     const response = await openai.embeddings.create({
-      model: "text-embedding-3-small",
+      model: 'text-embedding-3-small',
       input: cleanText,
     });
     return response.data[0].embedding;
@@ -132,7 +132,7 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
     };
 
     if (isIdentityQuestion(userMessage)) {
-      return handleStaticResponse("Assalamualaikum! 👋 Saya **Kia**, asisten virtual Universitas Tazkia. Kia siap bantu Kakak seputar informasi kampus, prodi, dan akademik. Ada yang bisa dibantu? 😊");
+      return handleStaticResponse('Assalamualaikum! 👋 Saya **Kia**, asisten virtual Universitas Tazkia. Kia siap bantu Kakak seputar informasi kampus, prodi, dan akademik. Ada yang bisa dibantu? 😊');
     }
 
     // --- Greeting Handler (NEW) ---
@@ -140,13 +140,13 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
       const lower = userMessage.toLowerCase();
       // Special response for Islamic greeting
       if (lower.includes('assalamualaikum') || lower.includes('assalamu')) {
-        return handleStaticResponse("Waalaikumussalam! 👋 Halo Kak, selamat datang di layanan Sapa Tazkia. Ada yang bisa Kia bantu hari ini seputar informasi kampus, prodi, atau akademik? 😊");
+        return handleStaticResponse('Waalaikumussalam! 👋 Halo Kak, selamat datang di layanan Sapa Tazkia. Ada yang bisa Kia bantu hari ini seputar informasi kampus, prodi, atau akademik? 😊');
       }
-      return handleStaticResponse("Halo Kak! 👋 Selamat datang di layanan Sapa Tazkia. Kia siap bantu Kakak seputar informasi kampus, pendaftaran, dan akademik. Ada yang bisa dibantu? 😊");
+      return handleStaticResponse('Halo Kak! 👋 Selamat datang di layanan Sapa Tazkia. Kia siap bantu Kakak seputar informasi kampus, pendaftaran, dan akademik. Ada yang bisa dibantu? 😊');
     }
 
     if (isBannedTopicQuestion(userMessage)) {
-      return handleStaticResponse("Mohon maaf Kak, Kia hanya fokus menjawab seputar informasi **Akademik & Kampus Tazkia** ya. 🙏 Silakan tanya tentang pendaftaran, biaya, atau prodi.");
+      return handleStaticResponse('Mohon maaf Kak, Kia hanya fokus menjawab seputar informasi **Akademik & Kampus Tazkia** ya. 🙏 Silakan tanya tentang pendaftaran, biaya, atau prodi.');
     }
 
     // --- Construct Messages ---
@@ -205,7 +205,7 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
   } catch (error) {
     logger.error('[OPENAI] Gen Answer Error:', error.message);
     return {
-      content: "Mohon maaf, koneksi Kia ke server sedang tidak stabil. Silakan coba sesaat lagi ya Kak. 🙏",
+      content: 'Mohon maaf, koneksi Kia ke server sedang tidak stabil. Silakan coba sesaat lagi ya Kak. 🙏',
       usage: {}
     };
   }
@@ -218,10 +218,10 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
 async function generateTitle(userMessage, aiResponse = null) {
   try {
     // 1. Validasi input kosong (tetap pertahankan ini)
-    if (!userMessage || userMessage.trim() === "") return "Percakapan Baru";
+    if (!userMessage || userMessage.trim() === '') return 'Percakapan Baru';
 
     // 2. Jika pesan sangat pendek (< 3 huruf), baru gunakan default
-    if (userMessage.length < 3) return "Percakapan Baru";
+    if (userMessage.length < 3) return 'Percakapan Baru';
 
     const messages = [
       {
@@ -245,14 +245,14 @@ async function generateTitle(userMessage, aiResponse = null) {
     // Inject konteks jawaban AI (opsional tapi membantu)
     if (aiResponse) {
       // Kita potong biar hemat token, ambil intinya saja
-      const cleanAiResponse = aiResponse.substring(0, 100).replace(/\n/g, " ");
+      const cleanAiResponse = aiResponse.substring(0, 100).replace(/\n/g, ' ');
       messages[1].content += `\nKonteks Jawaban AI: "${cleanAiResponse}"`;
     }
 
-    messages[1].content += `\nJudul:`;
+    messages[1].content += '\nJudul:';
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: 'gpt-4o-mini',
       messages: messages,
       max_tokens: 15,
       temperature: 0.3      // Naikkan sedikit biar lebih kreatif menangkap maksud
@@ -264,12 +264,12 @@ async function generateTitle(userMessage, aiResponse = null) {
     title = title.replace(/^["']|["']$/g, '').replace(/\.$/, '');
 
     // Fallback terakhir jika AI masih bandel output kosong
-    if (title.length < 3) return "Percakapan Baru";
+    if (title.length < 3) return 'Percakapan Baru';
 
     return title;
 
   } catch (error) {
-    console.warn("⚠️ [TITLE GEN] Error, fallback manual:", error.message);
+    console.warn('⚠️ [TITLE GEN] Error, fallback manual:', error.message);
     // Fallback manual: Ambil 4 kata pertama user
     return userMessage.split(' ').slice(0, 4).join(' ');
   }
@@ -299,12 +299,12 @@ function isIdentityQuestion(text) {
   const t = text.toLowerCase();
   // Removed "human" and "manusia" to avoid false positives (e.g., "humaniora")
   // Only target direct identity questions
-  return ["siapa kamu", "kamu siapa", "apakah kamu robot", "apakah anda robot", "admin siapa"].some(k => t.includes(k));
+  return ['siapa kamu', 'kamu siapa', 'apakah kamu robot', 'apakah anda robot', 'admin siapa'].some(k => t.includes(k));
 }
 
 function isBannedTopicQuestion(text) {
   const t = text.toLowerCase();
-  return ["resep", "masak", "politik", "presiden", "partai", "judi", "slot"].some(k => t.includes(k));
+  return ['resep', 'masak', 'politik', 'presiden', 'partai', 'judi', 'slot'].some(k => t.includes(k));
 }
 
 const RETRIABLE_STATUS = new Set([429, 500, 502, 503, 504]);
@@ -337,7 +337,7 @@ async function withRetry(fn, maxAttempts = 3, baseDelayMs = 1000) {
 async function testOpenAIConnection() {
   try {
     const res = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: 'Tes koneksi' }],
       max_tokens: 5
     });
