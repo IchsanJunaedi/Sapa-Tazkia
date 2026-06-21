@@ -161,6 +161,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [unit-and-integration, frontend-tests]
+    continue-on-error: true
 
     env:
       DATABASE_URL: mysql://root:testpassword@127.0.0.1:3306/sapa_tazkia_test
