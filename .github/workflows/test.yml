@@ -46,6 +46,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    env:
+      DATABASE_URL: mysql://root:testpassword@127.0.0.1:3306/sapa_tazkia_test
+      REDIS_URL: redis://127.0.0.1:6379
+      NODE_ENV: test
+      RATE_LIMIT_ENABLED: "false"
+
     services:
       mysql:
         image: mysql:8.0
@@ -155,6 +161,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [unit-and-integration, frontend-tests]
+
+    env:
+      DATABASE_URL: mysql://root:testpassword@127.0.0.1:3306/sapa_tazkia_test
+      REDIS_URL: redis://127.0.0.1:6379
+      NODE_ENV: test
+      RATE_LIMIT_ENABLED: "false"
+      JWT_SECRET: ci-test-jwt-secret-32-chars-long-x
+      SESSION_SECRET: ci-test-session-secret-32-chars-xx
+      CI: "true"
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      E2E_LOGIN_NIM: ${{ secrets.E2E_LOGIN_NIM }}
+      E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
 
     services:
       mysql:
