@@ -230,6 +230,41 @@ jobs:
           cp .env.test.example .env.test
           npx prisma db push --skip-generate
 
+      - name: Seed test user
+        working-directory: backend
+        env:
+          SEED_E2E_NIM: ${{ secrets.E2E_LOGIN_NIM }}
+          SEED_E2E_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+        run: |
+          node -e "
+          const bcrypt = require('bcryptjs');
+          const { PrismaClient } = require('@prisma/client');
+          const prisma = new PrismaClient();
+          (async () => {
+            const nim = process.env.SEED_E2E_NIM;
+            if (!nim) { console.log('No E2E_NIM — skipping seed'); return; }
+            const plain = process.env.SEED_E2E_PASSWORD || nim;
+            const hash = await bcrypt.hash(plain, 10);
+            await prisma.user.upsert({
+              where: { nim },
+              update: { passwordHash: hash, isEmailVerified: true, status: 'active' },
+              create: {
+                nim,
+                email: nim + '@test.local',
+                passwordHash: hash,
+                fullName: 'E2E Tester',
+                authMethod: 'nim',
+                userType: 'regular',
+                isProfileComplete: true,
+                isEmailVerified: true,
+                status: 'active',
+              },
+            });
+            console.log('Seeded E2E user:', nim);
+            await prisma.\$disconnect();
+          })();
+          "
+
       - name: Install Playwright browsers
         working-directory: backend
         run: npx playwright install --with-deps chromium
