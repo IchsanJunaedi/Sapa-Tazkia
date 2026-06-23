@@ -157,7 +157,7 @@ jobs:
       # ── Upload ZAP HTML report as artifact ───────────────────────────────────
       - name: Upload ZAP report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: zap-report-${{ github.run_number }}
           path: |
