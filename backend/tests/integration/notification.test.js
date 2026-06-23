@@ -5,6 +5,9 @@
 // - PATCH /api/notifications/read-all
 // - PATCH /api/notifications/:id/read
 // - POST /api/admin/announcements (admin only)
+// - Multi-user isolation (notifications belong to the requesting user only)
+// - Unread count accuracy
+// - Pagination / limit params (if supported)
 
 jest.mock('express-rate-limit', () => () => (req, res, next) => next());
 
@@ -155,5 +158,77 @@ describe('Notifications + Announcements', () => {
         expect(Array.isArray(r.body.announcements ?? r.body.data ?? [])).toBe(true);
       }
     });
+  });
+});
+
+// -----------------------------------------------------------------------
+// Extended: multi-user isolation + unread count accuracy
+// -----------------------------------------------------------------------
+describe('Notifications — extended coverage', () => {
+  const { agent } = require('../helpers/appHelper');
+  const { prisma, truncateAll, seedTestUser, disconnect } = require('../helpers/dbHelper');
+
+  let userA, tokenA;
+  let userB, tokenB;
+
+  beforeAll(async () => {
+    // Truncation done by the outer suite; seed two separate users here
+    const seedA = await seedTestUser({ nim: 'NOTIF_A001', email: 'notif-a@x.com' });
+    userA = seedA.user;
+    const rA = await agent.post('/api/auth/login').send({ identifier: userA.nim, password: seedA.plainPassword });
+    tokenA = rA.body.token;
+
+    const seedB = await seedTestUser({ nim: 'NOTIF_B001', email: 'notif-b@x.com' });
+    userB = seedB.user;
+    const rB = await agent.post('/api/auth/login').send({ identifier: userB.nim, password: seedB.plainPassword });
+    tokenB = rB.body.token;
+  });
+
+  afterAll(async () => {
+    await truncateAll();
+    await disconnect();
+  });
+
+  it('user A only sees their own notifications', async () => {
+    const ann = await prisma.announcement.create({ data: { title: 'Isolation', message: 'only for A' } });
+    // Create notification only for user A
+    await prisma.notification.create({ data: { userId: userA.id, announcementId: ann.id, isRead: false } });
+
+    const rA = await agent.get('/api/notifications').set('Authorization', `Bearer ${tokenA}`);
+    expect(rA.status).toBe(200);
+    expect(rA.body.data.length).toBeGreaterThan(0);
+
+    const rB = await agent.get('/api/notifications').set('Authorization', `Bearer ${tokenB}`);
+    expect(rB.status).toBe(200);
+    // User B should not see user A's notification
+    const bIds = rB.body.data.map((n) => n.userId);
+    expect(bIds).not.toContain(userA.id);
+  });
+
+  it('unreadCount decreases after PATCH read-all', async () => {
+    const ann = await prisma.announcement.create({ data: { title: 'Unread count', message: 'test' } });
+    await prisma.notification.createMany({
+      data: [
+        { userId: userA.id, announcementId: ann.id, isRead: false },
+      ],
+    });
+
+    // Before read-all
+    const before = await agent.get('/api/notifications').set('Authorization', `Bearer ${tokenA}`);
+    const unreadBefore = before.body.unreadCount;
+    expect(unreadBefore).toBeGreaterThan(0);
+
+    // Mark all read
+    await agent.patch('/api/notifications/read-all').set('Authorization', `Bearer ${tokenA}`);
+
+    // After read-all
+    const after = await agent.get('/api/notifications').set('Authorization', `Bearer ${tokenA}`);
+    expect(after.body.unreadCount).toBe(0);
+  });
+
+  it('GET /api/notifications accepts a limit query param without error', async () => {
+    const r = await agent.get('/api/notifications?limit=5').set('Authorization', `Bearer ${tokenA}`);
+    expect(r.status).toBe(200);
+    expect(r.body.success).toBe(true);
   });
 });

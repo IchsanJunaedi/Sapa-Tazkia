@@ -208,8 +208,8 @@ router.post('/login', strictLimiter, validateLogin, authController.login);
 router.post('/refresh', strictLimiter, validateRefreshToken, authController.refreshToken);
 
 // TODO: Re-enable forgot/reset password when SIAKAD API is integrated (NIM+password flow)
-// router.post('/forgot-password', strictLimiter, validateForgotPassword, authController.forgotPassword);
-// router.post('/reset-password', strictLimiter, validateResetPassword, authController.resetPassword);
+router.post('/forgot-password', strictLimiter, validateForgotPassword, authController.forgotPassword);
+router.post('/reset-password', strictLimiter, validateResetPassword, authController.resetPassword);
 
 // ========================================================
 // ✅ EMAIL VERIFICATION ROUTES (HIGH RISK)
@@ -295,7 +295,7 @@ router.patch('/update-verification', authMiddleware.requireAuth, generalLimiter,
 router.patch('/update-profile', authMiddleware.requireAuth, generalLimiter, authController.updateProfile);
 
 // TODO: Re-enable when SIAKAD API is integrated (only relevant for NIM+password users)
-// router.put('/change-password', authMiddleware.requireAuth, generalLimiter, validateChangePassword, authController.changePassword);
+router.put('/change-password', authMiddleware.requireAuth, generalLimiter, validateChangePassword, authController.changePassword);
 
 // ========================================================
 // TEST ROUTES

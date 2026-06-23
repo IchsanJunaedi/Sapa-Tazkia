@@ -1,0 +1,101 @@
+# .github/dependabot.yml
+#
+# Dependabot configuration for automatic dependency updates.
+# Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Schedule: Weekly on Mondays at 09:00 WIB (UTC+7 → UTC 02:00).
+# PRs are limited to 5 open at a time per ecosystem to avoid merge noise.
+
+version: 2
+
+updates:
+  # ─── Backend (Node.js / npm) ───────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "Asia/Jakarta"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "backend"
+    groups:
+      # Group all minor/patch updates into one PR per week to reduce noise.
+      backend-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Major version bumps require manual review — don't auto-open PRs.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    reviewers:
+      - "IchsanJunaedi"
+
+  # ─── Frontend (Node.js / npm) ──────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "Asia/Jakarta"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "frontend"
+    groups:
+      frontend-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    reviewers:
+      - "IchsanJunaedi"
+
+  # ─── Root (Node.js / npm) — shared tooling & scripts ──────────────────────
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "Asia/Jakarta"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "tooling"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  # ─── GitHub Actions ────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "Asia/Jakarta"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(actions)"
+      include: "scope"
+    reviewers:
+      - "IchsanJunaedi"
