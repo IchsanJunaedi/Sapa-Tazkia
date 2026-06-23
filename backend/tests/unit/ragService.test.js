@@ -153,11 +153,13 @@ describe('ragService.answerQuestion', () => {
     expect(r.stream).toBe('FakeStreamObj');
   });
 
-  it('throws on aborted signal', async () => {
+  it('returns graceful fallback on aborted signal', async () => {
     redisService.get.mockResolvedValueOnce(null);
     const ctrl = new AbortController();
     ctrl.abort();
-    await expect(ragService.answerQuestion('x', [], { abortSignal: ctrl.signal })).rejects.toThrow();
+    const r = await ragService.answerQuestion('x', [], { abortSignal: ctrl.signal });
+    expect(r.isAborted).toBe(true);
+    expect(r.answer).toBe('');
   });
 });
 

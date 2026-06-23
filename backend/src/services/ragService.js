@@ -51,7 +51,7 @@ class RagService {
 
       // --- LAYER 1: Context Injection ---
       if (history.length > 0) {
-        const lastUserMessage = [...history].reverse().find(m => m.role === 'user')?.content || "";
+        const lastUserMessage = [...history].reverse().find(m => m.role === 'user')?.content || '';
         const isShort = cleanQuery.split(' ').length < 4;
         const triggers = ['nya', 'itu', 'tersebut', 'tadi', 'ini', 'dia', 'beliau', 'dimana', 'berapa', 'kapan', 'dalil', 'hukum', 'biaya'];
         const hasTrigger = triggers.some(w => cleanQuery.includes(w));
@@ -112,7 +112,7 @@ class RagService {
 
           if (category) {
             searchOptions.filter = {
-              must: [{ key: "category", match: { value: category } }]
+              must: [{ key: 'category', match: { value: category } }]
             };
           }
 
@@ -132,7 +132,7 @@ class RagService {
         if (res.status === 'fulfilled' && Array.isArray(res.value)) {
           res.value.forEach(item => {
             // Use payload.text hash or ID as key
-            const content = (item.payload.text || "").trim();
+            const content = (item.payload.text || '').trim();
             const docHash = this.calculateTextHash(content);
 
             if (!uniqueDocs.has(docHash)) {
@@ -195,14 +195,14 @@ class RagService {
   // =============================================================================
 
   compileContext(docs) {
-    if (!docs || docs.length === 0) return "";
+    if (!docs || docs.length === 0) return '';
 
-    let contextString = "";
+    let contextString = '';
     let currentTokens = 0;
 
     for (const doc of docs) {
-      const title = doc.payload.title || "Informasi";
-      const text = doc.payload.text || "";
+      const title = doc.payload.title || 'Informasi';
+      const text = doc.payload.text || '';
 
       const chunk = `[[Sumber: ${title}]]\n${text}\n\n`;
 
@@ -278,6 +278,12 @@ class RagService {
       return response;
 
     } catch (error) {
+      const isAborted = abortSignal?.aborted || error.message === 'AbortError' || error.name === 'AbortError';
+      if (isAborted) {
+        console.warn('⚠️ [RAG] Request aborted by client');
+        const empty = (stream ? { isStream: false } : {});
+        return { answer: '', usage: { total_tokens: 0 }, docsFound: 0, docsDetail: [], isAborted: true, ...empty };
+      }
       console.error('❌ [RAG] Answer Process Error:', error.message);
       throw error;
     }
@@ -403,7 +409,7 @@ class RagService {
     const dataDir = path.join(__dirname, '../../data');
 
     if (!fs.existsSync(dataDir)) {
-      return { success: false, message: "Folder data missing" };
+      return { success: false, message: 'Folder data missing' };
     }
 
     const files = fs.readdirSync(dataDir).filter(f => f.endsWith('.json'));

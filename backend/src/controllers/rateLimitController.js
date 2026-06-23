@@ -64,7 +64,7 @@ class RateLimitController {
 
       res.json({ 
         success: false, // Tandai false tapi tetap return 200 OK secara HTTP
-        message: "Fallback status due to server error",
+        message: 'Fallback status due to server error',
         data: {
           user_type: userType,
           window_limits: {
@@ -94,6 +94,24 @@ class RateLimitController {
     } catch (error) {
       res.status(500).json({ success: false, error: 'Service check failed' });
     }
+  }
+
+  getRateLimitAnalytics(req, res) {
+    res.json({ 
+      success: true, 
+      message: 'Rate limit analytics endpoint', 
+      usingFallback: true,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  resetRateLimit(req, res) {
+    res.json({ 
+      success: true, 
+      message: 'Rate limit reset endpoint', 
+      usingFallback: true,
+      timestamp: new Date().toISOString()
+    });
   }
 }
 
