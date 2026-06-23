@@ -1,5 +1,5 @@
 #
-# Codecov configuration — target 75% total coverage.
+# Codecov configuration — target 75% total coverage (enforced).
 # Docs: https://docs.codecov.com/docs/codecov-yaml
 #
 codecov:
@@ -10,27 +10,27 @@ codecov:
 coverage:
   precision: 2
   round: down
-  range: "60...90"
+  range: "65...95"
 
   status:
     project:
       default:
-        target: 50%
+        target: 75%
         threshold: 2%
         base: auto
         if_ci_failed: error
         informational: false
       backend:
-        target: 50%
+        target: 75%
         threshold: 2%
         flags:
           - backend
       frontend:
-        target: 70%
+        target: 75%
         threshold: 2%
         flags:
           - frontend
-        informational: true
+        informational: false
     patch:
       default:
         target: 80%

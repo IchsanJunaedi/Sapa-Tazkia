@@ -55,6 +55,21 @@ module.exports = defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    // Firefox & WebKit run in CI or when PLAYWRIGHT_ALL_BROWSERS=1 is set locally.
+    // They share the same globalSetup auth state as Chromium.
+    // Install browsers first: npx playwright install --with-deps firefox webkit
+    ...(process.env.CI || process.env.PLAYWRIGHT_ALL_BROWSERS
+      ? [
+          {
+            name: 'firefox',
+            use: { ...devices['Desktop Firefox'] },
+          },
+          {
+            name: 'webkit',
+            use: { ...devices['Desktop Safari'] },
+          },
+        ]
+      : []),
   ],
   webServer: [
     {
@@ -73,7 +88,7 @@ module.exports = defineConfig({
       cwd: '../frontend',
       url: BASE_URL,
       reuseExistingServer: true,
-      timeout: 180_000,
+      timeout: 300_000,
       env: {
         ...process.env,
         BROWSER: 'none',
