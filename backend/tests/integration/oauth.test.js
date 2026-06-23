@@ -155,30 +155,30 @@ describe('OAuth & Extended Auth Integration', () => {
   // 3. Email Verification (OTP) endpoints
   // =========================================================================
   describe('POST /api/auth/verify-email', () => {
-    it('returns 400 if email is missing', async () => {
+    it('returns 422 if email is missing', async () => {
       const res = await agent.post('/api/auth/verify-email').send({ code: '123456' });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(res.body.success).toBe(false);
     });
 
-    it('returns 400 if code is missing', async () => {
+    it('returns 422 if code is missing', async () => {
       const res = await agent.post('/api/auth/verify-email').send({ email: 'x@student.tazkia.ac.id' });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(res.body.success).toBe(false);
     });
 
-    it('returns 400 if code is not 6 digits', async () => {
+    it('returns 422 if code is not 6 digits', async () => {
       const res = await agent
         .post('/api/auth/verify-email')
         .send({ email: 'x@student.tazkia.ac.id', code: '123' });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
-    it('returns 400 if code is non-numeric', async () => {
+    it('returns 422 if code is non-numeric', async () => {
       const res = await agent
         .post('/api/auth/verify-email')
         .send({ email: 'x@student.tazkia.ac.id', code: 'abcdef' });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
     it('returns 400/404 for unknown email with valid code format', async () => {
@@ -227,9 +227,9 @@ describe('OAuth & Extended Auth Integration', () => {
   // 4. JWT Refresh Token
   // =========================================================================
   describe('POST /api/auth/refresh', () => {
-    it('returns 400 when refreshToken is missing', async () => {
+    it('returns 422 when refreshToken is missing', async () => {
       const res = await agent.post('/api/auth/refresh').send({});
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(res.body.success).toBe(false);
     });
 
