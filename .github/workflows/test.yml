@@ -108,7 +108,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload backend coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: backend/coverage/jest/lcov.info
           flags: backend
@@ -149,7 +149,7 @@ jobs:
           CI: true
 
       - name: Upload frontend coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: frontend/coverage/lcov.info
           flags: frontend
@@ -293,7 +293,7 @@ jobs:
 
       - name: Upload E2E coverage to Codecov
         if: always()
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: backend/coverage/e2e/lcov.info
           flags: e2e
