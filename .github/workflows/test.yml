@@ -229,21 +229,21 @@ jobs:
         run: |
           cp .env.test.example .env.test
           npx prisma db push --skip-generate
+          node prisma/seed.js
 
       - name: Seed test user
         working-directory: backend
         env:
-          SEED_E2E_NIM: ${{ secrets.E2E_LOGIN_NIM }}
-          SEED_E2E_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+          SEED_E2E_NIM: ${{ secrets.E2E_LOGIN_NIM || '241572010024' }}
+          SEED_E2E_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD || '241572010024' }}
         run: |
           node -e "
           const bcrypt = require('bcryptjs');
           const { PrismaClient } = require('@prisma/client');
           const prisma = new PrismaClient();
           (async () => {
-            const nim = process.env.SEED_E2E_NIM;
-            if (!nim) { console.log('No E2E_NIM — skipping seed'); return; }
-            const plain = process.env.SEED_E2E_PASSWORD || nim;
+            const nim = process.env.SEED_E2E_NIM || '241572010024';
+            const plain = process.env.SEED_E2E_PASSWORD || '241572010024';
             const hash = await bcrypt.hash(plain, 10);
             await prisma.user.upsert({
               where: { nim },

@@ -6,7 +6,7 @@
 
 const { defineConfig, devices } = require('@playwright/test');
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env.test') });
+require('dotenv').config({ path: path.resolve(__dirname, '.env.test'), override: true });
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
 const REQUIRES_AUTH = (process.env.E2E_REQUIRES_AUTH || 'true').toLowerCase() !== 'false';
