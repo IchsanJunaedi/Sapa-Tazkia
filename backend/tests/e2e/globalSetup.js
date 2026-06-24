@@ -24,8 +24,22 @@ function loadE2EEnv() {
   const envTestPath = path.join(backendRoot, '.env.test');
   const envPath = path.join(backendRoot, '.env');
 
-  const originalNim = process.env.E2E_LOGIN_NIM;
-  const originalPassword = process.env.E2E_LOGIN_PASSWORD;
+  // Preserve variables from process.env that are not empty (like secrets and CI env config)
+  const preservedEnv = {};
+  const keysToPreserve = [
+    'DATABASE_URL',
+    'REDIS_URL',
+    'OPENAI_API_KEY',
+    'E2E_LOGIN_NIM',
+    'E2E_LOGIN_PASSWORD',
+    'JWT_SECRET',
+    'SESSION_SECRET'
+  ];
+  for (const key of keysToPreserve) {
+    if (process.env[key] !== undefined && process.env[key] !== '') {
+      preservedEnv[key] = process.env[key];
+    }
+  }
 
   if (fs.existsSync(envPath)) {
     dotenv.config({ path: envPath });
@@ -35,11 +49,11 @@ function loadE2EEnv() {
     dotenv.config({ path: envTestPath, override: true });
   }
 
-  if (originalNim !== undefined && originalNim !== '') {
-    process.env.E2E_LOGIN_NIM = originalNim;
-  }
-  if (originalPassword !== undefined && originalPassword !== '') {
-    process.env.E2E_LOGIN_PASSWORD = originalPassword;
+  // Restore preserved variables
+  for (const key of keysToPreserve) {
+    if (preservedEnv[key] !== undefined) {
+      process.env[key] = preservedEnv[key];
+    }
   }
 }
 

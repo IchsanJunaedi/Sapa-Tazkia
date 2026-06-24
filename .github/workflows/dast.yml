@@ -36,9 +36,10 @@ on:
       - '.github/workflows/dast.yml'
 
 permissions:
-  contents: read
+  contents: write
   issues: write           # ZAP action creates/updates a GitHub issue with the report
   pull-requests: write    # Allow commenting on PRs
+  actions: write          # Required by ZAP Action to upload report artifacts
 
 jobs:
   zap-baseline:
@@ -144,7 +145,7 @@ jobs:
 
       # ── OWASP ZAP Baseline Scan ───────────────────────────────────────────────
       - name: OWASP ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.12.0
+        uses: zaproxy/action-baseline@v0.15.0
         with:
           target: 'http://localhost:5000/'
           rules_file_name: '.zap/rules.tsv'

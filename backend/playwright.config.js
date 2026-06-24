@@ -7,17 +7,30 @@
 const { defineConfig, devices } = require('@playwright/test');
 const path = require('path');
 
-// Preserve OS environment variables (like secrets) before loading env files
-const originalNim = process.env.E2E_LOGIN_NIM;
-const originalPassword = process.env.E2E_LOGIN_PASSWORD;
+// Preserve variables from process.env that are not empty (like secrets and CI env config)
+const preservedEnv = {};
+const keysToPreserve = [
+  'DATABASE_URL',
+  'REDIS_URL',
+  'OPENAI_API_KEY',
+  'E2E_LOGIN_NIM',
+  'E2E_LOGIN_PASSWORD',
+  'JWT_SECRET',
+  'SESSION_SECRET'
+];
+for (const key of keysToPreserve) {
+  if (process.env[key] !== undefined && process.env[key] !== '') {
+    preservedEnv[key] = process.env[key];
+  }
+}
 
 require('dotenv').config({ path: path.resolve(__dirname, '.env.test'), override: true });
 
-if (originalNim !== undefined && originalNim !== '') {
-  process.env.E2E_LOGIN_NIM = originalNim;
-}
-if (originalPassword !== undefined && originalPassword !== '') {
-  process.env.E2E_LOGIN_PASSWORD = originalPassword;
+// Restore preserved variables
+for (const key of keysToPreserve) {
+  if (preservedEnv[key] !== undefined) {
+    process.env[key] = preservedEnv[key];
+  }
 }
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
