@@ -491,7 +491,7 @@ const chat = async (req, res) => {
     const { message, conversationId, stream = true } = req.body; // Default stream: true
 
     if (!message || message.trim() === '') {
-      return res.status(400).json({ success: false, message: "Message is required" });
+      return res.status(400).json({ success: false, message: 'Message is required' });
     }
 
 
@@ -522,7 +522,7 @@ const chat = async (req, res) => {
         content: m.content
       }));
     } else {
-      console.log(`📂 [AUTH CHAT] No previous conversation found. Starting new.`);
+      console.log('📂 [AUTH CHAT] No previous conversation found. Starting new.');
     }
 
     // Step 2: RAG Process (Calling Service)
@@ -540,7 +540,7 @@ const chat = async (req, res) => {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      let fullBotAnswer = "";
+      let fullBotAnswer = '';
       let tokenUsage = 0;
 
       // Send Meta
@@ -549,7 +549,7 @@ const chat = async (req, res) => {
       // Stream Loop
       try {
         for await (const chunk of ragResult.stream) {
-          const content = chunk.choices[0]?.delta?.content || "";
+          const content = chunk.choices[0]?.delta?.content || '';
           if (content) {
             fullBotAnswer += content;
             res.write(`data: ${JSON.stringify({ type: 'content', chunk: content })}\n\n`);
@@ -557,7 +557,7 @@ const chat = async (req, res) => {
           if (chunk.usage) tokenUsage = chunk.usage.total_tokens;
         }
       } catch (streamErr) {
-        console.error("Stream interrupted", streamErr);
+        console.error('Stream interrupted', streamErr);
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream interrupted' })}\n\n`);
       }
 
@@ -598,8 +598,8 @@ const chat = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ [AUTH CHAT ERROR]", error);
-    if (!res.headersSent) res.status(500).json({ success: false, message: "Server Error" });
+    console.error('❌ [AUTH CHAT ERROR]', error);
+    if (!res.headersSent) res.status(500).json({ success: false, message: 'Server Error' });
     else res.end();
   }
 };
@@ -618,7 +618,7 @@ async function handleDbSave(userId, conversationId, userMsg, botMsg, tokens, res
 
     // Create Conversation if needed
     if (!finalConvId) {
-      let smartTitle = userMsg.substring(0, 30) + "...";
+      let smartTitle = userMsg.substring(0, 30) + '...';
       try {
         if (openaiService.generateTitle) {
           smartTitle = await openaiService.generateTitle(userMsg); // Generate from User Msg only (Fast)
@@ -662,7 +662,7 @@ async function handleDbSave(userId, conversationId, userMsg, botMsg, tokens, res
     return { conversationId: finalConvId, title: titleResult };
 
   } catch (e) {
-    console.error("❌ [DB SAVE ERROR]", e.message);
+    console.error('❌ [DB SAVE ERROR]', e.message);
     return { conversationId };
   }
 }
@@ -801,17 +801,19 @@ const forgotPassword = async (req, res) => {
   try {
     const { email, nim } = req.body;
     await authService.forgotPassword({ email, nim });
-    res.json({
-      success: true,
-      message: 'Jika email terdaftar, link reset password akan dikirim.'
-    });
   } catch (error) {
-    if (error.message.includes('Terlalu banyak')) {
+    if (error.message && error.message.includes('Terlalu banyak')) {
       return res.status(429).json({ success: false, message: error.message });
     }
-    logger.error('[AUTH CTRL] forgotPassword error:', error.message);
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan.' });
+    // Log the real error (e.g. email delivery failure, SMTP unavailable)
+    // but DO NOT expose it — always return 200 to prevent user enumeration
+    logger.error('[AUTH CTRL] forgotPassword error (suppressed):', error.message);
   }
+  // Always return 200 regardless of whether user exists or email was sent
+  return res.json({
+    success: true,
+    message: 'Jika email terdaftar, link reset password akan dikirim.'
+  });
 };
 
 /**
