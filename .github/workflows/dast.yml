@@ -31,9 +31,6 @@ on:
         default: 'false'
   push:
     branches: [main]
-    paths:
-      - 'backend/src/**'
-      - '.github/workflows/dast.yml'
 
 permissions:
   contents: write

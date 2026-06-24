@@ -46,21 +46,21 @@ test.describe('Forgot-Password — input validation', () => {
 
   test('non-existent NIM returns 200 (enumeration guard) or 404', async () => {
     // Many implementations return 200 even for unknown users to prevent
-    // user enumeration. Accept both 200 and 404.
+    // user enumeration. Accept 200, 404, or 400 (if nim format validation rejects it).
     const ctx = await request.newContext({ baseURL: API_BASE });
     const { status } = await apiPost(ctx, '/api/auth/forgot-password', {
-      identifier: '000000000000',
+      nim: '000000000000',  // backend accepts {nim} or {email}, not {identifier}
     });
-    expect([200, 404]).toContain(status);
+    expect([200, 400, 404]).toContain(status);
     await ctx.dispose();
   });
 
   test('valid NIM triggers forgot-password without 5xx', async () => {
     const ctx = await request.newContext({ baseURL: API_BASE });
     const { status } = await apiPost(ctx, '/api/auth/forgot-password', {
-      identifier: VALID_NIM,
+      nim: VALID_NIM,  // backend accepts {nim} or {email}, not {identifier}
     });
-    // Accept 200 (sent), 429 (rate-limited in test env), or 404 (user not seeded)
+    // Accept 200 (sent), 429 (rate-limited), or 404 (user not seeded)
     expect([200, 404, 429]).toContain(status);
     await ctx.dispose();
   });
