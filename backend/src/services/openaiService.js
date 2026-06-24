@@ -204,6 +204,9 @@ async function generateAIResponse(userMessage, conversationHistory = [], customC
 
   } catch (error) {
     logger.error('[OPENAI] Gen Answer Error:', error.message);
+    if (options.stream) {
+      return createMockStream('Mohon maaf, koneksi Kia ke server sedang tidak stabil. Silakan coba sesaat lagi ya Kak. 🙏');
+    }
     return {
       content: 'Mohon maaf, koneksi Kia ke server sedang tidak stabil. Silakan coba sesaat lagi ya Kak. 🙏',
       usage: {}
