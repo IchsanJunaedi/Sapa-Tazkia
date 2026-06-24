@@ -1249,8 +1249,12 @@ const forgotPassword = async ({ email, nim }) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
-  await emailService.sendPasswordResetEmail(user.email, resetUrl);
-  logger.security(`[AUTH] Password reset email sent to userId: ${user.id}`);
+  try {
+    await emailService.sendPasswordResetEmail(user.email, resetUrl);
+    logger.security(`[AUTH] Password reset email sent to userId: ${user.id}`);
+  } catch (emailError) {
+    logger.error(`[AUTH] Failed to send password reset email to ${user.email} (userId: ${user.id}):`, emailError.message);
+  }
 
   return { success: true };
 };

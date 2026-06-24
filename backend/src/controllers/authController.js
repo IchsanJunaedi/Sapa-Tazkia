@@ -801,19 +801,17 @@ const forgotPassword = async (req, res) => {
   try {
     const { email, nim } = req.body;
     await authService.forgotPassword({ email, nim });
+    return res.json({
+      success: true,
+      message: 'Jika email terdaftar, link reset password akan dikirim.'
+    });
   } catch (error) {
     if (error.message && error.message.includes('Terlalu banyak')) {
       return res.status(429).json({ success: false, message: error.message });
     }
-    // Log the real error (e.g. email delivery failure, SMTP unavailable)
-    // but DO NOT expose it — always return 200 to prevent user enumeration
-    logger.error('[AUTH CTRL] forgotPassword error (suppressed):', error.message);
+    logger.error('[AUTH CTRL] forgotPassword error:', error.message);
+    return res.status(500).json({ success: false, message: 'Terjadi kesalahan.' });
   }
-  // Always return 200 regardless of whether user exists or email was sent
-  return res.json({
-    success: true,
-    message: 'Jika email terdaftar, link reset password akan dikirim.'
-  });
 };
 
 /**
