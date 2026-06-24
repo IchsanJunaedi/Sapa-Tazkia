@@ -6,7 +6,10 @@ module.exports = {
         commonjs: true,
         jest: true
     },
-    extends: ['eslint:recommended'],
+    extends: [
+        'eslint:recommended',
+        'plugin:security/recommended-legacy'
+    ],
     parserOptions: {
         ecmaVersion: 2022,
         sourceType: 'commonjs'

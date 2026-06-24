@@ -3,8 +3,8 @@
 // Sebelumnya setiap service file buat `new PrismaClient()` sendiri yang menyebabkan koneksi exhausted.
 const prisma = require('../config/prismaClient');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 // Import Passport dan Strategi Google
@@ -500,7 +500,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
-          console.log(`[DEBUG] Google OAuth triggered for:`, {
+          console.log('[DEBUG] Google OAuth triggered for:', {
             email: profile.emails?.[0]?.value || 'No email',
             id: profile.id,
             name: profile.displayName
@@ -528,7 +528,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             picture: profile.photos?.[0]?.value
           });
 
-          console.log(`[DEBUG] Google OAuth result:`, {
+          console.log('[DEBUG] Google OAuth result:', {
             email: userEmail,
             isNewUser: isNewUser,
             nim: user.nim,
@@ -540,7 +540,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           return done(null, user);
 
         } catch (error) {
-          console.error(`[ERROR] Google Strategy error:`, error);
+          console.error('[ERROR] Google Strategy error:', error);
           return done(error, false);
         }
       }
@@ -549,13 +549,13 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
   // SERIALIZE & DESERIALIZE USER - DIPERBAIKI
   passport.serializeUser((user, done) => {
-    console.log(`[DEBUG] Serializing user:`, user.id);
+    console.log('[DEBUG] Serializing user:', user.id);
     done(null, user.id);
   });
 
   passport.deserializeUser(async (id, done) => {
     try {
-      console.log(`[DEBUG] Deserializing user:`, id);
+      console.log('[DEBUG] Deserializing user:', id);
 
       const user = await prisma.user.findUnique({
         where: { id: id },
@@ -589,7 +589,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         return done(null, false);
       }
 
-      console.log(`[DEBUG] User deserialized:`, user.email);
+      console.log('[DEBUG] User deserialized:', user.email);
       done(null, user);
     } catch (error) {
       console.error('[ERROR] Deserialize user error:', error);
@@ -707,7 +707,7 @@ const logoutAllUserSessions = async (userId) => {
 // ========================================================
 const verifySession = async (token) => {
   try {
-    console.log(`[DEBUG] Verifying session token`);
+    console.log('[DEBUG] Verifying session token');
 
     // Verifikasi token JWT dasar dulu
     const decoded = verifyToken(token);
@@ -904,7 +904,7 @@ const register = async (userData) => {
   try {
     const { fullName, nim, email, password } = userData;
 
-    console.log(`[DEBUG] Registration attempt for:`, { fullName, nim, email });
+    console.log('[DEBUG] Registration attempt for:', { fullName, nim, email });
 
     // Validasi input
     if (!fullName || !nim || !email || !password) {
@@ -968,7 +968,7 @@ const register = async (userData) => {
       },
     });
 
-    console.log(`[DEBUG] User registered successfully:`, {
+    console.log('[DEBUG] User registered successfully:', {
       id: user.id,
       email: user.email,
       nim: user.nim
@@ -1080,9 +1080,11 @@ const login = async (identifier, password, ipAddress, userAgent, skipPassword = 
     if (!user.passwordHash) {
       // Untuk user tanpa password, gunakan NIM sebagai password sementara
       const extractedNim = user.nim || identifier.split('@')[0].split('.')[0];
-      if (password === extractedNim) {
+      const pwBuf = Buffer.from(password);
+        const nimBuf = Buffer.from(extractedNim);
+        if (pwBuf.length === nimBuf.length && crypto.timingSafeEqual(pwBuf, nimBuf)) {
         // Password match dengan NIM, lanjutkan login
-        console.log(`[DEBUG] Email-only user authenticated with NIM`);
+        console.log('[DEBUG] Email-only user authenticated with NIM');
       } else {
         console.log(`[DEBUG] Invalid password for email-only user: ${user.email}`);
         return {
@@ -1110,7 +1112,7 @@ const login = async (identifier, password, ipAddress, userAgent, skipPassword = 
     await logoutAllUserSessions(user.id);
     await createSession(user.id, token, ipAddress, userAgent);
 
-    console.log(`[DEBUG] Login successful for user:`, {
+    console.log('[DEBUG] Login successful for user:', {
       id: user.id,
       email: user.email,
       nim: user.nim,
@@ -1149,7 +1151,7 @@ const logout = async (token) => {
       where: { token: token },
     });
 
-    console.log(`[DEBUG] Logout successful for token`);
+    console.log('[DEBUG] Logout successful for token');
 
     return {
       success: true,

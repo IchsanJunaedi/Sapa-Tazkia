@@ -267,7 +267,7 @@ jobs:
 
       - name: Install Playwright browsers
         working-directory: backend
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps
 
       - name: Run E2E tests
         working-directory: backend

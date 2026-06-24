@@ -11,7 +11,7 @@ class RateLimitUtils {
       'gpt-4-turbo': 0.00001
     };
     
-    return tokens * (costPerToken[model] || costPerToken['gpt-3.5-turbo']);
+    return tokens * (Object.hasOwn(costPerToken, model) ? costPerToken[model] : costPerToken['gpt-3.5-turbo']);
   }
 
   static getRetryAfterTime(window, limitType) {
@@ -21,7 +21,7 @@ class RateLimitUtils {
       day: 86400
     };
     
-    return windows[window] || 60;
+    return Object.hasOwn(windows, window) ? windows[window] : 60;
   }
 
   static generateRateLimitKey(prefix, identifier, window) {

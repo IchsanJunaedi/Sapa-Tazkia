@@ -84,7 +84,7 @@ function correctWord(word) {
   const lower = core.toLowerCase();
 
   // Step 1: exact map lookup (highest priority)
-  if (CORRECTION_MAP[lower]) {
+  if (Object.hasOwn(CORRECTION_MAP, lower)) {
     return prefix + CORRECTION_MAP[lower] + suffix;
   }
 
