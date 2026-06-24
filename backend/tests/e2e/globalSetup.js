@@ -24,12 +24,22 @@ function loadE2EEnv() {
   const envTestPath = path.join(backendRoot, '.env.test');
   const envPath = path.join(backendRoot, '.env');
 
+  const originalNim = process.env.E2E_LOGIN_NIM;
+  const originalPassword = process.env.E2E_LOGIN_PASSWORD;
+
   if (fs.existsSync(envPath)) {
     dotenv.config({ path: envPath });
   }
 
   if (fs.existsSync(envTestPath)) {
     dotenv.config({ path: envTestPath, override: true });
+  }
+
+  if (originalNim !== undefined && originalNim !== '') {
+    process.env.E2E_LOGIN_NIM = originalNim;
+  }
+  if (originalPassword !== undefined && originalPassword !== '') {
+    process.env.E2E_LOGIN_PASSWORD = originalPassword;
   }
 }
 

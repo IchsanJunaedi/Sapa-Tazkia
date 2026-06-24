@@ -133,8 +133,8 @@ jobs:
       # ── Generate ZAP rules config to suppress known false positives ──────────
       - name: Write ZAP rules file
         run: |
-          mkdir -p /tmp/zap
-          cat > /tmp/zap/rules.tsv << 'EOF'
+          mkdir -p .zap
+          cat > .zap/rules.tsv << 'EOF'
           10202	IGNORE	(Absence of Anti-CSRF Tokens) - API uses JWT, not form CSRF
           10038	IGNORE	(Content Security Policy Header Not Set) - configured at nginx layer
           10035	IGNORE	(Strict-Transport-Security Header Not Set) - TLS terminated at load balancer
@@ -147,23 +147,12 @@ jobs:
         uses: zaproxy/action-baseline@v0.12.0
         with:
           target: 'http://localhost:5000/'
-          rules_file_name: '/tmp/zap/rules.tsv'
+          rules_file_name: '.zap/rules.tsv'
           cmd_options: '-I'           # -I = don't fail on warnings (informational mode)
           issue_title: 'DAST: ZAP Baseline Findings — ${{ github.sha }}'
           token: ${{ secrets.GITHUB_TOKEN }}
           artifact_name: 'zap-report-${{ github.run_number }}'
           fail_action: ${{ github.event.inputs.fail_on_warn == 'true' }}
-
-      # ── Upload ZAP HTML report as artifact ───────────────────────────────────
-      - name: Upload ZAP report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-report-${{ github.run_number }}
-          path: |
-            report_html.html
-            report_json.json
-          retention-days: 30
 
       - name: Stop backend server
         if: always()

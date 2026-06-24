@@ -6,7 +6,19 @@
 
 const { defineConfig, devices } = require('@playwright/test');
 const path = require('path');
+
+// Preserve OS environment variables (like secrets) before loading env files
+const originalNim = process.env.E2E_LOGIN_NIM;
+const originalPassword = process.env.E2E_LOGIN_PASSWORD;
+
 require('dotenv').config({ path: path.resolve(__dirname, '.env.test'), override: true });
+
+if (originalNim !== undefined && originalNim !== '') {
+  process.env.E2E_LOGIN_NIM = originalNim;
+}
+if (originalPassword !== undefined && originalPassword !== '') {
+  process.env.E2E_LOGIN_PASSWORD = originalPassword;
+}
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
 const REQUIRES_AUTH = (process.env.E2E_REQUIRES_AUTH || 'true').toLowerCase() !== 'false';
